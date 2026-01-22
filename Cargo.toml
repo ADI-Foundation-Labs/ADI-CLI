@@ -1,0 +1,59 @@
+[package]
+name = "adi-cli"
+version = "0.1.0"
+edition = "2021"
+
+
+[profile.release]
+opt-level = "z"
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+codegen-units = 1
+panic = "abort"
+incremental = false
+overflow-checks = false
+
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+config = { version = "0.15", default-features = false, features = ["yaml"] }
+tokio = { version = "1", default-features = false, features = ["full"] }
+
+colored = "3"
+eyre = "0.6"
+built = { version = "0.7", features = ["git2"] }
+serde = { version = "1", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "6.0"
+
+[build-dependencies]
+built = { version = "0.7", features = ["git2"] }
+
+[lints.rust]
+unused_must_use = "deny"
+
+[lints.clippy]
+panic = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+large_enum_variant = "allow"
+cast_possible_truncation = "deny"
+cast_sign_loss = "deny"
+redundant_clone = "deny"
+wildcard_imports = "deny"
+indexing_slicing = "deny"
+needless_collect = "deny"
+trivially_copy_pass_by_ref = "deny"
+match_bool = "deny"
+map_entry = "deny"
+manual_flatten = "deny"
+needless_return = "deny"
+semicolon_if_nothing_returned = "deny"
+needless_question_mark = "deny"
+explicit_into_iter_loop = "deny"
+iter_nth_zero = "deny"
+bind_instead_of_map = "deny"
+manual_filter_map = "deny"
+double_ended_iterator_last = "allow"
