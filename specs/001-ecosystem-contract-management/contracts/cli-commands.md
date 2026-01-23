@@ -20,8 +20,6 @@ adi
 │   └── chain        # Upgrade chain contracts
 ├── accept
 │   └── ownership    # Accept pending ownership transfers
-├── register
-│   └── verifier     # Register verifier for execution version
 ├── doctor           # Verify dependency availability
 └── version
     └── show         # Show version information
@@ -458,39 +456,6 @@ Pending transfers found:
 [SUCCESS] Verifier ownership accepted
 
 [SUCCESS] All pending ownership transfers accepted
-```
-
----
-
-## adi register verifier
-
-Register verifier for a specific execution version.
-
-### Synopsis
-```
-adi register verifier --version <EXEC_VERSION> [OPTIONS]
-```
-
-### Options
-| Option             | Type   | Required | Default     | Description                    |
-| ------------------ | ------ | -------- | ----------- | ------------------------------ |
-| `--version`        | u32    | Yes      | -           | Execution version (e.g., 4, 5) |
-| `--ecosystem-name` | string | No       | from config | Ecosystem name                 |
-| `--l1-rpc-url`     | string | No       | from config | L1 RPC URL                     |
-
-### Output
-**Success (exit 0):**
-```
-[INFO] Registering verifiers for execution version 4
-
-[INFO] Getting verifier addresses...
-[INFO]   Plonk verifier: 0xaaaa...bbbb
-[INFO]   Fflonk verifier: 0xcccc...dddd
-
-[PROGRESS] Registering verifiers in DualVerifier...
-[SUCCESS] Verifiers registered for execution version 4
-
-Transaction: 0x1234...5678
 ```
 
 ---

@@ -92,8 +92,7 @@ Based on plan.md structure:
 - [ ] T035 Create src/commands/deploy/mod.rs with Deploy subcommand enum
 - [ ] T036 Create src/commands/upgrade/mod.rs with Upgrade subcommand enum
 - [ ] T037 [P] Create src/commands/accept.rs placeholder with Accept subcommand
-- [ ] T038 [P] Create src/commands/register.rs placeholder with Register subcommand
-- [ ] T039 Register all new command modules in src/commands/mod.rs
+- [ ] T038 Register all new command modules in src/commands/mod.rs
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 
@@ -247,63 +246,45 @@ Based on plan.md structure:
 
 ---
 
-## Phase 10: User Story 8 - Register Verifier (Priority: P3)
-
-**Goal**: Register verifiers for specific execution versions to enable proof verification
-
-**Independent Test**: Run `adi register verifier --version 4`, verify Plonk and Fflonk verifiers registered in DualVerifier
-
-### Implementation for User Story 8
-
-- [ ] T097 [US8] Implement verifier address retrieval from ecosystem contracts in src/external/cast.rs
-- [ ] T098 [US8] Implement DualVerifier registration call in src/external/cast.rs
-- [ ] T099 [US8] Create RegisterVerifier command struct with --version option in src/commands/register.rs
-- [ ] T100 [US8] Implement RegisterVerifier::run() - get verifiers, register in DualVerifier in src/commands/register.rs
-- [ ] T101 [US8] Register RegisterVerifier in src/commands/mod.rs
-
-**Checkpoint**: Can register verifiers for proof verification
-
----
-
-## Phase 11: User Story 9 - Manage State Backend (Priority: P3)
+## Phase 10: User Story 8 - Manage State Backend (Priority: P3)
 
 **Goal**: Ensure state persistence works correctly across container restarts and mounts
 
 **Independent Test**: Perform operations, exit container, mount same state, verify operations can continue
 
-### Implementation for User Story 9
+### Implementation for User Story 8
 
-- [ ] T102 [US9] Implement state integrity validation on startup in src/state/filesystem.rs
-- [ ] T103 [US9] Add state directory mount detection and warning in src/state/filesystem.rs
-- [ ] T104 [US9] Add state backup before destructive operations in src/state/filesystem.rs
-- [ ] T105 [US9] Document state directory structure in quickstart.md
+- [ ] T097 [US8] Implement state integrity validation on startup in src/state/filesystem.rs
+- [ ] T098 [US8] Add state directory mount detection and warning in src/state/filesystem.rs
+- [ ] T099 [US8] Add state backup before destructive operations in src/state/filesystem.rs
+- [ ] T100 [US8] Document state directory structure in quickstart.md
 
 **Checkpoint**: All user stories complete
 
 ---
 
-## Phase 12: Polish & Cross-Cutting Concerns
+## Phase 11: Polish & Cross-Cutting Concerns
 
 **Purpose**: Docker support, automation, and final touches
 
 ### Docker Infrastructure
 
-- [ ] T106 [P] Create docker/Dockerfile.deps with zkstack CLI and foundry-zksync installation
-- [ ] T107 [P] Create docker/Dockerfile for CLI image on top of deps
-- [ ] T108 Create docker/docker-bake.hcl with parameterized build configuration
-- [ ] T109 Add Docker volume mount examples to quickstart.md
+- [ ] T101 [P] Create docker/Dockerfile.deps with zkstack CLI and foundry-zksync installation
+- [ ] T102 [P] Create docker/Dockerfile for CLI image on top of deps
+- [ ] T103 Create docker/docker-bake.hcl with parameterized build configuration
+- [ ] T104 Add Docker volume mount examples to quickstart.md
 
 ### Development Automation
 
-- [ ] T110 Update Taskfile.yml with docker build targets (deps, cli, all)
-- [ ] T111 [P] Add Taskfile task for running tests
-- [ ] T112 [P] Add Taskfile task for local Anvil deployment testing
+- [ ] T105 Update Taskfile.yml with docker build targets (deps, cli, all)
+- [ ] T106 [P] Add Taskfile task for running tests
+- [ ] T107 [P] Add Taskfile task for local Anvil deployment testing
 
 ### Final Validation
 
-- [ ] T113 Validate all commands work per quickstart.md local Anvil flow
-- [ ] T114 Validate all commands work per quickstart.md Sepolia flow
-- [ ] T115 Verify error messages include actionable remediation steps
+- [ ] T108 Validate all commands work per quickstart.md local Anvil flow
+- [ ] T109 Validate all commands work per quickstart.md Sepolia flow
+- [ ] T110 Verify error messages include actionable remediation steps
 
 ---
 
@@ -313,11 +294,11 @@ Based on plan.md structure:
 
 - **Setup (Phase 1)**: No dependencies - can start immediately
 - **Foundational (Phase 2)**: Depends on Setup completion - BLOCKS all user stories
-- **User Stories (Phase 3-11)**: All depend on Foundational phase completion
+- **User Stories (Phase 3-10)**: All depend on Foundational phase completion
   - P1 stories (US1, US2, US3) should be done in order as they build on each other
   - P2 stories (US4, US5, US6) can start after P1 but US6 depends on US5
-  - P3 stories (US7, US8, US9) can proceed independently after Foundational
-- **Polish (Phase 12)**: Can start after Foundational, full validation after all stories complete
+  - P3 stories (US7, US8) can proceed independently after Foundational
+- **Polish (Phase 11)**: Can start after Foundational, full validation after all stories complete
 
 ### User Story Dependencies
 
@@ -328,8 +309,7 @@ Based on plan.md structure:
 - **User Story 5 (P2)**: Can start after Foundational - Independent upgrade logic
 - **User Story 6 (P2)**: Depends on US5 (chain upgrade follows ecosystem upgrade)
 - **User Story 7 (P3)**: Depends on US2 (ownership only pending after deployment)
-- **User Story 8 (P3)**: Depends on US2 (needs deployed ecosystem with DualVerifier)
-- **User Story 9 (P3)**: Can start after Foundational - State backend refinements
+- **User Story 8 (P3)**: Can start after Foundational - State backend refinements
 
 ### Within Each User Story
 
@@ -362,10 +342,10 @@ T023, T024, T025 → T026, T027
 T028, T029, T030, T031 → T032, T033
 ```
 
-**Phase 12 - Docker and Taskfile can run in parallel:**
+**Phase 11 - Docker and Taskfile can run in parallel:**
 ```
-T106, T107 → T108
-T110, T111, T112
+T101, T102 → T103
+T105, T106, T107
 ```
 
 ---
@@ -388,9 +368,9 @@ T110, T111, T112
 2. **MVP Milestone**: US1 + US2 + US3 → Can deploy complete ecosystem with chain
 3. **Operational Tooling**: US4 (doctor) → Better user experience
 4. **Upgrade Support**: US5 + US6 → Can upgrade existing deployments
-5. **Post-Deployment**: US7 + US8 → Complete operational lifecycle
-6. **Robustness**: US9 → Production-ready state management
-7. **Containerization**: Phase 12 → Docker-ready distribution
+5. **Post-Deployment**: US7 → Complete operational lifecycle
+6. **Robustness**: US8 → Production-ready state management
+7. **Containerization**: Phase 11 → Docker-ready distribution
 
 ### Critical Path
 
@@ -398,7 +378,7 @@ T110, T111, T112
 Setup → Foundational → US1 → US2 → US3 → MVP Complete
                    ↘ US4 (parallel)
                    ↘ US5 → US6
-                   ↘ US7, US8, US9 (after US2)
+                   ↘ US7, US8 (after US2)
 ```
 
 ---

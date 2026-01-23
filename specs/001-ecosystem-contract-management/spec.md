@@ -50,6 +50,8 @@ As a chain operator, I want to deploy ecosystem smart contracts to L1 so that my
 
 6. **Given** a funder wallet has insufficient balance, **When** user runs deployment, **Then** system reports required amounts (ETH and ADI tokens) and halts before any transactions.
 
+7. **Given** protocol version requires verifier registration (versions <0.30.2), **When** deployment completes, **Then** verifiers are automatically registered as part of the deployment process.
+
 ---
 
 ### User Story 3 - Initialize and Register Chain (Priority: P1)
@@ -140,21 +142,7 @@ As a chain operator, I want to accept pending ownership transfers after deployme
 
 ---
 
-### User Story 8 - Register Verifier for Execution Version (Priority: P3)
-
-As a chain operator, I want to register verifiers for specific execution versions so that proofs can be verified correctly.
-
-**Why this priority**: Verifier registration is a specific post-deployment task for chains using real proofs.
-
-**Independent Test**: Can be tested by registering verifier for execution version 4 or 5, verifying verifier is registered in DualVerifier.
-
-**Acceptance Scenarios**:
-
-1. **Given** deployed ecosystem with DualVerifier, **When** user runs `adi register verifier --version 4`, **Then** Plonk and Fflonk verifiers are registered for execution version 4.
-
----
-
-### User Story 9 - Manage State Backend (Priority: P3)
+### User Story 8 - Manage State Backend (Priority: P3)
 
 As a chain operator, I want to use different state backends so that I can persist ecosystem state in various storage systems.
 

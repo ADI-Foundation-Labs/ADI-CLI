@@ -117,8 +117,7 @@ src/
 │   │   ├── mod.rs
 │   │   ├── ecosystem.rs # Upgrade ecosystem
 │   │   └── chain.rs     # Upgrade chain
-│   ├── accept.rs        # Accept ownership
-│   └── register.rs      # Register verifier
+│   └── accept.rs        # Accept ownership
 ├── state/               # State backend abstraction
 │   ├── mod.rs           # StateBackend trait
 │   └── filesystem.rs    # Filesystem implementation

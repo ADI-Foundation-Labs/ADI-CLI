@@ -21,7 +21,6 @@ cargo test               # Run tests
 - `adi upgrade ecosystem` - Upgrade ecosystem contracts to new protocol version
 - `adi upgrade chain` - Upgrade chain contracts to match ecosystem version
 - `adi accept ownership` - Accept pending ownership transfers post-deployment
-- `adi register verifier` - Register verifier for specific execution version
 
 ## Architecture
 
