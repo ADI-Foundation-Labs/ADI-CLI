@@ -46,9 +46,9 @@ As a chain operator, I want to deploy ecosystem smart contracts to the settlemen
 
 4. **Given** custom gas price requirements, **When** user provides `--gas-price` flag, **Then** deployment uses the specified gas price for all transactions.
 
-5. **Given** a funder wallet is configured with sufficient ETH and ADI tokens, **When** user runs deployment, **Then** ecosystem wallets are automatically funded before contract deployment begins.
+5. **Given** a funder wallet is configured with sufficient ETH (and CGT if custom base token is configured), **When** user runs deployment, **Then** ecosystem wallets are automatically funded before contract deployment begins.
 
-6. **Given** a funder wallet has insufficient balance, **When** user runs deployment, **Then** system reports required amounts (ETH and ADI tokens) and halts before any transactions.
+6. **Given** a funder wallet has insufficient balance, **When** user runs deployment, **Then** system reports required amounts (ETH, and CGT if custom base token) and halts before any transactions.
 
 7. **Given** protocol version requires verifier registration (versions <0.30.2), **When** deployment completes, **Then** verifiers are automatically registered as part of the deployment process.
 
@@ -171,7 +171,7 @@ As a chain operator, I want to use different state backends so that I can persis
 ### Edge Cases
 
 - What happens when settlement layer RPC is unreachable during deployment? System should provide clear error with retry guidance.
-- What happens when funder wallet has insufficient funds? System should check ETH and ADI token balances before deploying and report required amounts for each.
+- What happens when funder wallet has insufficient funds? System should check ETH (and CGT if custom base token) balances before deploying and report required amounts for each.
 - What happens when gas price changes significantly during multi-transaction deployment? System should handle transaction failures gracefully.
 - What happens when user tries to upgrade to an unsupported version? System should validate target version before proceeding.
 - What happens when state directory has corrupted files? System should validate state integrity on startup.
@@ -224,7 +224,7 @@ Commits:
 
 - **FR-016**: System MUST support configuring settlement layer RPC URL for contract interactions.
 
-- **FR-017**: System MUST follow config-file-first approach where configuration values (settlement layer RPC URL, state directory paths, private keys, ADI token address, chain name/ID, gas price) are read from config file by default, with optional CLI flags for overrides. Action-specific parameters like `--to <version>` for upgrades remain required flags.
+- **FR-017**: System MUST follow config-file-first approach where configuration values (settlement layer RPC URL, state directory paths, private keys, CGT address, chain name/ID, gas price) are read from config file by default, with optional CLI flags for overrides. Action-specific parameters like `--to <version>` for upgrades remain required flags.
 
 - **FR-018**: System MUST persist all contract addresses and deployment state to state backend.
 
@@ -234,11 +234,11 @@ Commits:
 
 - **FR-021**: System MUST automatically accept pending ownership transfers during deployment for contracts using Ownable2Step pattern (`acceptOwnership()`) and governance-controlled contracts (`governanceAcceptOwner()`). Affected contracts include: Server Notifier, Validator Timelock, Verifier, Governance, Chain Admin, and Rollup DA Manager.
 
-- **FR-022**: System MUST support automatic wallet funding where user provides a funded "funder" wallet private key, and the system automatically funds ecosystem wallets (deployer, governor, operator) with required ETH and ADI tokens before operations.
+- **FR-022**: System MUST support automatic wallet funding where user provides a funded "funder" wallet private key, and the system automatically funds ecosystem wallets (deployer, governor, operator) with required ETH (and CGT when custom base token is configured) before operations.
 
-- **FR-023**: System MUST verify sufficient balance (ETH and ADI tokens) in funder wallet before starting deployment operations and report required amounts if insufficient.
+- **FR-023**: System MUST verify sufficient balance (ETH, and CGT when custom base token is configured) in funder wallet before starting deployment operations and report required amounts if insufficient.
 
-- **FR-024**: System MUST allow configuration of ADI token contract address for automatic funding operations.
+- **FR-024**: System MUST allow configuration of CGT (Custom Gas Token) contract address for automatic funding operations when chain uses custom base token (base token address != `0x0000000000000000000000000000000000000001`).
 
 ### Key Entities
 

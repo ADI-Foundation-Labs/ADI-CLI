@@ -186,15 +186,15 @@ Automatic funding via funder wallet before deployment operations.
 ### Rationale
 - Deployment requires funded wallets; manual funding is error-prone
 - Pre-flight balance checks prevent mid-deployment failures
-- ERC-20 token funding (ADI) requires separate transfer logic
+- ERC-20 token funding (CGT) requires separate transfer logic when custom base token is configured
 
 ### Implementation
 ```rust
 pub struct FundingConfig {
     pub funder_private_key: String,
-    pub adi_token_address: String,
+    pub cgt_token_address: Option<String>,  // Only set when base token != ETH
     pub eth_amounts: HashMap<WalletRole, U256>,
-    pub adi_amounts: HashMap<WalletRole, U256>,
+    pub cgt_amounts: HashMap<WalletRole, U256>,  // Only used when base token != ETH
 }
 
 pub async fn fund_wallets(
@@ -202,23 +202,30 @@ pub async fn fund_wallets(
     wallets: &[Wallet],
     rpc_url: &str,
 ) -> Result<()> {
-    // 1. Check funder balance (ETH + ADI)
+    // 1. Check funder balance (ETH, and CGT if custom base token)
     // 2. Calculate total required
     // 3. Fail early if insufficient
     // 4. Transfer ETH to each wallet
-    // 5. Transfer ADI tokens to each wallet
+    // 5. Transfer CGT to each wallet (if base token != ETH)
 }
 ```
 
 ### Required Amounts (from deployment guide)
-| Wallet                 | ETH   | ADI   |
+
+**Note:** CGT (Custom Gas Token) is only required when chain uses a custom base token (not ETH).
+- Chain without CGT: Fund with ETH only
+- Chain with CGT: Fund with ETH + CGT
+
+| Wallet                 | ETH   | CGT*  |
 | ---------------------- | ----- | ----- |
 | Ecosystem Deployer     | 1 ETH | -     |
-| Ecosystem Governor     | 1 ETH | 5 ADI |
-| Chain Governor         | 1 ETH | 5 ADI |
+| Ecosystem Governor     | 1 ETH | 5 CGT |
+| Chain Governor         | 1 ETH | 5 CGT |
 | Chain Operator         | 5 ETH | -     |
 | Chain Prove Operator   | 5 ETH | -     |
 | Chain Execute Operator | 5 ETH | -     |
+
+*CGT column only applies when base token address != `0x0000000000000000000000000000000000000001` (ETH)
 
 ---
 
@@ -354,7 +361,7 @@ settlement:
 
 funder:
   private_key: "0x..."
-  adi_token_address: "0x2a98B46fe31BA8Be05ef1cE3D36e1f80Db04190D"
+  cgt_address: "0x2a98B46fe31BA8Be05ef1cE3D36e1f80Db04190D"  # Optional: only needed when base token != ETH
 
 ecosystem:
   name: adi_ecosystem
@@ -372,7 +379,7 @@ ADI_STATE_DIR=~/.adi_cli/state
 ADI_SETTLEMENT_RPC_URL=http://localhost:8545
 ADI_SETTLEMENT_GAS_PRICE=10000000000
 ADI_FUNDER_PRIVATE_KEY=0x...
-ADI_FUNDER_ADI_TOKEN_ADDRESS=0x...
+ADI_FUNDER_CGT_ADDRESS=0x...  # Optional: only needed when base token != ETH
 ADI_ECOSYSTEM_NAME=adi_ecosystem
 ADI_ECOSYSTEM_CHAIN_NAME=adi
 ADI_ECOSYSTEM_CHAIN_ID=222

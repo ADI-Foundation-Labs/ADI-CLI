@@ -80,7 +80,7 @@ Based on plan.md structure:
 ### Configuration Enhancement
 
 - [ ] T028 Add SettlementConfig struct (rpc_url, gas_price) to src/config.rs
-- [ ] T029 Add FunderConfig struct (private_key, adi_token_address) to src/config.rs
+- [ ] T029 Add FunderConfig struct (private_key, cgt_address: Option) to src/config.rs
 - [ ] T030 Add EcosystemConfig struct (name, chain_name, chain_id) to src/config.rs
 - [ ] T031 Add DockerConfig struct (zksync_era_commit, era_contracts_tag, foundry_zksync_version) to src/config.rs
 - [ ] T032 Update Config struct to include settlement, funder, ecosystem, docker fields in src/config.rs

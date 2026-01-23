@@ -167,10 +167,18 @@ pub struct Chain {
     pub updated_at: DateTime<Utc>,
 }
 
+/// Chain's base token configuration (also known as Custom Gas Token / CGT)
+/// - `Eth`: Default. Uses ETH as native token (address: 0x0000000000000000000000000000000000000001)
+/// - `Custom`: Uses an ERC-20 from settlement layer as native token (requires CGT funding)
+///
+/// Native token behavior:
+/// - L2 without CGT: ETH becomes native token
+/// - L2 with CGT: ERC-20 from L1 becomes native token
+/// - L3 without CGT: Settlement layer native token (e.g., ADI) becomes native token
 pub enum BaseToken {
-    Eth,
+    Eth,  // Default: 0x0000000000000000000000000000000000000001
     Custom {
-        address: Address,
+        address: Address,  // ERC-20 contract address on settlement layer
         symbol: String,
         decimals: u8,
     },
@@ -193,8 +201,12 @@ pub enum ChainState {
 **Validation Rules:**
 - `name`: Non-empty, alphanumeric with underscores, max 64 chars
 - `chain_id`: Positive integer, unique within ecosystem, not settlement layer chain IDs (1, 11155111)
-- `base_token.address`: If custom, must be valid ERC-20 contract
+- `base_token.address`: If custom (CGT), must be valid ERC-20 contract on settlement layer
 - `prover_mode`: Must match genesis.json execution version
+
+**Funding Requirements:**
+- `BaseToken::Eth`: Fund wallets with ETH only
+- `BaseToken::Custom`: Fund wallets with ETH + CGT (Custom Gas Token)
 
 **State Transitions:**
 - `Initialized` → `Deployed` (via `adi deploy chain`)
@@ -385,7 +397,7 @@ pub struct SettlementConfig {
 
 pub struct FunderConfig {
     pub private_key: SecretString,
-    pub adi_token_address: Address,
+    pub cgt_address: Option<Address>,  // Only set when base token != ETH
 }
 
 pub struct EcosystemConfig {
