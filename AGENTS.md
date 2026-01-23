@@ -33,7 +33,13 @@ This is a Rust CLI application (`adi-cli`) using the command pattern with SDK-fi
 - **context.rs**: `Context` struct carries config and logger through command execution
 - **config.rs**: Loads config from `~/.adi_cli/.adi.yml` (YAML) with `ADI_` environment variable overrides
 - **error.rs**: Re-exports `eyre::Result` and `WrapErr` for consistent error handling
-- **log.rs**: `Logger` with `MessageBuilder` pattern for colored, timestamped console output
+
+### Logging
+
+- Uses `env_logger` crate for logging interface
+- Colored output via `env_logger`'s built-in support (uses `anstyle` internally)
+- Default log level: `info`
+- Debug logs available (set `RUST_LOG=debug`)
 
 ### Adding Commands
 
