@@ -52,6 +52,8 @@ As a chain operator, I want to deploy ecosystem smart contracts to the settlemen
 
 7. **Given** protocol version requires verifier registration (versions <0.30.2), **When** deployment completes, **Then** verifiers are automatically registered as part of the deployment process.
 
+8. **Given** deployment creates contracts with pending ownership (Server Notifier, Validator Timelock, Verifier, Governance), **When** deployment completes, **Then** ownership is automatically accepted for all Ownable2Step contracts using `acceptOwnership()` and for governance-controlled contracts using `governanceAcceptOwner()`.
+
 ---
 
 ### User Story 3 - Initialize Chain Configuration (Priority: P1)
@@ -89,6 +91,8 @@ As a chain operator, I want to deploy chain contracts and register my chain with
 3. **Given** custom gas price requirements, **When** user provides `--gas-price` flag, **Then** deployment uses the specified gas price for all transactions.
 
 4. **Given** a funder wallet is configured, **When** user runs deployment with `--auto-fund`, **Then** chain wallets are automatically funded before contract deployment begins.
+
+5. **Given** chain deployment creates contracts with pending ownership (Chain Admin), **When** deployment completes, **Then** ownership is automatically accepted for all Ownable2Step contracts using `acceptOwnership()`.
 
 ---
 
@@ -146,23 +150,7 @@ As a chain operator, I want to upgrade my chain's contracts to match the ecosyst
 
 ---
 
-### User Story 7 - Accept Pending Ownership (Priority: P3)
-
-As a chain operator, I want to accept pending ownership transfers after deployment so that governance is properly established.
-
-**Why this priority**: Ownership acceptance is a post-deployment cleanup task that can be done after core functionality works.
-
-**Independent Test**: Can be tested by running ownership acceptance commands after deployment, verifying ownership is transferred.
-
-**Acceptance Scenarios**:
-
-1. **Given** deployment completed with pending ownership, **When** user runs `adi accept ownership`, **Then** ownership is accepted for server notifier, rollup DA manager, validator timelock, and verifier.
-
-2. **Given** custom ownership transfer is needed, **When** user runs `adi transfer ownership --to <ADDRESS>`, **Then** ownership transfer is initiated to the specified address.
-
----
-
-### User Story 8 - Manage State Backend (Priority: P3)
+### User Story 7 - Manage State Backend (Priority: P3)
 
 As a chain operator, I want to use different state backends so that I can persist ecosystem state in various storage systems.
 
@@ -244,7 +232,7 @@ Commits:
 
 - **FR-020**: System MUST support both Sepolia testnet and local Anvil deployments.
 
-- **FR-021**: System MUST handle ownership acceptance and transfer operations post-deployment.
+- **FR-021**: System MUST automatically accept pending ownership transfers during deployment for contracts using Ownable2Step pattern (`acceptOwnership()`) and governance-controlled contracts (`governanceAcceptOwner()`). Affected contracts include: Server Notifier, Validator Timelock, Verifier, Governance, Chain Admin, and Rollup DA Manager.
 
 - **FR-022**: System MUST support automatic wallet funding where user provides a funded "funder" wallet private key, and the system automatically funds ecosystem wallets (deployer, governor, operator) with required ETH and ADI tokens before operations.
 

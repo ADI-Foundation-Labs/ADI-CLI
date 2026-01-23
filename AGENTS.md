@@ -11,6 +11,9 @@ SDK-first Rust CLI (`adi-cli`) for managing ZkSync ecosystem smart contracts wit
 - Avoid code duplication; use functions and modules to encapsulate reusable logic.
 - Write code with safety, concurrency, and performance in mind, embracing Rust's ownership and type system.
 - Ensure code is well-documented with inline comments and Rustdoc.
+- Keep files small and focused (<200 lines)
+- Test after every meaningful change
+- Don't give out high level answers, your job is to give a specific solution applicable to the project.
 
 ## Error Handling and Safety
 
@@ -24,11 +27,25 @@ SDK-first Rust CLI (`adi-cli`) for managing ZkSync ecosystem smart contracts wit
 - Handle errors and edge cases early, returning errors where appropriate.
 - No wildcard imports
 - Use exit codes: 0 = success, 1 = error, 2 = usage error
+- Validate all input data
 
 ## Performance
 - Use `&str` over `String` when possible
 - Avoid unnecessary `.clone()` — prefer borrowing
 - Use iterators over explicit loops
+
+## Git Conventions
+
+- Commit message format: feat|fix|refactor|docs|test|chore|ci|build|style: description
+- `build` - Changes that affect the build system or external dependencies (dependencies update)
+- `ci` - Changes to CI configuration files and scripts
+- `docs` - Documentation only changes
+- `feat` - A new feature
+- `fix` - A bug fix
+- `chore` - Changes which does not touch the code (ex. manual update of release notes). It will not generate release notes changes
+- `refactor` - A code change that contains refactor
+- `style` - Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc)
+- `test` - Adding missing tests or correcting existing tests and also changes for our test app
 
 ## Documentation
 - Document public functions with `///` doc comments
@@ -55,7 +72,6 @@ cargo test               # Run tests
 - `adi doctor` - Verify external dependency availability (zkstack, forge, cast)
 - `adi upgrade ecosystem` - Upgrade ecosystem contracts to new protocol version
 - `adi upgrade chain` - Upgrade chain contracts to match ecosystem version
-- `adi accept ownership` - Accept pending ownership transfers post-deployment
 
 ## Architecture
 
@@ -151,48 +167,3 @@ alloy-primitives = { workspace = true }
 tokio = { workspace = true }
 ```
 
-
-
-# Rust CLI Project Rules
-
-## Code Style
-- Use Rust 2021 edition
-- Run `cargo fmt` before commits
-- Run `cargo clippy -- -D warnings` — treat warnings as errors
-- Prefer `snake_case` for functions/variables, `PascalCase` for types
-- Keep functions under 50 lines; extract helpers when needed
-
-## CLI Structure
-- Use `clap` with derive macros for argument parsing
-- Structure commands in `src/commands/` module
-- Keep `main.rs` minimal — just setup and dispatch
-- Use `src/lib.rs` for reusable logic
-
-```
-src/
-├── main.rs          # Entry point, CLI setup
-├── lib.rs           # Public API
-├── commands/
-│   ├── mod.rs
-│   └── <command>.rs
-├── config.rs        # Config loading
-└── error.rs         # Custom error types
-```
-
-## Output & UX
-- Use `println!` for normal output, `eprintln!` for errors
-- Support `--json` flag for machine-readable output
-- Use exit codes: 0 = success, 1 = error, 2 = usage error
-- Add `--verbose` / `-v` flag with `tracing` levels
-
-## Testing
-- Unit tests in the same file with `#[cfg(test)]` module
-- Integration tests in `tests/` directory
-- Use `assert_cmd` and `predicates` for CLI testing
-- Mock external services; don't hit real APIs in tests
-
-
-## Git Conventions
-- Commit message format: `feat|fix|refactor|docs|test: description`
-- Keep commits atomic and focused
-- Run `cargo test` before pushing

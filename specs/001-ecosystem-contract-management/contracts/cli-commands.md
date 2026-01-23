@@ -19,8 +19,6 @@ adi
 ├── upgrade
 │   ├── ecosystem    # Upgrade ecosystem contracts
 │   └── chain        # Upgrade chain contracts
-├── accept
-│   └── ownership    # Accept pending ownership transfers
 ├── doctor           # Verify dependency availability
 └── version
     └── show         # Show version information
@@ -144,7 +142,13 @@ adi deploy ecosystem [OPTIONS]
 [INFO] Verifier deployed at 0xabcd...ef01
 ... (more contracts)
 
-[SUCCESS] Ecosystem contracts deployed
+[PROGRESS] Accepting ownership transfers...
+[INFO] Server Notifier ownership accepted
+[INFO] Validator Timelock ownership accepted
+[INFO] Verifier ownership accepted
+[INFO] Governance ownership accepted
+
+[SUCCESS] Ecosystem contracts deployed (ownership accepted)
 
 Contract addresses saved to:
   - configs/contracts.yaml
@@ -183,7 +187,7 @@ Resolution:
 ### Postconditions
 - All ecosystem contracts deployed to settlement layer
 - Contract addresses persisted to state
-- Pending ownership transfers may exist
+- Ownership transfers automatically accepted
 
 ---
 
@@ -288,8 +292,10 @@ adi deploy chain [OPTIONS]
 [INFO] Chain Admin deployed at 0xfedc...ba98
 [PROGRESS] Registering chain with Bridgehub...
 [INFO] Chain registered with Bridgehub
+[PROGRESS] Accepting ownership transfers...
+[INFO] Chain Admin ownership accepted
 
-[SUCCESS] Chain 'adi' deployed and registered
+[SUCCESS] Chain 'adi' deployed and registered (ownership accepted)
 
 Contract addresses saved to:
   - chains/adi/configs/contracts.yaml
@@ -330,7 +336,7 @@ Resolution:
 - Chain contracts deployed to settlement layer
 - Chain registered with Bridgehub
 - Contract addresses persisted to chain state
-- Pending ownership transfers may exist
+- Ownership transfers automatically accepted
 
 ---
 
@@ -511,47 +517,6 @@ To execute:
   2. Execute chain admin calldata
 
 Or use --execute flag.
-```
-
----
-
-## adi accept ownership
-
-Accept pending ownership transfers post-deployment.
-
-### Synopsis
-```
-adi accept ownership [OPTIONS]
-```
-
-### Options
-| Option             | Type   | Required | Default     | Description                 |
-| ------------------ | ------ | -------- | ----------- | --------------------------- |
-| `--ecosystem-name`   | string | No       | from config | Ecosystem name              |
-| `--chain-name`       | string | No       | all chains  | Specific chain name         |
-| `--settlement-rpc-url` | string | No     | from config | Settlement layer RPC URL    |
-| `--dry-run`          | bool   | No       | false       | Show what would be accepted |
-
-### Output
-**Success (exit 0):**
-```
-[INFO] Checking pending ownership transfers...
-
-Pending transfers found:
-  - Server Notifier: pending from 0x1111... to 0x2222...
-  - Validator Timelock: pending from 0x3333... to 0x4444...
-  - Verifier: pending from 0x5555... to 0x6666...
-
-[PROGRESS] Accepting Server Notifier ownership...
-[SUCCESS] Server Notifier ownership accepted
-
-[PROGRESS] Accepting Validator Timelock ownership...
-[SUCCESS] Validator Timelock ownership accepted
-
-[PROGRESS] Accepting Verifier ownership...
-[SUCCESS] Verifier ownership accepted
-
-[SUCCESS] All pending ownership transfers accepted
 ```
 
 ---

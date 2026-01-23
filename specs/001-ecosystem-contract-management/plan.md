@@ -114,11 +114,10 @@ src/
 │   │   ├── mod.rs
 │   │   ├── ecosystem.rs # Deploy ecosystem contracts
 │   │   └── chain.rs     # Deploy chain contracts
-│   ├── upgrade/         # Upgrade subcommands
-│   │   ├── mod.rs
-│   │   ├── ecosystem.rs # Upgrade ecosystem
-│   │   └── chain.rs     # Upgrade chain
-│   └── accept.rs        # Accept ownership
+│   └── upgrade/         # Upgrade subcommands
+│       ├── mod.rs
+│       ├── ecosystem.rs # Upgrade ecosystem
+│       └── chain.rs     # Upgrade chain
 ├── state/               # State backend abstraction
 │   ├── mod.rs           # StateBackend trait
 │   └── filesystem.rs    # Filesystem implementation

@@ -225,11 +225,12 @@ pub async fn fund_wallets(
 ## 6. Ownership Management
 
 ### Decision
-Dedicated commands for ownership acceptance and transfer operations.
+Ownership acceptance is performed automatically as part of deployment commands.
 
 ### Rationale
-- Deployment leaves pending ownership transfers that must be accepted
-- Separate commands provide flexibility for different operational workflows
+- Deployment creates pending ownership transfers that must be accepted
+- Automatic acceptance during deployment eliminates the need for a separate post-deployment step
+- Simplifies the CLI by reducing the number of commands
 - Supports both Ownable and Ownable2Step patterns
 
 ### Contracts Requiring Ownership Management
@@ -244,13 +245,9 @@ Dedicated commands for ownership acceptance and transfer operations.
 | Chain Admin          | Ownable2Step          | `acceptOwnership()`       |
 
 ### Implementation
-```bash
-# Accept all pending ownership for ecosystem
-adi accept ownership --ecosystem-name [name]
-
-# Transfer ownership to new address
-adi transfer ownership --to [address]
-```
+Ownership acceptance is integrated into the deployment flow:
+- `adi deploy ecosystem` - Accepts ownership for ecosystem-level contracts after deployment
+- `adi deploy chain` - Accepts ownership for chain-level contracts after deployment
 
 ---
 
