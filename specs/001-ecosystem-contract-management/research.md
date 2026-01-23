@@ -351,7 +351,7 @@ YAML configuration with environment variable overrides following ADI_ prefix con
 # ~/.adi_cli/.adi.yml
 state_dir: ~/.adi_cli/state
 
-l1:
+settlement:
   rpc_url: http://localhost:8545
   gas_price: 10000000000  # 10 gwei
 
@@ -372,8 +372,8 @@ docker:
 ### Environment Variable Mapping
 ```bash
 ADI_STATE_DIR=~/.adi_cli/state
-ADI_L1_RPC_URL=http://localhost:8545
-ADI_L1_GAS_PRICE=10000000000
+ADI_SETTLEMENT_RPC_URL=http://localhost:8545
+ADI_SETTLEMENT_GAS_PRICE=10000000000
 ADI_FUNDER_PRIVATE_KEY=0x...
 ADI_FUNDER_ADI_TOKEN_ADDRESS=0x...
 ADI_ECOSYSTEM_NAME=adi_ecosystem

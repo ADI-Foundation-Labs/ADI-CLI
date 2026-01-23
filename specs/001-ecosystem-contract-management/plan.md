@@ -15,7 +15,7 @@ SDK-first Rust CLI (`adi-cli`) for managing ZkSync ecosystem smart contracts wit
 **Testing**: cargo test (unit + integration), contract tests against local Anvil
 **Target Platform**: Linux containers (Docker), also macOS for development
 **Project Type**: Single project with SDK-first architecture (library crates + thin CLI wrapper)
-**Performance Goals**: CLI responsiveness <1s for non-network operations; deployment bound by L1 transaction times
+**Performance Goals**: CLI responsiveness <1s for non-network operations; deployment bound by settlement layer transaction times
 **Constraints**: Must operate within Docker; no dependency installation; strict Clippy lints (no panics, no unwrap, no indexing)
 **Scale/Scope**: Single ecosystem with multiple chains; ~9 user stories across 3 priority levels
 
@@ -112,7 +112,8 @@ src/
 │   │   └── chain.rs     # Initialize chain
 │   ├── deploy/          # Deploy subcommands
 │   │   ├── mod.rs
-│   │   └── ecosystem.rs # Deploy ecosystem contracts
+│   │   ├── ecosystem.rs # Deploy ecosystem contracts
+│   │   └── chain.rs     # Deploy chain contracts
 │   ├── upgrade/         # Upgrade subcommands
 │   │   ├── mod.rs
 │   │   ├── ecosystem.rs # Upgrade ecosystem

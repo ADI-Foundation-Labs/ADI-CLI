@@ -12,9 +12,10 @@ This document defines the command-line interface contracts for the ADI CLI. Each
 adi
 ├── init
 │   ├── ecosystem    # Initialize new ecosystem configuration
-│   └── chain        # Initialize and register a chain
+│   └── chain        # Initialize chain configuration
 ├── deploy
-│   └── ecosystem    # Deploy ecosystem contracts to L1
+│   ├── ecosystem    # Deploy ecosystem contracts to settlement layer
+│   └── chain        # Deploy chain contracts to settlement layer
 ├── upgrade
 │   ├── ecosystem    # Upgrade ecosystem contracts
 │   └── chain        # Upgrade chain contracts
@@ -39,9 +40,9 @@ adi init ecosystem [OPTIONS]
 ### Options
 | Option                 | Type    | Required | Default     | Description                              |
 | ---------------------- | ------- | -------- | ----------- | ---------------------------------------- |
-| `--name`               | string  | No       | from config | Ecosystem name                           |
-| `--l1-network`         | enum    | No       | localhost   | L1 network (mainnet, sepolia, localhost) |
-| `--l1-rpc-url`         | string  | No       | from config | L1 RPC endpoint URL                      |
+| `--name`               | string  | No       | from config | Ecosystem name                                        |
+| `--settlement-network` | enum    | No       | localhost   | Settlement network (mainnet, sepolia, localhost)      |
+| `--settlement-rpc-url` | string  | No       | from config | Settlement layer RPC endpoint URL                     |
 | `--chain-name`         | string  | No       | from config | Initial chain name                       |
 | `--chain-id`           | u64     | No       | from config | Initial chain ID                         |
 | `--prover-mode`        | enum    | No       | no-proofs   | Prover mode (no-proofs, gpu)             |
@@ -50,13 +51,13 @@ adi init ecosystem [OPTIONS]
 | `--state-dir`          | path    | No       | from config | State directory path                     |
 
 ### Environment Variables
-| Variable                   | Maps To        |
-| -------------------------- | -------------- |
-| `ADI_ECOSYSTEM_NAME`       | `--name`       |
-| `ADI_L1_RPC_URL`           | `--l1-rpc-url` |
-| `ADI_ECOSYSTEM_CHAIN_NAME` | `--chain-name` |
-| `ADI_ECOSYSTEM_CHAIN_ID`   | `--chain-id`   |
-| `ADI_STATE_DIR`            | `--state-dir`  |
+| Variable                   | Maps To              |
+| -------------------------- | -------------------- |
+| `ADI_ECOSYSTEM_NAME`       | `--name`             |
+| `ADI_SETTLEMENT_RPC_URL`   | `--settlement-rpc-url` |
+| `ADI_ECOSYSTEM_CHAIN_NAME` | `--chain-name`       |
+| `ADI_ECOSYSTEM_CHAIN_ID`   | `--chain-id`         |
+| `ADI_STATE_DIR`            | `--state-dir`        |
 
 ### Output
 **Success (exit 0):**
@@ -102,7 +103,7 @@ Resolution:
 
 ## adi deploy ecosystem
 
-Deploy ecosystem smart contracts to L1.
+Deploy ecosystem smart contracts to the settlement layer.
 
 ### Synopsis
 ```
@@ -110,21 +111,21 @@ adi deploy ecosystem [OPTIONS]
 ```
 
 ### Options
-| Option         | Type   | Required | Default     | Description                   |
-| -------------- | ------ | -------- | ----------- | ----------------------------- |
-| `--name`       | string | No       | from config | Ecosystem name                |
-| `--l1-rpc-url` | string | No       | from config | L1 RPC endpoint URL           |
-| `--gas-price`  | u64    | No       | auto        | Gas price in wei              |
-| `--dry-run`    | bool   | No       | false       | Simulate without broadcasting |
-| `--auto-fund`  | bool   | No       | true        | Auto-fund wallets from funder |
+| Option               | Type   | Required | Default     | Description                       |
+| -------------------- | ------ | -------- | ----------- | --------------------------------- |
+| `--name`             | string | No       | from config | Ecosystem name                    |
+| `--settlement-rpc-url` | string | No     | from config | Settlement layer RPC endpoint URL |
+| `--gas-price`        | u64    | No       | auto        | Gas price in wei                  |
+| `--dry-run`          | bool   | No       | false       | Simulate without broadcasting     |
+| `--auto-fund`        | bool   | No       | true        | Auto-fund wallets from funder     |
 
 ### Environment Variables
-| Variable                 | Maps To                     |
-| ------------------------ | --------------------------- |
-| `ADI_ECOSYSTEM_NAME`     | `--name`                    |
-| `ADI_L1_RPC_URL`         | `--l1-rpc-url`              |
-| `ADI_L1_GAS_PRICE`       | `--gas-price`               |
-| `ADI_FUNDER_PRIVATE_KEY` | Funder wallet for auto-fund |
+| Variable                     | Maps To                     |
+| ---------------------------- | --------------------------- |
+| `ADI_ECOSYSTEM_NAME`         | `--name`                    |
+| `ADI_SETTLEMENT_RPC_URL`     | `--settlement-rpc-url`      |
+| `ADI_SETTLEMENT_GAS_PRICE`   | `--gas-price`               |
+| `ADI_FUNDER_PRIVATE_KEY`     | Funder wallet for auto-fund |
 
 ### Output
 **Success (exit 0):**
@@ -176,11 +177,11 @@ Resolution:
 ### Preconditions
 - Ecosystem must be initialized
 - Wallets must have sufficient balance (or funder configured)
-- L1 RPC must be reachable
+- Settlement layer RPC must be reachable
 - zkstack CLI and forge must be available
 
 ### Postconditions
-- All ecosystem contracts deployed to L1
+- All ecosystem contracts deployed to settlement layer
 - Contract addresses persisted to state
 - Pending ownership transfers may exist
 
@@ -188,7 +189,7 @@ Resolution:
 
 ## adi init chain
 
-Initialize and register a new chain within an ecosystem.
+Initialize a new chain configuration within an ecosystem.
 
 ### Synopsis
 ```
@@ -203,38 +204,133 @@ adi init chain [OPTIONS]
 | `--chain-id`           | u64     | Yes      | -           | Chain ID                  |
 | `--base-token-address` | address | No       | ETH         | Custom base token address |
 | `--prover-mode`        | enum    | No       | no-proofs   | Prover mode               |
-| `--l1-rpc-url`         | string  | No       | from config | L1 RPC endpoint URL       |
-| `--gas-price`          | u64     | No       | auto        | Gas price in wei          |
 
 ### Output
 **Success (exit 0):**
 ```
 [INFO] Initializing chain 'adi' (ID: 222) in ecosystem 'adi_ecosystem'
-[INFO] Deploying chain contracts...
-[INFO] Registering chain with Bridgehub...
+[INFO] Creating chain directory structure
+[INFO] Generated chain wallets
 
-[SUCCESS] Chain 'adi' initialized and registered
-
-Chain contracts:
-  - Diamond Proxy: 0x9876...5432
-  - Chain Admin: 0xfedc...ba98
-  - Governance: 0x1111...2222
+[SUCCESS] Chain 'adi' initialized
 
 Chain configuration saved to:
-  - chains/adi/configs/contracts.yaml
   - chains/adi/configs/wallets.yaml
   - chains/adi/configs/genesis.yaml
+
+Next step: Deploy chain contracts with:
+  adi deploy chain --name adi
+```
+
+**Error (exit 1):**
+```
+Error: Failed to initialize chain
+
+Cause: Chain 'adi' already exists in ecosystem
+
+Resolution:
+  1. Choose a different chain name with --name
+  2. Or remove existing chain at ~/.adi_cli/state/adi_ecosystem/chains/adi
 ```
 
 ### Preconditions
-- Parent ecosystem must be deployed
+- Parent ecosystem must be initialized
 - Chain name must be unique within ecosystem
-- Chain ID must not conflict with L1 or existing chains
+- Chain ID must not conflict with settlement layer or existing chains
 
 ### Postconditions
-- Chain contracts deployed to L1
+- Chain directory structure created
+- Chain wallet keypairs generated and stored
+- Chain configuration initialized
+- NO contracts deployed (use `adi deploy chain`)
+
+---
+
+## adi deploy chain
+
+Deploy chain contracts to the settlement layer and register with Bridgehub.
+
+### Synopsis
+```
+adi deploy chain [OPTIONS]
+```
+
+### Options
+| Option                 | Type   | Required | Default     | Description                       |
+| ---------------------- | ------ | -------- | ----------- | --------------------------------- |
+| `--ecosystem-name`     | string | No       | from config | Parent ecosystem name             |
+| `--name`               | string | Yes      | -           | Chain name                        |
+| `--settlement-rpc-url` | string | No       | from config | Settlement layer RPC endpoint URL |
+| `--gas-price`          | u64    | No       | auto        | Gas price in wei                  |
+| `--dry-run`            | bool   | No       | false       | Simulate without broadcasting     |
+| `--auto-fund`          | bool   | No       | true        | Auto-fund wallets from funder     |
+
+### Environment Variables
+| Variable                   | Maps To                     |
+| -------------------------- | --------------------------- |
+| `ADI_ECOSYSTEM_NAME`       | `--ecosystem-name`          |
+| `ADI_SETTLEMENT_RPC_URL`   | `--settlement-rpc-url`      |
+| `ADI_SETTLEMENT_GAS_PRICE` | `--gas-price`               |
+| `ADI_FUNDER_PRIVATE_KEY`   | Funder wallet for auto-fund |
+
+### Output
+**Success (exit 0):**
+```
+[INFO] Deploying chain 'adi' (ID: 222) to settlement layer
+[INFO] Checking wallet balances...
+[INFO]   Chain Deployer: 1.5 ETH (required: 1 ETH) ✓
+[INFO]   Chain Governor: 1.2 ETH, 5 ADI (required: 1 ETH, 5 ADI) ✓
+[INFO] Deploying chain contracts with gas price 10 gwei
+
+[PROGRESS] Deploying Diamond Proxy...
+[INFO] Diamond Proxy deployed at 0x9876...5432
+[PROGRESS] Deploying Chain Admin...
+[INFO] Chain Admin deployed at 0xfedc...ba98
+[PROGRESS] Registering chain with Bridgehub...
+[INFO] Chain registered with Bridgehub
+
+[SUCCESS] Chain 'adi' deployed and registered
+
+Contract addresses saved to:
+  - chains/adi/configs/contracts.yaml
+
+Key addresses:
+  - Diamond Proxy: 0x9876543210fedcba9876543210fedcba98765432
+  - Chain Admin: 0xfedcba9876543210fedcba9876543210fedcba98
+  - Governance: 0x1111222233334444555566667777888899990000
+```
+
+**Error (exit 1):**
+```
+Error: Failed to deploy chain contracts
+
+Cause: Insufficient balance in chain deployer wallet
+
+Details:
+  - Wallet: 0x1234...5678
+  - Required: 1.5 ETH
+  - Available: 0.3 ETH
+
+Resolution:
+  1. Fund the chain deployer wallet with at least 1.2 ETH more
+  2. Or configure a funder wallet in ~/.adi_cli/.adi.yml:
+     funder:
+       private_key: "0x..."
+  3. Re-run: adi deploy chain --name adi
+```
+
+### Preconditions
+- Chain must be initialized (via `adi init chain`)
+- Parent ecosystem must be deployed (contracts exist on settlement layer)
+- Chain wallets must have sufficient balance (or funder configured)
+- Settlement layer RPC must be reachable
+- zkstack CLI and forge must be available
+
+### Postconditions
+- Chain contracts deployed to settlement layer
 - Chain registered with Bridgehub
-- Chain configuration persisted to state
+- Contract addresses persisted to chain state
+- Pending ownership transfers may exist
 
 ---
 
@@ -333,10 +429,10 @@ adi upgrade ecosystem --to <VERSION> [OPTIONS]
 ### Options
 | Option             | Type   | Required | Default          | Description                                  |
 | ------------------ | ------ | -------- | ---------------- | -------------------------------------------- |
-| `--to`             | string | Yes      | -                | Target protocol version (e.g., v30)          |
-| `--ecosystem-name` | string | No       | from config      | Ecosystem name                               |
-| `--l1-rpc-url`     | string | No       | from config      | L1 RPC endpoint URL                          |
-| `--gas-price`      | u64    | No       | auto             | Gas price in wei                             |
+| `--to`               | string | Yes      | -                | Target protocol version (e.g., v30)          |
+| `--ecosystem-name`   | string | No       | from config      | Ecosystem name                               |
+| `--settlement-rpc-url` | string | No     | from config      | Settlement layer RPC endpoint URL            |
+| `--gas-price`        | u64    | No       | auto             | Gas price in wei                             |
 | `--output-dir`     | path   | No       | ./upgrade-output | Directory for calldata output                |
 | `--execute`        | bool   | No       | false            | Execute upgrade (not just generate calldata) |
 
@@ -389,11 +485,11 @@ adi upgrade chain --to <VERSION> [OPTIONS]
 ### Options
 | Option             | Type   | Required | Default          | Description               |
 | ------------------ | ------ | -------- | ---------------- | ------------------------- |
-| `--to`             | string | Yes      | -                | Target protocol version   |
-| `--chain-name`     | string | No       | from config      | Chain name                |
-| `--ecosystem-name` | string | No       | from config      | Ecosystem name            |
-| `--l1-rpc-url`     | string | No       | from config      | L1 RPC URL                |
-| `--l2-rpc-url`     | string | No       | from config      | L2 RPC URL                |
+| `--to`               | string | Yes      | -                | Target protocol version            |
+| `--chain-name`       | string | No       | from config      | Chain name                         |
+| `--ecosystem-name`   | string | No       | from config      | Ecosystem name                     |
+| `--settlement-rpc-url` | string | No     | from config      | Settlement layer RPC URL           |
+| `--l2-rpc-url`       | string | No       | from config      | L2 RPC URL                         |
 | `--gas-price`      | u64    | No       | auto             | Gas price in wei          |
 | `--output-dir`     | path   | No       | ./upgrade-output | Calldata output directory |
 | `--execute`        | bool   | No       | false            | Execute upgrade           |
@@ -431,10 +527,10 @@ adi accept ownership [OPTIONS]
 ### Options
 | Option             | Type   | Required | Default     | Description                 |
 | ------------------ | ------ | -------- | ----------- | --------------------------- |
-| `--ecosystem-name` | string | No       | from config | Ecosystem name              |
-| `--chain-name`     | string | No       | all chains  | Specific chain name         |
-| `--l1-rpc-url`     | string | No       | from config | L1 RPC URL                  |
-| `--dry-run`        | bool   | No       | false       | Show what would be accepted |
+| `--ecosystem-name`   | string | No       | from config | Ecosystem name              |
+| `--chain-name`       | string | No       | all chains  | Specific chain name         |
+| `--settlement-rpc-url` | string | No     | from config | Settlement layer RPC URL    |
+| `--dry-run`          | bool   | No       | false       | Show what would be accepted |
 
 ### Output
 **Success (exit 0):**

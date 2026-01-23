@@ -9,7 +9,7 @@
 
 ### User Story 1 - Initialize New Ecosystem (Priority: P1)
 
-As a chain operator, I want to initialize a new ZkSync ecosystem configuration from scratch so that I can deploy smart contracts to L1 and create the foundation for my chain.
+As a chain operator, I want to initialize a new ZkSync ecosystem configuration from scratch so that I can deploy smart contracts to the settlement layer and create the foundation for my chain.
 
 **Why this priority**: This is the foundational operation that must occur before any other ecosystem management. Without ecosystem initialization, no other operations are possible.
 
@@ -18,7 +18,7 @@ As a chain operator, I want to initialize a new ZkSync ecosystem configuration f
 
 **Acceptance Scenarios**:
 
-1. **Given** a Docker container with required dependencies (zkstack CLI, foundry-zksync), **When** user runs `adi init ecosystem` with ecosystem name and L1 network configuration, **Then** the system creates the ecosystem directory structure with ZkStack.yaml, configs directory, and chains directory.
+1. **Given** a Docker container with required dependencies (zkstack CLI, foundry-zksync), **When** user runs `adi init ecosystem` with ecosystem name and settlement network configuration, **Then** the system creates the ecosystem directory structure with ZkStack.yaml, configs directory, and chains directory.
 
 2. **Given** user provides a config file with private keys, **When** ecosystem init is executed, **Then** the system uses provided keys for deployer and governor wallets instead of generating random ones.
 
@@ -30,7 +30,7 @@ As a chain operator, I want to initialize a new ZkSync ecosystem configuration f
 
 ### User Story 2 - Deploy Ecosystem Contracts (Priority: P1)
 
-As a chain operator, I want to deploy ecosystem smart contracts to L1 so that my chain infrastructure is established on the settlement layer.
+As a chain operator, I want to deploy ecosystem smart contracts to the settlement layer so that my chain infrastructure is established.
 
 **Why this priority**: Contract deployment is required immediately after initialization to make the ecosystem operational. This is core functionality.
 
@@ -54,21 +54,41 @@ As a chain operator, I want to deploy ecosystem smart contracts to L1 so that my
 
 ---
 
-### User Story 3 - Initialize and Register Chain (Priority: P1)
+### User Story 3 - Initialize Chain Configuration (Priority: P1)
 
-As a chain operator, I want to initialize and register a new chain within my ecosystem so that I can operate a ZkSync rollup.
+As a chain operator, I want to initialize a new chain configuration within my ecosystem so that I can prepare for chain deployment.
 
-**Why this priority**: Chain registration is essential for having an operational L2. Without a registered chain, the ecosystem cannot process transactions.
+**Why this priority**: Chain initialization is the first step before deployment. Configuration must be established before contracts can be deployed.
 
-**Independent Test**: Can be tested by running chain init after ecosystem deployment, verifying chain contracts are deployed and chain is registered with bridgehub.
+**Independent Test**: Can be tested by running `adi init chain` after ecosystem initialization, verifying chain directory structure and configuration files (wallets.yaml, genesis.yaml) are created.
 
 **Acceptance Scenarios**:
 
-1. **Given** a deployed ecosystem, **When** user runs `adi init chain --name adi --chain-id 222`, **Then** chain-specific contracts are deployed and chain is registered with the bridgehub.
+1. **Given** an initialized ecosystem, **When** user runs `adi init chain --name adi --chain-id 222`, **Then** chain configuration directory is created with wallets.yaml and genesis.yaml.
 
-2. **Given** chain initialization succeeds, **When** checking chain contracts.yaml, **Then** it contains diamond_proxy_addr, governance_addr, chain_admin_addr, and all L1/L2 contract addresses.
+2. **Given** chain initialization succeeds, **When** checking chain directory, **Then** it contains proper wallet files with deployer, operator, governor keys.
 
-3. **Given** a base token configuration, **When** user specifies `--base-token-address <ADDRESS>`, **Then** the chain is configured with the custom base token instead of ETH.
+3. **Given** a base token configuration, **When** user specifies `--base-token-address <ADDRESS>`, **Then** the chain configuration includes the custom base token instead of ETH.
+
+---
+
+### User Story 3b - Deploy Chain Contracts (Priority: P1)
+
+As a chain operator, I want to deploy chain contracts and register my chain with the ecosystem so that I can operate a ZkSync rollup.
+
+**Why this priority**: Chain deployment is required to make the chain operational. Without deployed contracts, the chain cannot process transactions.
+
+**Independent Test**: Can be tested by running `adi deploy chain` after ecosystem deployment, verifying chain contracts are deployed and chain is registered with bridgehub.
+
+**Acceptance Scenarios**:
+
+1. **Given** an initialized chain and deployed ecosystem, **When** user runs `adi deploy chain --name adi`, **Then** chain-specific contracts are deployed and chain is registered with the bridgehub.
+
+2. **Given** chain deployment succeeds, **When** checking chain contracts.yaml, **Then** it contains diamond_proxy_addr, governance_addr, chain_admin_addr, and all settlement layer/L2 contract addresses.
+
+3. **Given** custom gas price requirements, **When** user provides `--gas-price` flag, **Then** deployment uses the specified gas price for all transactions.
+
+4. **Given** a funder wallet is configured, **When** user runs deployment with `--auto-fund`, **Then** chain wallets are automatically funded before contract deployment begins.
 
 ---
 
@@ -162,7 +182,7 @@ As a chain operator, I want to use different state backends so that I can persis
 
 ### Edge Cases
 
-- What happens when L1 RPC is unreachable during deployment? System should provide clear error with retry guidance.
+- What happens when settlement layer RPC is unreachable during deployment? System should provide clear error with retry guidance.
 - What happens when funder wallet has insufficient funds? System should check ETH and ADI token balances before deploying and report required amounts for each.
 - What happens when gas price changes significantly during multi-transaction deployment? System should handle transaction failures gracefully.
 - What happens when user tries to upgrade to an unsupported version? System should validate target version before proceeding.
@@ -214,9 +234,9 @@ Commits:
 
 - **FR-015**: System MUST verify external dependency availability (zkstack, forge, cast) before operations with the fixed version.
 
-- **FR-016**: System MUST support configuring L1 RPC URL for contract interactions.
+- **FR-016**: System MUST support configuring settlement layer RPC URL for contract interactions.
 
-- **FR-017**: System MUST follow config-file-first approach where configuration values (L1 RPC URL, state directory paths, private keys, ADI token address, chain name/ID, gas price) are read from config file by default, with optional CLI flags for overrides. Action-specific parameters like `--to <version>` for upgrades remain required flags.
+- **FR-017**: System MUST follow config-file-first approach where configuration values (settlement layer RPC URL, state directory paths, private keys, ADI token address, chain name/ID, gas price) are read from config file by default, with optional CLI flags for overrides. Action-specific parameters like `--to <version>` for upgrades remain required flags.
 
 - **FR-018**: System MUST persist all contract addresses and deployment state to state backend.
 
@@ -269,7 +289,7 @@ Commits:
 ## Assumptions
 
 - Users have access to Docker and can run containers.
-- L1 RPC endpoints are available and have appropriate rate limits for deployment operations.
+- Settlement layer RPC endpoints are available and have appropriate rate limits for deployment operations.
 - Users understand basic ZkSync ecosystem concepts (bridgehub, chain admin, governance).
 - The reference ecosystem directory structure from dry_run_ecosystem is the canonical format.
 - zkstack CLI and foundry-zksync tooling may have breaking changes; specific commits/versions are pinned to ensure reproducibility.

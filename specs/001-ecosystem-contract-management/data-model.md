@@ -33,7 +33,7 @@ use semver::Version;
 
 pub struct Ecosystem {
     pub name: String,
-    pub l1_network: L1Network,
+    pub settlement_network: SettlementNetwork,
     pub state_path: PathBuf,
     pub contracts: EcosystemContracts,
     pub wallets: EcosystemWallets,
@@ -43,7 +43,7 @@ pub struct Ecosystem {
     pub updated_at: DateTime<Utc>,
 }
 
-pub enum L1Network {
+pub enum SettlementNetwork {
     Mainnet,
     Sepolia,
     Localhost,
@@ -58,7 +58,7 @@ pub enum L1Network {
 
 **Validation Rules:**
 - `name`: Non-empty, alphanumeric with underscores, max 64 chars
-- `l1_network`: Must be a valid supported network
+- `settlement_network`: Must be a valid supported network
 - `state_path`: Must be writable directory
 - `protocol_version`: Must be supported version (v29.x, v30.x)
 
@@ -71,7 +71,7 @@ pub enum L1Network {
 
 ### 2. EcosystemContracts
 
-Contract addresses deployed at ecosystem level on L1. Uses `alloy_primitives::Address` for type safety.
+Contract addresses deployed at ecosystem level on the settlement layer. Uses `alloy_primitives::Address` for type safety.
 
 ```rust
 use alloy_primitives::{Address, B256};
@@ -183,7 +183,7 @@ pub enum ProverMode {
 
 pub enum ChainState {
     Initialized,
-    Registered,
+    Deployed,  // Chain contracts deployed and registered with Bridgehub
     Running,
     Upgrading,
     Stopped,
@@ -192,13 +192,13 @@ pub enum ChainState {
 
 **Validation Rules:**
 - `name`: Non-empty, alphanumeric with underscores, max 64 chars
-- `chain_id`: Positive integer, unique within ecosystem, not L1 chain IDs (1, 11155111)
+- `chain_id`: Positive integer, unique within ecosystem, not settlement layer chain IDs (1, 11155111)
 - `base_token.address`: If custom, must be valid ERC-20 contract
 - `prover_mode`: Must match genesis.json execution version
 
 **State Transitions:**
-- `Initialized` → `Registered` (via `adi init chain`)
-- `Registered` → `Running` (external: server start)
+- `Initialized` → `Deployed` (via `adi deploy chain`)
+- `Deployed` → `Running` (external: server start)
 - `Running` → `Upgrading` (via `adi upgrade chain`)
 - `Upgrading` → `Running` (upgrade complete)
 - Any → `Stopped` (external: server stop)
@@ -213,16 +213,16 @@ Contract addresses for a specific chain.
 use alloy_primitives::Address;
 
 pub struct ChainContracts {
-    // Diamond (main L2 contract on L1)
+    // Diamond (main L2 contract on settlement layer)
     pub diamond_proxy_addr: Address,
 
     // Admin contracts
     pub governance_addr: Address,
     pub chain_admin_addr: Address,
 
-    // L1 contracts
-    pub l1_shared_bridge: Address,
-    pub l1_erc20_bridge: Address,
+    // Settlement layer contracts
+    pub settlement_shared_bridge: Address,
+    pub settlement_erc20_bridge: Address,
 
     // L2 contracts (deployed on L2)
     pub l2_shared_bridge: Address,
@@ -372,13 +372,13 @@ use secrecy::SecretString;
 
 pub struct Config {
     pub state_dir: PathBuf,
-    pub l1: L1Config,
+    pub settlement: SettlementConfig,
     pub funder: Option<FunderConfig>,
     pub ecosystem: EcosystemConfig,
     pub docker: DockerConfig,
 }
 
-pub struct L1Config {
+pub struct SettlementConfig {
     pub rpc_url: String,
     pub gas_price: Option<u64>,  // In wei
 }
@@ -408,7 +408,7 @@ pub struct DockerConfig {
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         Ecosystem                                │
-│  - name, l1_network, protocol_version (semver::Version)         │
+│  - name, settlement_network, protocol_version (semver::Version) │
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────────┐    ┌─────────────────────┐             │
 │  │ EcosystemContracts  │    │  EcosystemWallets   │             │
@@ -449,7 +449,7 @@ pub struct DockerConfig {
 ```yaml
 # ecosystems/adi_ecosystem/metadata.yaml
 name: adi_ecosystem
-l1_network: sepolia
+settlement_network: sepolia
 protocol_version: "29.0.11"  # semver string format
 chains:
   - adi
@@ -548,7 +548,7 @@ impl Chain {
         ensure!(self.chain_id > 0, "Chain ID must be positive");
         ensure!(
             self.chain_id != 1 && self.chain_id != 11155111,
-            "Chain ID conflicts with L1 networks"
+            "Chain ID conflicts with settlement layer networks"
         );
         self.contracts.validate()?;
         self.wallets.validate()?;
@@ -583,7 +583,7 @@ impl Wallet {
 | ------------------ | ------------------------------------------- |
 | `alloy-primitives` | Address, B256, U256, Bytes types            |
 | `alloy-signer`     | Local wallet signing and address derivation |
-| `alloy-provider`   | JSON-RPC provider for L1 interactions       |
+| `alloy-provider`   | JSON-RPC provider for settlement layer interactions |
 | `alloy-contract`   | Contract interaction helpers                |
 | `alloy-rlp`        | RLP encoding for transactions               |
 | `alloy-sol-types`  | Solidity type encoding/decoding             |
