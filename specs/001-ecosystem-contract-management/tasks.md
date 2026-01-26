@@ -220,6 +220,7 @@ Based on plan.md structure:
 - [ ] T087 [US5] Create UpgradeEcosystem command struct with --to, --execute, --output-dir options in src/commands/upgrade/ecosystem.rs
 - [ ] T088 [US5] Implement UpgradeEcosystem::run() - generate calldata, optionally execute in src/commands/upgrade/ecosystem.rs
 - [ ] T089 [US5] Add calldata file output to upgrade-output directory in src/commands/upgrade/ecosystem.rs
+- [ ] T089a [US5] Save forge script deployment output as v{VERSION}-ecosystem.toml to upgrade-output directory in src/commands/upgrade/ecosystem.rs
 - [ ] T090 [US5] Add execution instructions output for governance in src/commands/upgrade/ecosystem.rs
 - [ ] T091 [US5] Register UpgradeEcosystem in src/commands/upgrade/mod.rs
 
@@ -238,6 +239,7 @@ Based on plan.md structure:
 - [ ] T092 [US6] Implement zkstack generate-chain-upgrade wrapper in src/external/zkstack.rs
 - [ ] T093 [US6] Create UpgradeChain command struct with --to, --chain-name, --execute options in src/commands/upgrade/chain.rs
 - [ ] T094 [US6] Implement UpgradeChain::run() - validate ecosystem version, generate chain calldata in src/commands/upgrade/chain.rs
+- [ ] T094a [US6] Save forge script deployment output as v{VERSION}-{chain-name}.toml to upgrade-output directory in src/commands/upgrade/chain.rs
 - [ ] T095 [US6] Add DA validator pair update instructions in upgrade output in src/commands/upgrade/chain.rs
 - [ ] T096 [US6] Register UpgradeChain in src/commands/upgrade/mod.rs
 

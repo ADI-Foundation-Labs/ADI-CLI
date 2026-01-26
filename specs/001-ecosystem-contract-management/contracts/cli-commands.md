@@ -457,6 +457,13 @@ Calldata saved to:
   - upgrade-output/schedule-transparent.calldata
   - upgrade-output/execute.calldata
 
+Deployment output saved to:
+  - upgrade-output/v30-ecosystem.toml
+
+Note: The deployment output file contains new contract addresses, deployment
+data, and transaction history. This file is required as input for subsequent
+upgrades.
+
 To execute the upgrade:
   1. Review generated calldata
   2. Execute scheduleTransparent via governance:
@@ -475,6 +482,7 @@ Or use --execute flag to execute automatically:
 
 ### Postconditions
 - Upgrade calldata files generated
+- Deployment output file saved (v{VERSION}-ecosystem.toml)
 - If `--execute`, upgrade executed via governance
 
 ---
@@ -512,12 +520,20 @@ Calldata saved to:
   - upgrade-output/chain-schedule.calldata
   - upgrade-output/chain-admin.calldata
 
+Deployment output saved to:
+  - upgrade-output/v30-<chain-name>.toml
+
 To execute:
   1. Execute schedule calldata via chain admin
   2. Execute chain admin calldata
 
 Or use --execute flag.
 ```
+
+### Postconditions
+- Chain upgrade calldata files generated
+- Deployment output file saved (v{VERSION}-{chain-name}.toml)
+- If `--execute`, upgrade executed via chain admin
 
 ---
 

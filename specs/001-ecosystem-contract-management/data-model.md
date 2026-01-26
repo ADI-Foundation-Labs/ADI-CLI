@@ -327,6 +327,15 @@ pub struct UpgradeCalldata {
     pub execute: Bytes,
     pub governance_address: Address,
 }
+
+/// Forge script output saved to v{VERSION}-ecosystem.toml or v{VERSION}-{chain-name}.toml
+/// Contains:
+/// - deployed_addresses: New contract addresses (facets, bridges, validators)
+/// - contracts_config: Diamond cut data, protocol versions, init parameters
+/// - governance_calls: stage0, stage1, stage2 encoded calls
+/// - transactions: List of transaction hashes from deployment
+///
+/// This file is required as input for subsequent upgrades.
 ```
 
 **State Transitions:**

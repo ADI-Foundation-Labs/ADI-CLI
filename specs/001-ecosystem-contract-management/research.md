@@ -273,7 +273,8 @@ Generate and output upgrade calldata for governance execution rather than direct
 2. Run forge script to simulate upgrade
 3. Extract stage1_calls from generated output
 4. Encode scheduleTransparent and execute calldata
-5. Output calldata for governance execution
+5. Save forge script output (v{VERSION}-ecosystem.toml) containing new addresses and deployment data
+6. Output calldata files for governance execution
 
 ### Implementation
 ```rust
@@ -282,6 +283,7 @@ pub struct UpgradeOutput {
     pub execute_calldata: Bytes,
     pub governance_address: Address,
     pub target_version: ProtocolVersion,
+    pub deployment_output_path: PathBuf,  // e.g., upgrade-output/v30-ecosystem.toml
 }
 
 pub async fn prepare_ecosystem_upgrade(
@@ -293,8 +295,19 @@ pub async fn prepare_ecosystem_upgrade(
     // 2. Run forge script (simulate)
     // 3. Parse output YAML/TOML
     // 4. Encode governance calldata
+    // 5. Save deployment output file (v{VERSION}-ecosystem.toml)
 }
 ```
+
+### Deployment Output File
+
+The forge script generates an output file containing critical data for subsequent upgrades:
+- `deployed_addresses` - New contract addresses (facets, bridges, validators, etc.)
+- `contracts_config` - Diamond cut data, protocol versions, init parameters
+- `governance_calls` - stage0, stage1, stage2 encoded calls
+- `transactions` - List of transaction hashes from deployment
+
+This file is saved as `v{VERSION}-ecosystem.toml` for ecosystem upgrades and `v{VERSION}-{chain-name}.toml` for chain upgrades.
 
 ---
 
