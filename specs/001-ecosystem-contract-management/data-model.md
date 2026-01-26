@@ -400,7 +400,79 @@ pub struct ContractDeployment {
 
 ---
 
-### 8. Upgrade
+### 8. UpgradeInputConfig
+
+Upgrade input configuration from era-contracts `upgrade-envs/`. Structure varies by protocol
+version - stored as raw TOML for maximum flexibility.
+
+```rust
+use std::path::Path;
+use serde::de::DeserializeOwned;
+
+/// Upgrade input configuration from era-contracts upgrade-envs.
+/// Structure varies by protocol version - stored as raw TOML.
+///
+/// Example config (v0.30.0):
+/// ```toml
+/// era_chain_id = 531050204
+/// testnet_verifier = true
+/// old_protocol_version = "0x1d00000001"
+///
+/// [contracts]
+/// genesis_root = "0x6ef70107..."
+/// bridgehub_proxy_address = "0xc4fd2580..."
+///
+/// [state_transition]
+/// admin_facet_addr = "0x493EE7a0..."
+/// ```
+pub struct UpgradeInputConfig {
+    raw: toml::Value,
+}
+
+impl UpgradeInputConfig {
+    /// Load configuration from TOML file
+    pub fn from_file(path: &Path) -> Result<Self> {
+        let content = std::fs::read_to_string(path)?;
+        let raw: toml::Value = toml::from_str(&content)?;
+        Ok(Self { raw })
+    }
+
+    /// Load configuration from TOML string
+    pub fn from_str(content: &str) -> Result<Self> {
+        let raw: toml::Value = toml::from_str(content)?;
+        Ok(Self { raw })
+    }
+
+    /// Get a typed value by dotted path (e.g., "contracts.genesis_root")
+    ///
+    /// # Example
+    /// ```rust
+    /// let chain_id: u64 = config.get("era_chain_id")?.unwrap();
+    /// let genesis: String = config.get("contracts.genesis_root")?.unwrap();
+    /// let facet: Option<String> = config.get("state_transition.admin_facet_addr")?;
+    /// ```
+    pub fn get<T: DeserializeOwned>(&self, path: &str) -> Result<Option<T>>;
+
+    /// Check if a dotted path exists in the config
+    pub fn has(&self, path: &str) -> bool;
+
+    /// Get the raw TOML value for direct access
+    pub fn raw(&self) -> &toml::Value;
+
+    /// Serialize to TOML string for writing to file
+    pub fn to_toml_string(&self) -> Result<String>;
+}
+```
+
+**Rationale for dynamic TOML:**
+- Config structure changes between protocol versions (v0.27.0 vs v0.30.0 have different sections)
+- Each chain has unique values (addresses, chain IDs)
+- Config is primarily input to external Forge scripts - pass-through, not deeply processed
+- Matches upstream era-contracts pattern
+
+---
+
+### 9. Upgrade
 
 Protocol version upgrade record.
 
@@ -415,13 +487,15 @@ pub struct Upgrade {
     pub source_version: Version,
     pub target_version: Version,
     pub status: UpgradeStatus,
-    pub calldata: UpgradeCalldata,
+    pub input_config: UpgradeInputConfig,    // Input parameters for upgrade scripts
+    pub calldata: Option<UpgradeCalldata>,   // Generated after prepare phase
     pub executed_tx: Option<B256>,
     pub created_at: DateTime<Utc>,
     pub executed_at: Option<DateTime<Utc>>,
 }
 
 pub enum UpgradeStatus {
+    Pending,            // Input config loaded, not yet prepared
     Prepared,           // Calldata generated
     Scheduled,          // scheduleTransparent executed
     Executed,           // execute called
@@ -445,13 +519,14 @@ pub struct UpgradeCalldata {
 ```
 
 **State Transitions:**
+- `Pending` → `Prepared` (Forge scripts generate calldata)
 - `Prepared` → `Scheduled` (scheduleTransparent tx confirmed)
 - `Scheduled` → `Executed` (execute tx confirmed)
 - Any → `Failed` (transaction reverts)
 
 ---
 
-### 9. StateBackend
+### 10. StateBackend
 
 Abstract interface for state persistence.
 
@@ -489,7 +564,7 @@ ecosystems/{name}/deployments/{contract_name}
 
 ---
 
-### 10. Config
+### 11. Config
 
 Application configuration.
 
