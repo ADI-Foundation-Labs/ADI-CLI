@@ -52,7 +52,7 @@ As a chain operator, I want to deploy ecosystem smart contracts to the settlemen
 
 7. **Given** protocol version requires verifier registration (versions <0.30.2), **When** deployment completes, **Then** verifiers are automatically registered as part of the deployment process.
 
-8. **Given** deployment creates contracts with pending ownership (Server Notifier, Validator Timelock, Verifier, Governance), **When** deployment completes, **Then** ownership is automatically accepted for all Ownable2Step contracts using `acceptOwnership()` and for governance-controlled contracts using `governanceAcceptOwner()`.
+8. **Given** deployment creates contracts with pending ownership, **When** deployment completes, **Then** ownership is automatically accepted for all Ownable2Step contracts using `acceptOwnership()` and for governance-controlled contracts using `governanceAcceptOwner()`. The specific contracts requiring ownership acceptance vary by protocol version (see research.md Section 6 for version-specific lists).
 
 ---
 
@@ -92,7 +92,7 @@ As a chain operator, I want to deploy chain contracts and register my chain with
 
 4. **Given** a funder wallet is configured, **When** user runs deployment with `--auto-fund`, **Then** chain wallets are automatically funded before contract deployment begins.
 
-5. **Given** chain deployment creates contracts with pending ownership (Chain Admin), **When** deployment completes, **Then** ownership is automatically accepted for all Ownable2Step contracts using `acceptOwnership()`.
+5. **Given** chain deployment creates contracts with pending ownership, **When** deployment completes, **Then** ownership is automatically accepted for all Ownable2Step contracts using `acceptOwnership()`. The specific contracts vary by protocol version (see research.md Section 6 for version-specific lists).
 
 ---
 
@@ -232,7 +232,7 @@ Commits:
 
 - **FR-020**: System MUST support both Sepolia testnet and local Anvil deployments.
 
-- **FR-021**: System MUST automatically accept pending ownership transfers during deployment for contracts using Ownable2Step pattern (`acceptOwnership()`) and governance-controlled contracts (`governanceAcceptOwner()`). Affected contracts include: Server Notifier, Validator Timelock, Verifier, Governance, Chain Admin, and Rollup DA Manager.
+- **FR-021**: System MUST automatically accept pending ownership transfers during deployment for contracts using Ownable2Step pattern (`acceptOwnership()`) and governance-controlled contracts (`governanceAcceptOwner()`). The list of affected contracts varies by protocol version and MUST be determined through research for each supported version (see research.md Section 6 for version-specific lists).
 
 - **FR-022**: System MUST support automatic wallet funding where user provides a funded "funder" wallet private key, and the system automatically funds ecosystem wallets (deployer, governor, operator) with required ETH (and CGT when custom base token is configured) before operations.
 

@@ -679,7 +679,7 @@ governor:
 ### TOML (Upgrade configuration input)
 
 ```toml
-# upgrade-input.toml
+# ecosystems/upgrades/v30-upgrade-input.toml
 era_chain_id = 222
 testnet_verifier = true
 owner_address = "0xF6A96e4e5b602DDbf34E166729da97dbb2A3bEE2"
@@ -781,11 +781,11 @@ impl Wallet {
 
 ## Recommended Alloy Crates
 
-| Crate              | Purpose                                     |
-| ------------------ | ------------------------------------------- |
-| `alloy-primitives` | Address, B256, U256, Bytes types            |
-| `alloy-signer`     | Local wallet signing and address derivation |
+| Crate              | Purpose                                             |
+| ------------------ | --------------------------------------------------- |
+| `alloy-primitives` | Address, B256, U256, Bytes types                    |
+| `alloy-signer`     | Local wallet signing and address derivation         |
 | `alloy-provider`   | JSON-RPC provider for settlement layer interactions |
-| `alloy-contract`   | Contract interaction helpers                |
-| `alloy-rlp`        | RLP encoding for transactions               |
-| `alloy-sol-types`  | Solidity type encoding/decoding             |
+| `alloy-contract`   | Contract interaction helpers                        |
+| `alloy-rlp`        | RLP encoding for transactions                       |
+| `alloy-sol-types`  | Solidity type encoding/decoding                     |

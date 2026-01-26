@@ -241,15 +241,31 @@ Ownership acceptance is performed automatically as part of deployment commands.
 - Supports both Ownable and Ownable2Step patterns
 
 ### Contracts Requiring Ownership Management
-| Contract             | Pattern               | Accept Method             |
-| -------------------- | --------------------- | ------------------------- |
-| Server Notifier      | Ownable2Step          | `acceptOwnership()`       |
-| Rollup DA Manager    | Governance-controlled | `governanceAcceptOwner()` |
-| Validator Timelock   | Ownable2Step          | `acceptOwnership()`       |
-| Verifier             | Ownable2Step          | `acceptOwnership()`       |
-| Bridged Token Beacon | Ownable               | No accept needed          |
-| Governance           | Ownable2Step          | `acceptOwnership()`       |
-| Chain Admin          | Ownable2Step          | `acceptOwnership()`       |
+
+> **Important**: This list varies by protocol version. Each upgrade requires research to determine which contracts need ownership acceptance for the target version.
+
+#### Protocol Version v0.29.x - v0.30.x (Current Reference)
+
+| Contract             | Level     | Pattern               | Accept Method             |
+| -------------------- | --------- | --------------------- | ------------------------- |
+| Server Notifier      | Ecosystem | Ownable2Step          | `acceptOwnership()`       |
+| Rollup DA Manager    | Ecosystem | Governance-controlled | `governanceAcceptOwner()` |
+| Validator Timelock   | Ecosystem | Ownable2Step          | `acceptOwnership()`       |
+| Verifier             | Ecosystem | Ownable2Step          | `acceptOwnership()`       |
+| Bridged Token Beacon | Ecosystem | Ownable               | No accept needed          |
+| Governance           | Ecosystem | Ownable2Step          | `acceptOwnership()`       |
+| Chain Admin          | Chain     | Ownable2Step          | `acceptOwnership()`       |
+
+#### Version-Specific Notes
+- **v0.30.2+**: Verifier registration is no longer required (auto-registered)
+- **Future versions**: May introduce new contracts or change ownership patterns
+
+#### Research Process for New Versions
+When upgrading to a new protocol version, verify:
+1. Which contracts are deployed with pending ownership transfers
+2. The ownership pattern used by each contract (Ownable, Ownable2Step, or governance-controlled)
+3. Any new contracts introduced that require ownership acceptance
+4. Any contracts removed or with changed ownership patterns
 
 ### Implementation
 Ownership acceptance is integrated into the deployment flow:

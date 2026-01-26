@@ -142,6 +142,7 @@ adi deploy ecosystem [OPTIONS]
 [INFO] Verifier deployed at 0xabcd...ef01
 ... (more contracts)
 
+# Note: Contracts below are representative for v0.29.x-v0.30.x. Actual contracts vary by protocol version.
 [PROGRESS] Accepting ownership transfers...
 [INFO] Server Notifier ownership accepted
 [INFO] Validator Timelock ownership accepted
@@ -292,6 +293,7 @@ adi deploy chain [OPTIONS]
 [INFO] Chain Admin deployed at 0xfedc...ba98
 [PROGRESS] Registering chain with Bridgehub...
 [INFO] Chain registered with Bridgehub
+# Note: Contracts below are representative for v0.29.x-v0.30.x. Actual contracts vary by protocol version.
 [PROGRESS] Accepting ownership transfers...
 [INFO] Chain Admin ownership accepted
 
