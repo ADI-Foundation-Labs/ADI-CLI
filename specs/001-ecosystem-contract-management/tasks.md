@@ -82,7 +82,7 @@ Based on plan.md structure:
 - [ ] T028 Add SettlementConfig struct (rpc_url, gas_price) to src/config.rs
 - [ ] T029 Add FunderConfig struct (private_key, cgt_address: Option) to src/config.rs
 - [ ] T030 Add EcosystemConfig struct (name, chain_name, chain_id) to src/config.rs
-- [ ] T031 Add DockerConfig struct (zksync_era_commit, era_contracts_tag, foundry_zksync_version) to src/config.rs
+- [ ] T031 Add DockerConfig struct (registry, image_name) for toolkit image configuration to src/config.rs
 - [ ] T032 Update Config struct to include settlement, funder, ecosystem, docker fields in src/config.rs
 - [ ] T033 Add environment variable mappings for new config fields (ADI_SETTLEMENT_RPC_URL, ADI_FUNDER_PRIVATE_KEY, etc.) in src/config.rs
 
@@ -101,7 +101,7 @@ Based on plan.md structure:
 
 **Goal**: Allow chain operators to initialize a new ZkSync ecosystem configuration from scratch
 
-**Independent Test**: Run `adi init ecosystem` in Docker container, verify ZkStack.yaml, wallets.yaml, and contracts.yaml are generated in state directory
+**Independent Test**: Run `adi init ecosystem` with Docker available, verify ZkStack.yaml, wallets.yaml, and contracts.yaml are generated in state directory
 
 ### Implementation for User Story 1
 
@@ -183,27 +183,7 @@ Based on plan.md structure:
 
 ---
 
-## Phase 6: User Story 4 - Verify Dependency Availability (Priority: P2)
-
-**Goal**: Verify required external tools (zkstack, forge, cast) are available before operations
-
-**Independent Test**: Run `adi doctor`, verify status report for zkstack, forge, cast, and configuration
-
-### Implementation for User Story 4
-
-- [ ] T074 [US4] Create Doctor command struct with --json option in src/commands/doctor.rs
-- [ ] T075 [US4] Implement dependency availability checking using which/command --version in src/commands/doctor.rs
-- [ ] T076 [US4] Implement config file existence and state directory writability checks in src/commands/doctor.rs
-- [ ] T077 [US4] Implement Doctor::run() with formatted colored output in src/commands/doctor.rs
-- [ ] T078 [US4] Implement JSON output mode for doctor command in src/commands/doctor.rs
-- [ ] T079 [US4] Add installation guidance for missing dependencies in src/commands/doctor.rs
-- [ ] T080 [US4] Register Doctor in src/commands/mod.rs
-
-**Checkpoint**: Can verify environment before operations
-
----
-
-## Phase 7: User Story 5 - Upgrade Ecosystem Contracts (Priority: P2)
+## Phase 6: User Story 4 - Upgrade Ecosystem Contracts (Priority: P2)
 
 **Goal**: Upgrade ecosystem contracts to a new protocol version for new features and security fixes
 
@@ -211,73 +191,83 @@ Based on plan.md structure:
 
 ### Implementation for User Story 5
 
-- [ ] T081 [US5] Create Upgrade struct with status, calldata, versions in src/ecosystem/config.rs
-- [ ] T082 [US5] Create UpgradeCalldata struct (schedule_transparent, execute, governance_address) in src/ecosystem/config.rs
-- [ ] T083 [US5] Create UpgradeStatus enum (Prepared, Scheduled, Executed, Failed) in src/ecosystem/config.rs
-- [ ] T084 [US5] Implement upgrade input TOML generation from ecosystem state in src/external/forge.rs
-- [ ] T085 [US5] Implement forge script execution for upgrade simulation in src/external/forge.rs
-- [ ] T086 [US5] Implement calldata extraction from forge script output in src/external/forge.rs
-- [ ] T087 [US5] Create UpgradeEcosystem command struct with --to, --execute, --output-dir options in src/commands/upgrade/ecosystem.rs
-- [ ] T088 [US5] Implement UpgradeEcosystem::run() - generate calldata, optionally execute in src/commands/upgrade/ecosystem.rs
-- [ ] T089 [US5] Add calldata file output to upgrade-output directory in src/commands/upgrade/ecosystem.rs
-- [ ] T089a [US5] Save forge script deployment output as v{VERSION}-ecosystem.toml to upgrade-output directory in src/commands/upgrade/ecosystem.rs
-- [ ] T090 [US5] Add execution instructions output for governance in src/commands/upgrade/ecosystem.rs
-- [ ] T091 [US5] Register UpgradeEcosystem in src/commands/upgrade/mod.rs
+- [ ] T074 [US4] Create Upgrade struct with status, calldata, versions in src/ecosystem/config.rs
+- [ ] T075 [US4] Create UpgradeCalldata struct (schedule_transparent, execute, governance_address) in src/ecosystem/config.rs
+- [ ] T076 [US4] Create UpgradeStatus enum (Prepared, Scheduled, Executed, Failed) in src/ecosystem/config.rs
+- [ ] T077 [US4] Implement upgrade input TOML generation from ecosystem state in src/external/forge.rs
+- [ ] T078 [US4] Implement forge script execution for upgrade simulation in src/external/forge.rs
+- [ ] T079 [US4] Implement calldata extraction from forge script output in src/external/forge.rs
+- [ ] T080 [US4] Create UpgradeEcosystem command struct with --to, --execute, --output-dir options in src/commands/upgrade/ecosystem.rs
+- [ ] T081 [US4] Implement UpgradeEcosystem::run() - generate calldata, optionally execute in src/commands/upgrade/ecosystem.rs
+- [ ] T082 [US4] Add calldata file output to upgrade-output directory in src/commands/upgrade/ecosystem.rs
+- [ ] T082a [US4] Save forge script deployment output as v{VERSION}-ecosystem.toml to upgrade-output directory in src/commands/upgrade/ecosystem.rs
+- [ ] T083 [US4] Add execution instructions output for governance in src/commands/upgrade/ecosystem.rs
+- [ ] T084 [US4] Register UpgradeEcosystem in src/commands/upgrade/mod.rs
 
 **Checkpoint**: Can prepare ecosystem upgrades
 
 ---
 
-## Phase 8: User Story 6 - Upgrade Chain Contracts (Priority: P2)
+## Phase 7: User Story 5 - Upgrade Chain Contracts (Priority: P2)
 
 **Goal**: Upgrade chain contracts to match ecosystem protocol version
 
 **Independent Test**: After ecosystem upgrade, run `adi upgrade chain --to v30`, verify chain upgrade calldata generated
 
-### Implementation for User Story 6
+### Implementation for User Story 5
 
-- [ ] T092 [US6] Implement zkstack generate-chain-upgrade wrapper in src/external/zkstack.rs
-- [ ] T093 [US6] Create UpgradeChain command struct with --to, --chain-name, --execute options in src/commands/upgrade/chain.rs
-- [ ] T094 [US6] Implement UpgradeChain::run() - validate ecosystem version, generate chain calldata in src/commands/upgrade/chain.rs
-- [ ] T094a [US6] Save forge script deployment output as v{VERSION}-{chain-name}.toml to upgrade-output directory in src/commands/upgrade/chain.rs
-- [ ] T095 [US6] Add DA validator pair update instructions in upgrade output in src/commands/upgrade/chain.rs
-- [ ] T096 [US6] Register UpgradeChain in src/commands/upgrade/mod.rs
+- [ ] T085 [US5] Implement zkstack generate-chain-upgrade wrapper in src/external/zkstack.rs
+- [ ] T086 [US5] Create UpgradeChain command struct with --to, --chain-name, --execute options in src/commands/upgrade/chain.rs
+- [ ] T087 [US5] Implement UpgradeChain::run() - validate ecosystem version, generate chain calldata in src/commands/upgrade/chain.rs
+- [ ] T087a [US5] Save forge script deployment output as v{VERSION}-{chain-name}.toml to upgrade-output directory in src/commands/upgrade/chain.rs
+- [ ] T088 [US5] Add DA validator pair update instructions in upgrade output in src/commands/upgrade/chain.rs
+- [ ] T089 [US5] Register UpgradeChain in src/commands/upgrade/mod.rs
 
 **Checkpoint**: Can prepare chain upgrades after ecosystem upgrades
 
 ---
 
-## Phase 9: User Story 7 - Manage State Backend (Priority: P3)
+## Phase 8: User Story 6 - Manage State Backend (Priority: P3)
 
-**Goal**: Ensure state persistence works correctly across container restarts and mounts
+**Goal**: Ensure state persistence works correctly across CLI sessions
 
-**Independent Test**: Perform operations, exit container, mount same state, verify operations can continue
+**Independent Test**: Perform operations, restart CLI, verify operations can continue from previous state
 
-### Implementation for User Story 7
+### Implementation for User Story 6
 
-- [ ] T097 [US7] Implement state integrity validation on startup in src/state/filesystem.rs
-- [ ] T098 [US7] Add state directory mount detection and warning in src/state/filesystem.rs
-- [ ] T099 [US7] Add state backup before destructive operations in src/state/filesystem.rs
-- [ ] T100 [US7] Document state directory structure in quickstart.md
+- [ ] T090 [US6] Implement state integrity validation on startup in src/state/filesystem.rs
+- [ ] T091 [US6] Add state directory validation and error reporting in src/state/filesystem.rs
+- [ ] T092 [US6] Add state backup before destructive operations in src/state/filesystem.rs
+- [ ] T093 [US6] Document state directory structure in quickstart.md
 
 **Checkpoint**: All user stories complete
 
 ---
 
-## Phase 10: Polish & Cross-Cutting Concerns
+## Phase 9: Polish & Cross-Cutting Concerns
 
-**Purpose**: Docker support, automation, and final touches
+**Purpose**: Toolkit image building, Docker orchestration modules, automation, and final touches
 
-### Docker Infrastructure
+### Docker Orchestration Modules
 
-- [ ] T101 [P] Create docker/Dockerfile.deps with zkstack CLI and foundry-zksync installation
-- [ ] T102 [P] Create docker/Dockerfile for CLI image on top of deps
+- [ ] T094 [P] Create src/docker/client.rs with Bollard client wrapper
+- [ ] T095 [P] Create src/docker/image.rs with image pulling/management
+- [ ] T096 [P] Create src/docker/container.rs with container lifecycle
+- [ ] T097 [P] Create src/docker/stream.rs with real-time output streaming
+- [ ] T098 Create src/docker/mod.rs exporting all Docker modules
+- [ ] T099 [P] Create src/toolkit/config.rs with image reference builder
+- [ ] T100 [P] Create src/toolkit/runner.rs with zkstack/forge execution via containers
+- [ ] T101 Create src/toolkit/mod.rs exporting toolkit modules
+
+### Toolkit Image Building
+
+- [ ] T102 Create docker/Dockerfile for toolkit image (zkstack + foundry-zksync + era-contracts)
 - [ ] T103 Create docker/docker-bake.hcl with parameterized build configuration
-- [ ] T104 Add Docker volume mount examples to quickstart.md
+- [ ] T104 Add Docker requirements and usage to quickstart.md
 
 ### Development Automation
 
-- [ ] T105 Update Taskfile.yml with docker build targets (deps, cli, all)
+- [ ] T105 Update Taskfile.yml with toolkit image build targets
 - [ ] T106 [P] Add Taskfile task for running tests
 - [ ] T107 [P] Add Taskfile task for local Anvil deployment testing
 
@@ -286,6 +276,7 @@ Based on plan.md structure:
 - [ ] T108 Validate all commands work per quickstart.md local Anvil flow
 - [ ] T109 Validate all commands work per quickstart.md Sepolia flow
 - [ ] T110 Verify error messages include actionable remediation steps
+- [ ] T111 Verify Docker daemon detection and error messaging
 
 ---
 
@@ -295,11 +286,11 @@ Based on plan.md structure:
 
 - **Setup (Phase 1)**: No dependencies - can start immediately
 - **Foundational (Phase 2)**: Depends on Setup completion - BLOCKS all user stories
-- **User Stories (Phase 3-9)**: All depend on Foundational phase completion
+- **User Stories (Phase 3-8)**: All depend on Foundational phase completion
   - P1 stories (US1, US2, US3, US3b) should be done in order as they build on each other
-  - P2 stories (US4, US5, US6) can start after P1 but US6 depends on US5
-  - P3 story (US7) can proceed independently after Foundational
-- **Polish (Phase 10)**: Can start after Foundational, full validation after all stories complete
+  - P2 stories (US4, US5) can start after P1 but US5 depends on US4
+  - P3 story (US6) can proceed independently after Foundational
+- **Polish (Phase 9)**: Can start after Foundational, full validation after all stories complete
 
 ### User Story Dependencies
 
@@ -307,10 +298,9 @@ Based on plan.md structure:
 - **User Story 2 (P1)**: Depends on US1 (needs initialized ecosystem to deploy)
 - **User Story 3 (P1)**: Depends on US1 (needs initialized ecosystem for chain config)
 - **User Story 3b (P1)**: Depends on US2 AND US3 (needs deployed ecosystem and initialized chain)
-- **User Story 4 (P2)**: Can start after Foundational - Independent utility command
-- **User Story 5 (P2)**: Can start after Foundational - Independent upgrade logic
-- **User Story 6 (P2)**: Depends on US5 (chain upgrade follows ecosystem upgrade)
-- **User Story 7 (P3)**: Can start after Foundational - State backend refinements
+- **User Story 4 (P2)**: Can start after Foundational - Independent upgrade logic
+- **User Story 5 (P2)**: Depends on US4 (chain upgrade follows ecosystem upgrade)
+- **User Story 6 (P3)**: Can start after Foundational - State backend refinements
 
 ### Within Each User Story
 
@@ -343,9 +333,11 @@ T023, T024, T025 → T026, T027
 T028, T029, T030, T031 → T032, T033
 ```
 
-**Phase 10 - Docker and Taskfile can run in parallel:**
+**Phase 9 - Docker modules can run in parallel:**
 ```
-T101, T102 → T103
+T094, T095, T096, T097 → T098
+T099, T100 → T101
+T102 → T103
 T105, T106, T107
 ```
 
@@ -368,18 +360,16 @@ T105, T106, T107
 
 1. **Foundation**: Setup + Foundational → Core infrastructure ready
 2. **MVP Milestone**: US1 + US2 + US3 + US3b → Can deploy complete ecosystem with chain
-3. **Operational Tooling**: US4 (doctor) → Better user experience
-4. **Upgrade Support**: US5 + US6 → Can upgrade existing deployments
-5. **Robustness**: US7 → Production-ready state management
-6. **Containerization**: Phase 10 → Docker-ready distribution
+3. **Upgrade Support**: US4 + US5 → Can upgrade existing deployments
+4. **Robustness**: US6 → Production-ready state management
+5. **Polish**: Phase 9 → Docker orchestration modules and toolkit image building
 
 ### Critical Path
 
 ```
 Setup → Foundational → US1 → US2 → US3 → US3b → MVP Complete
-                    ↘ US4 (parallel)
-                    ↘ US5 → US6
-                    ↘ US7 (after Foundational)
+                    ↘ US4 → US5
+                    ↘ US6 (after Foundational)
 ```
 
 ---
