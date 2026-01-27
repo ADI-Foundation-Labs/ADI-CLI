@@ -4,8 +4,12 @@
 //! ecosystem deployment and governance operations.
 
 use alloy_primitives::Address;
-use secrecy::SecretString;
+use alloy_signer_local::PrivateKeySigner;
+use eyre::WrapErr;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
+
+use crate::error::Result;
 
 /// A wallet with an address and optional private key.
 ///
@@ -93,6 +97,60 @@ impl Wallet {
     pub fn has_private_key(&self) -> bool {
         self.private_key.is_some()
     }
+
+    /// Generates a new random wallet with a cryptographically secure private key.
+    ///
+    /// Uses `alloy-signer-local` for secure key generation.
+    ///
+    /// # Returns
+    ///
+    /// A new wallet with a randomly generated private key and derived address.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if key generation fails.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let wallet = Wallet::generate()?;
+    /// assert!(wallet.has_private_key());
+    /// ```
+    pub fn generate() -> Result<Self> {
+        let signer = PrivateKeySigner::random();
+        let address = signer.address();
+        // Format private key as hex string with 0x prefix
+        let private_key_bytes = signer.credential().to_bytes();
+        let private_key_hex = format!("0x{}", hex::encode(private_key_bytes));
+        let private_key = SecretString::from(private_key_hex);
+
+        Ok(Self {
+            address,
+            private_key: Some(private_key),
+        })
+    }
+
+    /// Creates a wallet from a hex-encoded private key string.
+    ///
+    /// # Arguments
+    ///
+    /// * `private_key` - Hex-encoded private key (with or without 0x prefix)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the private key is invalid.
+    pub fn from_private_key(private_key: &SecretString) -> Result<Self> {
+        let key_str = private_key.expose_secret();
+        let key_str = key_str.strip_prefix("0x").unwrap_or(key_str);
+
+        let signer: PrivateKeySigner = key_str.parse().wrap_err("Failed to parse private key")?;
+        let address = signer.address();
+
+        Ok(Self {
+            address,
+            private_key: Some(private_key.clone()),
+        })
+    }
 }
 
 impl std::fmt::Debug for Wallet {
@@ -143,5 +201,31 @@ impl EcosystemWallets {
     /// Creates new ecosystem wallets from deployer and governor wallets.
     pub fn new(deployer: Wallet, governor: Wallet) -> Self {
         Self { deployer, governor }
+    }
+
+    /// Generates new ecosystem wallets with random private keys.
+    ///
+    /// Creates both deployer and governor wallets with cryptographically
+    /// secure random private keys.
+    ///
+    /// # Returns
+    ///
+    /// New ecosystem wallets with generated private keys.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if wallet generation fails.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let wallets = EcosystemWallets::generate()?;
+    /// assert!(wallets.deployer.has_private_key());
+    /// assert!(wallets.governor.has_private_key());
+    /// ```
+    pub fn generate() -> Result<Self> {
+        let deployer = Wallet::generate().wrap_err("Failed to generate deployer wallet")?;
+        let governor = Wallet::generate().wrap_err("Failed to generate governor wallet")?;
+        Ok(Self { deployer, governor })
     }
 }

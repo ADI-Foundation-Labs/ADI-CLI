@@ -43,6 +43,8 @@ secrecy = { version = "0.8", features = ["serde"] }
 # Utilities
 uuid = { version = "1", features = ["v4", "serde"] }
 async-trait = "0.1"
+hex = "0.4"
+serde_yaml = "0.9"
 
 [build-dependencies]
 built = { version = "0.7", features = ["git2"] }

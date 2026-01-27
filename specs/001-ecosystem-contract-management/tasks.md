@@ -105,14 +105,14 @@ Based on plan.md structure:
 
 ### Implementation for User Story 1
 
-- [ ] T040 [US1] Implement wallet generation using alloy-signer in src/ecosystem/wallets.rs
-- [ ] T041 [US1] Implement ecosystem directory structure creation in src/ecosystem/config.rs
-- [ ] T042 [US1] Create InitEcosystem command struct with Clap options in src/commands/init/ecosystem.rs
-- [ ] T043 [US1] Implement zkstack ecosystem create wrapper in src/external/zkstack.rs
-- [ ] T044 [US1] Implement InitEcosystem::run() - parse options, create ecosystem, generate wallets in src/commands/init/ecosystem.rs
-- [ ] T045 [US1] Add ecosystem state persistence (save metadata, wallets, contracts to filesystem) in src/commands/init/ecosystem.rs
-- [ ] T046 [US1] Add colored output for init ecosystem progress and success in src/commands/init/ecosystem.rs
-- [ ] T047 [US1] Register InitEcosystem in src/commands/init/mod.rs
+- [X] T040 [US1] Implement wallet generation using alloy-signer in src/ecosystem/wallets.rs
+- [X] T041 [US1] Implement ecosystem directory structure creation in src/ecosystem/config.rs
+- [X] T042 [US1] Create InitEcosystem command struct with Clap options in src/commands/init/ecosystem.rs
+- [X] T043 [US1] Implement zkstack ecosystem create wrapper in src/external/zkstack.rs
+- [X] T044 [US1] Implement InitEcosystem::run() - parse options, create ecosystem, generate wallets in src/commands/init/ecosystem.rs
+- [X] T045 [US1] Add ecosystem state persistence (save metadata, wallets, contracts to filesystem) in src/commands/init/ecosystem.rs
+- [X] T046 [US1] Add colored output for init ecosystem progress and success in src/commands/init/ecosystem.rs
+- [X] T047 [US1] Register InitEcosystem in src/commands/init/mod.rs
 
 **Checkpoint**: User Story 1 complete - can initialize ecosystem and verify generated files
 

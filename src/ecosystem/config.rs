@@ -6,12 +6,14 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
-use eyre::{ensure, Result};
+use eyre::{ensure, WrapErr};
 use semver::Version;
 use serde::{Deserialize, Serialize};
+use tokio::fs;
 
 use super::contracts::EcosystemContracts;
 use super::wallets::EcosystemWallets;
+use crate::error::Result;
 
 /// Settlement network configuration.
 ///
@@ -207,5 +209,108 @@ impl Ecosystem {
     /// ```
     pub fn version_string(&self) -> String {
         format!("v{}", self.protocol_version)
+    }
+
+    /// Creates the ecosystem directory structure.
+    ///
+    /// Creates the following directory structure at `state_path`:
+    /// ```text
+    /// {state_path}/
+    /// ├── configs/
+    /// └── chains/
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if directory creation fails.
+    pub async fn create_directory_structure(&self) -> Result<()> {
+        // Create main ecosystem directory
+        fs::create_dir_all(&self.state_path)
+            .await
+            .wrap_err_with(|| {
+                format!(
+                    "Failed to create ecosystem directory: {}",
+                    self.state_path.display()
+                )
+            })?;
+
+        // Create configs subdirectory
+        let configs_dir = self.state_path.join("configs");
+        fs::create_dir_all(&configs_dir).await.wrap_err_with(|| {
+            format!(
+                "Failed to create configs directory: {}",
+                configs_dir.display()
+            )
+        })?;
+
+        // Create chains subdirectory
+        let chains_dir = self.state_path.join("chains");
+        fs::create_dir_all(&chains_dir).await.wrap_err_with(|| {
+            format!(
+                "Failed to create chains directory: {}",
+                chains_dir.display()
+            )
+        })?;
+
+        Ok(())
+    }
+
+    /// Returns the path to the configs directory.
+    pub fn configs_path(&self) -> PathBuf {
+        self.state_path.join("configs")
+    }
+
+    /// Returns the path to the chains directory.
+    pub fn chains_path(&self) -> PathBuf {
+        self.state_path.join("chains")
+    }
+
+    /// Returns the path to the ZkStack.yaml metadata file.
+    pub fn metadata_path(&self) -> PathBuf {
+        self.state_path.join("ZkStack.yaml")
+    }
+
+    /// Returns the path to the wallets.yaml file.
+    pub fn wallets_path(&self) -> PathBuf {
+        self.configs_path().join("wallets.yaml")
+    }
+
+    /// Returns the path to the contracts.yaml file.
+    pub fn contracts_path(&self) -> PathBuf {
+        self.configs_path().join("contracts.yaml")
+    }
+
+    /// Creates a chain directory structure within this ecosystem.
+    ///
+    /// Creates the following directory structure:
+    /// ```text
+    /// {state_path}/chains/{chain_name}/
+    /// └── configs/
+    /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `chain_name` - Name of the chain
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if directory creation fails.
+    pub async fn create_chain_directory(&self, chain_name: &str) -> Result<PathBuf> {
+        let chain_dir = self.chains_path().join(chain_name);
+        fs::create_dir_all(&chain_dir).await.wrap_err_with(|| {
+            format!("Failed to create chain directory: {}", chain_dir.display())
+        })?;
+
+        let chain_configs_dir = chain_dir.join("configs");
+        fs::create_dir_all(&chain_configs_dir)
+            .await
+            .wrap_err_with(|| {
+                format!(
+                    "Failed to create chain configs directory: {}",
+                    chain_configs_dir.display()
+                )
+            })?;
+
+        Ok(chain_dir)
     }
 }

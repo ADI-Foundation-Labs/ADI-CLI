@@ -169,6 +169,99 @@ impl ZkstackCli {
             .await
             .wrap_err("zkstack CLI not found. Ensure it is installed and available in PATH.")
     }
+
+    /// Creates a new ecosystem using `zkstack ecosystem create`.
+    ///
+    /// This command initializes a new ZkSync ecosystem with the specified
+    /// configuration. It generates the ecosystem directory structure and
+    /// configuration files.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Ecosystem creation configuration
+    ///
+    /// # Returns
+    ///
+    /// A `CommandOutput` with the result of the ecosystem creation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command fails to execute.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let zkstack = ZkstackCli::new();
+    /// let config = EcosystemCreateConfig {
+    ///     ecosystem_name: "my_ecosystem".to_string(),
+    ///     chain_name: "my_chain".to_string(),
+    ///     chain_id: 270,
+    ///     prover_mode: "no-proofs".to_string(),
+    ///     wallet_creation: "random".to_string(),
+    ///     l1_network: "localhost".to_string(),
+    ///     start_containers: false,
+    /// };
+    /// let output = zkstack.ecosystem_create(&config).await?;
+    /// ```
+    pub async fn ecosystem_create(&self, config: &EcosystemCreateConfig) -> Result<CommandOutput> {
+        let mut args = vec![
+            "ecosystem".to_string(),
+            "create".to_string(),
+            "--zksync-os".to_string(),
+            "-v".to_string(),
+            "--ecosystem-name".to_string(),
+            config.ecosystem_name.clone(),
+            "--chain-name".to_string(),
+            config.chain_name.clone(),
+            "--chain-id".to_string(),
+            config.chain_id.to_string(),
+            "--prover-mode".to_string(),
+            config.prover_mode.clone(),
+            "--wallet-creation".to_string(),
+            config.wallet_creation.clone(),
+            "--l1-network".to_string(),
+            config.l1_network.clone(),
+        ];
+
+        if !config.start_containers {
+            args.push("--start-containers".to_string());
+            args.push("false".to_string());
+        }
+
+        // Add ignore prerequisites for automation
+        args.push("--ignore-prerequisites".to_string());
+
+        let output = self.execute(&args).await?;
+
+        if !output.success() {
+            return Err(eyre::eyre!(
+                "zkstack ecosystem create failed with exit code {}: {}",
+                output.exit_code,
+                output.stderr
+            ));
+        }
+
+        Ok(output)
+    }
+}
+
+/// Configuration for ecosystem creation via zkstack CLI.
+#[derive(Debug, Clone)]
+pub struct EcosystemCreateConfig {
+    /// Name of the ecosystem.
+    pub ecosystem_name: String,
+    /// Name of the initial chain.
+    pub chain_name: String,
+    /// Chain ID for the initial chain.
+    pub chain_id: u64,
+    /// Prover mode ("no-proofs" or "gpu").
+    pub prover_mode: String,
+    /// Wallet creation mode ("random" or "provided").
+    pub wallet_creation: String,
+    /// L1 network ("localhost", "sepolia", "mainnet").
+    pub l1_network: String,
+    /// Whether to start Docker containers after creation.
+    pub start_containers: bool,
 }
 
 impl Default for ZkstackCli {
