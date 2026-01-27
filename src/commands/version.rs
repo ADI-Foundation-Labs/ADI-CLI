@@ -21,7 +21,7 @@ impl VersionCommand {
     }
 }
 
-async fn show_version(context: &Context) -> Result<()> {
+async fn show_version(_context: &Context) -> Result<()> {
     let package_name = PKG_NAME;
     let package_version = PKG_VERSION;
 
@@ -34,8 +34,8 @@ async fn show_version(context: &Context) -> Result<()> {
     };
 
     // Display version information
-    context.info(&format!("{} {}", package_name, package_version));
-    context.info(&format!("commit: {}", git_commit_short));
+    ::log::info!("{} {}", package_name, package_version);
+    ::log::info!("commit: {}", git_commit_short);
 
     Ok(())
 }

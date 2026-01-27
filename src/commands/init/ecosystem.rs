@@ -13,6 +13,7 @@ use crate::chain::config::ProverMode;
 use crate::context::Context;
 use crate::ecosystem::config::SettlementNetwork;
 use crate::error::Result;
+use crate::success;
 
 /// Wallet creation mode for ecosystem initialization.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, clap::ValueEnum)]
@@ -192,10 +193,7 @@ impl InitEcosystem {
             SettlementNetwork::from(self.settlement_network)
         };
 
-        context.info(&format!(
-            "Initializing ecosystem '{}'",
-            ecosystem_name.cyan()
-        ));
+        ::log::info!("Initializing ecosystem '{}'", ecosystem_name.cyan());
 
         // Check if ecosystem already exists
         if ecosystem_path.exists() {
@@ -211,18 +209,18 @@ impl InitEcosystem {
         }
 
         // Generate wallets
-        context.info("Generating wallet keypairs...");
+        ::log::info!("Generating wallet keypairs...");
         let wallets =
             EcosystemWallets::generate().wrap_err("Failed to generate ecosystem wallets")?;
 
-        context.info(&format!(
+        ::log::info!(
             "Generated deployer wallet: {}",
             format!("{}", wallets.deployer.address).bright_yellow()
-        ));
-        context.info(&format!(
+        );
+        ::log::info!(
             "Generated governor wallet: {}",
             format!("{}", wallets.governor.address).bright_yellow()
-        ));
+        );
 
         // Create ecosystem structure
         let now = Utc::now();
@@ -244,7 +242,7 @@ impl InitEcosystem {
             .wrap_err("Invalid ecosystem configuration")?;
 
         // Create directory structure
-        context.info("Creating ecosystem directory structure...");
+        ::log::info!("Creating ecosystem directory structure...");
         ecosystem
             .create_directory_structure()
             .await
@@ -256,11 +254,11 @@ impl InitEcosystem {
             .await
             .wrap_err_with(|| format!("Failed to create chain directory for '{}'", chain_name))?;
 
-        context.info(&format!(
+        ::log::info!(
             "Creating initial chain '{}' with ID {}",
             chain_name.cyan(),
             chain_id.to_string().cyan()
-        ));
+        );
 
         // Save ecosystem state using filesystem backend
         let state_backend = FilesystemBackend::new(state_dir.clone())
@@ -326,10 +324,7 @@ impl InitEcosystem {
             .wrap_err("Failed to create chain genesis placeholder")?;
 
         // Success output
-        context.success(&format!(
-            "Ecosystem initialized at {}",
-            ecosystem_path.display()
-        ));
+        success!("Ecosystem initialized at {}", ecosystem_path.display());
 
         println!();
         println!("{}", "State files created:".bright_white().bold());
