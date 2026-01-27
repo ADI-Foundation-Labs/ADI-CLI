@@ -17,6 +17,8 @@ alloy-primitives = "0.8"        # Address, B256, U256, Bytes
 alloy-signer = "0.8"            # Wallet signing
 alloy-provider = "0.8"          # RPC provider
 secrecy = "0.8"                 # Secret string handling
+bollard = "0.18"                # Docker API client for container orchestration
+futures-util = "0.3"            # Async stream handling for Docker output
 ```
 
 ---
@@ -596,12 +598,73 @@ pub struct EcosystemConfig {
     pub chain_id: u64,
 }
 
+/// Configuration for Docker toolkit image orchestration.
+/// The CLI runs on the host and orchestrates pre-built toolkit containers.
 pub struct DockerConfig {
-    pub zksync_era_commit: String,
-    pub era_contracts_tag: String,
-    pub foundry_zksync_version: String,
+    pub registry: String,        // e.g., "harbor.io/adi"
+    pub image_name: String,      // e.g., "adi-toolkit"
+}
+
+impl Default for DockerConfig {
+    fn default() -> Self {
+        Self {
+            registry: "harbor.io/adi".to_string(),
+            image_name: "adi-toolkit".to_string(),
+        }
+    }
+}
+
+// Image reference format: {registry}/{image_name}:v{major}.{minor}.{patch}
+// Example: harbor.io/adi/adi-toolkit:v29.0.11
+```
+
+---
+
+### 12. ToolkitRunner
+
+Executes commands inside Docker toolkit containers.
+
+```rust
+/// Runs commands in ephemeral Docker toolkit containers.
+/// Container lifecycle: create → start → stream output → wait → remove
+pub struct ToolkitRunner {
+    docker: bollard::Docker,
+    config: DockerConfig,
+}
+
+impl ToolkitRunner {
+    /// Execute zkstack CLI command in toolkit container
+    pub async fn run_zkstack(
+        &self,
+        args: &[&str],
+        state_dir: &Path,
+        protocol_version: &Version,
+    ) -> Result<i64>;
+
+    /// Execute forge command in toolkit container
+    pub async fn run_forge(
+        &self,
+        args: &[&str],
+        state_dir: &Path,
+        protocol_version: &Version,
+    ) -> Result<i64>;
+
+    /// Execute cast command in toolkit container
+    pub async fn run_cast(
+        &self,
+        args: &[&str],
+        protocol_version: &Version,
+    ) -> Result<i64>;
 }
 ```
+
+**Container Configuration:**
+- Image: `{registry}/{image_name}:v{protocol_version}`
+- Working directory: `/workspace`
+- Volume mounts: `{state_dir}:/workspace` (read-write)
+- Network: host (for RPC access)
+- Lifecycle: Ephemeral (removed after each operation)
+- Output: Real-time streaming to terminal
 
 ---
 
@@ -779,7 +842,7 @@ impl Wallet {
 
 ---
 
-## Recommended Alloy Crates
+## Recommended Crates
 
 | Crate              | Purpose                                             |
 | ------------------ | --------------------------------------------------- |
@@ -789,3 +852,5 @@ impl Wallet {
 | `alloy-contract`   | Contract interaction helpers                        |
 | `alloy-rlp`        | RLP encoding for transactions                       |
 | `alloy-sol-types`  | Solidity type encoding/decoding                     |
+| `bollard`          | Docker API client for container orchestration       |
+| `futures-util`     | Async stream handling for Docker output streaming   |

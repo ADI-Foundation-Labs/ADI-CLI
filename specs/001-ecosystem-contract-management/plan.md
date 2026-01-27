@@ -5,19 +5,19 @@
 
 ## Summary
 
-SDK-first Rust CLI (`adi-cli`) for managing ZkSync ecosystem smart contracts within Docker containers. The CLI automates ecosystem initialization, contract deployment, chain registration, and upgrade operations by wrapping zkstack CLI and foundry-zksync tooling. Uses abstract state backends (filesystem default) for persistent storage with Docker volume mounts.
+SDK-first Rust CLI (`adi-cli`) for managing ZkSync ecosystem smart contracts. The CLI runs on the host machine and orchestrates pre-built Docker toolkit images containing zkstack CLI, foundry-zksync, and era-contracts. It automates ecosystem initialization, contract deployment, chain registration, and upgrade operations. Uses abstract state backends (filesystem default) for persistent storage.
 
 ## Technical Context
 
 **Language/Version**: Rust (latest stable, edition 2021)
-**Primary Dependencies**: Clap 4 (CLI), Tokio (async), eyre (errors), config (YAML), serde (serialization), colored (output)
+**Primary Dependencies**: Clap 4 (CLI), Tokio (async), eyre (errors), config (YAML), serde (serialization), bollard (Docker API)
 **Storage**: Filesystem-based key-value state backend (abstract trait for extensibility)
 **Testing**: cargo test (unit + integration), contract tests against local Anvil
-**Target Platform**: Linux containers (Docker), also macOS for development
+**Target Platform**: Host machine (Linux, macOS) with Docker daemon
 **Project Type**: Single project with SDK-first architecture (library crates + thin CLI wrapper)
 **Performance Goals**: CLI responsiveness <1s for non-network operations; deployment bound by settlement layer transaction times
-**Constraints**: Must operate within Docker; no dependency installation; strict Clippy lints (no panics, no unwrap, no indexing)
-**Scale/Scope**: Single ecosystem with multiple chains; ~9 user stories across 3 priority levels
+**Constraints**: Requires Docker daemon running; strict Clippy lints (no panics, no unwrap, no indexing)
+**Scale/Scope**: Single ecosystem with multiple chains; 6 user stories across 3 priority levels
 
 ## Constitution Check
 
@@ -105,7 +105,6 @@ src/
 ├── commands/            # Command implementations
 │   ├── mod.rs           # Commands enum registration
 │   ├── version.rs       # Version command (existing)
-│   ├── doctor.rs        # Dependency verification
 │   ├── init/            # Init subcommands
 │   │   ├── mod.rs
 │   │   ├── ecosystem.rs # Initialize ecosystem
@@ -130,7 +129,17 @@ src/
 │   ├── mod.rs
 │   ├── config.rs        # Chain configuration types
 │   └── contracts.rs     # Chain contract addresses
-├── external/            # External tool wrappers
+├── docker/              # Docker orchestration (Bollard)
+│   ├── mod.rs           # Module exports
+│   ├── client.rs        # Docker client wrapper
+│   ├── container.rs     # Container lifecycle
+│   ├── image.rs         # Image pulling/management
+│   └── stream.rs        # Real-time output streaming
+├── toolkit/             # Toolkit abstraction
+│   ├── mod.rs           # Module exports
+│   ├── config.rs        # Image configuration
+│   └── runner.rs        # Command execution via containers
+├── external/            # External tool wrappers (via Docker)
 │   ├── mod.rs
 │   ├── zkstack.rs       # zkstack CLI wrapper
 │   ├── forge.rs         # forge wrapper
@@ -145,9 +154,8 @@ tests/
 └── contract/            # Contract tests (Anvil)
 
 docker/
-├── Dockerfile.deps      # Dependencies image (zkstack + foundry-zksync)
-├── Dockerfile           # CLI image (on top of deps)
-└── docker-bake.hcl      # Docker Bake configuration
+├── Dockerfile           # Toolkit image (zkstack + foundry-zksync + era-contracts)
+└── docker-bake.hcl      # Docker Bake configuration for toolkit images
 
 Taskfile.yml             # Development task automation
 ```
