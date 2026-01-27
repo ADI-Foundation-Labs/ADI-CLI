@@ -3,7 +3,7 @@
 **Feature Branch**: `001-ecosystem-contract-management`
 **Created**: 2026-01-22
 **Status**: Draft
-**Input**: User description: SDK-first Rust CLI for managing ZkSync ecosystem smart contracts within Docker containers, featuring abstract state backends, automation of chain deployments, and contract upgrade operations.
+**Input**: User description: SDK-first Rust CLI for managing ZkSync ecosystem smart contracts. The CLI runs on the host machine and orchestrates pre-built Docker toolkit images containing zkstack, foundry-zksync, and era-contracts. Features abstract state backends, automation of chain deployments, and contract upgrade operations.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -13,18 +13,18 @@ As a chain operator, I want to initialize a new ZkSync ecosystem configuration f
 
 **Why this priority**: This is the foundational operation that must occur before any other ecosystem management. Without ecosystem initialization, no other operations are possible.
 
-**Independent Test**: Can be fully tested by running the init command in a Docker container with mounted volumes, verifying that all configuration files (ZkStack.yaml, wallets.yaml, contracts.yaml) are generated in the state directory.
+**Independent Test**: Can be fully tested by running the init command with Docker available, verifying that all configuration files (ZkStack.yaml, wallets.yaml, contracts.yaml) are generated in the state directory.
 
 
 **Acceptance Scenarios**:
 
-1. **Given** a Docker container with required dependencies (zkstack CLI, foundry-zksync), **When** user runs `adi init ecosystem` with ecosystem name and settlement network configuration, **Then** the system creates the ecosystem directory structure with ZkStack.yaml, configs directory, and chains directory.
+1. **Given** Docker is running with toolkit images available, **When** user runs `adi init ecosystem` with ecosystem name and settlement network configuration, **Then** the system creates the ecosystem directory structure with ZkStack.yaml, configs directory, and chains directory.
 
 2. **Given** user provides a config file with private keys, **When** ecosystem init is executed, **Then** the system uses provided keys for deployer and governor wallets instead of generating random ones.
 
 3. **Given** no existing state, **When** user runs `adi init ecosystem --chain-name mychain --chain-id 222`, **Then** a chain configuration is created with proper wallet files (wallets.yaml containing deployer, operator, governor keys).
 
-4. **Given** ecosystem init completes successfully, **When** user mounts the output directory, **Then** all generated files are accessible from the host machine.
+4. **Given** ecosystem init completes successfully, **Then** all generated files are stored in the configured state directory on the host machine.
 
 ---
 
@@ -96,25 +96,7 @@ As a chain operator, I want to deploy chain contracts and register my chain with
 
 ---
 
-### User Story 4 - Verify Dependency Availability (Priority: P2)
-
-As a chain operator running the CLI in Docker, I want the system to verify that required external tools are available so that I can troubleshoot missing dependencies before starting operations.
-
-**Why this priority**: Dependency verification prevents cryptic failures during operations and improves user experience.
-
-**Independent Test**: Can be tested by running `adi doctor` command and verifying it reports status of zkstack CLI, foundry (forge/cast), and required environment configurations.
-
-**Acceptance Scenarios**:
-
-1. **Given** CLI is executed in Docker, **When** user runs `adi doctor`, **Then** system checks for zkstack CLI, forge, cast, and reports availability status for each.
-
-2. **Given** a dependency is missing, **When** user runs `adi doctor`, **Then** system reports which dependency is missing and does NOT attempt to install it.
-
-3. **Given** all dependencies are available, **When** user runs any command, **Then** operations proceed without dependency-related failures.
-
----
-
-### User Story 5 - Upgrade Ecosystem Contracts (Priority: P2)
+### User Story 4 - Upgrade Ecosystem Contracts (Priority: P2)
 
 As a chain operator, I want to upgrade ecosystem contracts to a new protocol version so that I can benefit from new features and security fixes.
 
@@ -132,7 +114,7 @@ As a chain operator, I want to upgrade ecosystem contracts to a new protocol ver
 
 ---
 
-### User Story 6 - Upgrade Chain Contracts (Priority: P2)
+### User Story 5 - Upgrade Chain Contracts (Priority: P2)
 
 As a chain operator, I want to upgrade my chain's contracts to match the ecosystem protocol version so that my chain can use new features.
 
@@ -150,7 +132,7 @@ As a chain operator, I want to upgrade my chain's contracts to match the ecosyst
 
 ---
 
-### User Story 7 - Manage State Backend (Priority: P3)
+### User Story 6 - Manage State Backend (Priority: P3)
 
 As a chain operator, I want to use different state backends so that I can persist ecosystem state in various storage systems.
 
@@ -162,9 +144,9 @@ As a chain operator, I want to use different state backends so that I can persis
 
 1. **Given** filesystem state backend is configured, **When** user performs any operation, **Then** state is persisted to the configured directory path.
 
-2. **Given** state directory is mounted from host, **When** container exits, **Then** all state is preserved and accessible on host.
+2. **Given** state directory is configured, **When** CLI operations complete, **Then** all state is preserved in the configured directory.
 
-3. **Given** state exists from previous session, **When** new container mounts same state, **Then** operations can continue from previous state.
+3. **Given** state exists from previous session, **When** CLI is run again, **Then** operations can continue from previous state.
 
 ---
 
@@ -175,7 +157,7 @@ As a chain operator, I want to use different state backends so that I can persis
 - What happens when gas price changes significantly during multi-transaction deployment? System should handle transaction failures gracefully.
 - What happens when user tries to upgrade to an unsupported version? System should validate target version before proceeding.
 - What happens when state directory has corrupted files? System should validate state integrity on startup.
-- What happens when Docker container runs without required mounts? System should detect and report missing mounts clearly.
+- What happens when Docker daemon is not running? System should detect and report clearly with instructions to start Docker.
 
 ## Requirements *(mandatory)*
 
@@ -183,17 +165,15 @@ As a chain operator, I want to use different state backends so that I can persis
 
 - **FR-001**: System MUST be architected with SDK-first approach where core logic resides in reusable library crates, with CLI being a thin wrapper.
 
-- **FR-002**: System MUST operate within Docker containers without installing dependencies (only verifying their existence).
+- **FR-002**: System MUST run on the host machine and orchestrate pre-built Docker toolkit images. The CLI does NOT run inside Docker containers.
 
-- **FR-003**: System MUST support two Docker files (so that we won't build first image with the dependencies each time, but only docker image with the CLI above the first image as a source): (1) dependencies image with zkstack CLI and foundry-zksync, (2) CLI image with this tool.
+- **FR-003**: System MUST use pre-built toolkit Docker images containing zkstack CLI, foundry-zksync, and era-contracts. Images are tagged by protocol version (e.g., `v29`, `v30`).
 
-- **FR-004**: System MUST use Docker Bake for building parameterized container images:
-Commits:
-- smart contracts (zksync-era)
-- os-integration
-- Zk-os
-- Genesis.json
--  (Install `foundryup-zksync` (to get the `cast` tool): https://foundry-book.zksync.io/introduction/installation/)
+- **FR-004**: System MUST use Docker Bake for building parameterized toolkit container images with:
+  - zksync-era commit (smart contracts)
+  - era-contracts tag
+  - foundry-zksync version
+  - Optional: os-integration commit, zk-os commit
 
 - **FR-005**: System MUST implement abstract state backend with key-value storage interface.
 
@@ -214,13 +194,13 @@ Commits:
 
 - **FR-011**: System MUST allow users to provide private keys in configuration for deployment and wallet funding.
 
-- **FR-012**: System MUST support mounting state and config directories when running in Docker.
+- **FR-012**: System MUST mount state directories into toolkit containers for persistence.
 
-- **FR-013**: System MUST support creating new ecosystem state from scratch and outputting it to host machine.
+- **FR-013**: System MUST support creating new ecosystem state from scratch in the configured state directory.
 
 - **FR-014**: System MUST automate the manual processes documented in deployment and upgrade guides.
 
-- **FR-015**: System MUST verify external dependency availability (zkstack, forge, cast) before operations with the fixed version.
+- **FR-015**: System MUST auto-detect protocol version from ecosystem configuration and select the appropriate toolkit image, with CLI flag override (`--protocol-version`) available.
 
 - **FR-016**: System MUST support configuring settlement layer RPC URL for contract interactions.
 
@@ -239,6 +219,14 @@ Commits:
 - **FR-023**: System MUST verify sufficient balance (ETH, and CGT when custom base token is configured) in funder wallet before starting deployment operations and report required amounts if insufficient.
 
 - **FR-024**: System MUST allow configuration of CGT (Custom Gas Token) contract address for automatic funding operations when chain uses custom base token (base token address != `0x0000000000000000000000000000000000000001`).
+
+- **FR-025**: System MUST require Docker to be installed and running on the host machine.
+
+- **FR-026**: System MUST automatically pull toolkit images from the configured registry when they are not available locally.
+
+- **FR-027**: System MUST use ephemeral containers (create, run, remove) for each operation to ensure clean state.
+
+- **FR-028**: System MUST stream container output to the terminal in real-time during operations.
 
 ### Key Entities
 
@@ -276,7 +264,7 @@ Commits:
 
 ## Assumptions
 
-- Users have access to Docker and can run containers.
+- Users have Docker installed and running on their host machine (Docker Desktop or Docker Engine).
 - Settlement layer RPC endpoints are available and have appropriate rate limits for deployment operations.
 - Users understand basic ZkSync ecosystem concepts (bridgehub, chain admin, governance).
 - The reference ecosystem directory structure from dry_run_ecosystem is the canonical format.

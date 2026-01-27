@@ -1,6 +1,8 @@
 ## Overview
 
-SDK-first Rust CLI (`adi-cli`) for managing ZkSync ecosystem smart contracts within Docker containers.
+SDK-first Rust CLI (`adi-cli`) for managing ZkSync ecosystem smart contracts. The CLI runs on the host machine and orchestrates pre-built Docker toolkit images containing zkstack, foundry-zksync, and era-contracts.
+
+**Requirement:** Docker must be installed and running on the host machine.
 
 ## Key Principles
 
@@ -69,7 +71,6 @@ cargo test               # Run tests
 - `adi deploy ecosystem` - Deploy ecosystem contracts to settlement layer
 - `adi init chain` - Initialize chain configuration within an ecosystem
 - `adi deploy chain` - Deploy chain contracts to settlement layer
-- `adi doctor` - Verify external dependency availability (zkstack, forge, cast)
 - `adi upgrade ecosystem` - Upgrade ecosystem contracts to new protocol version
 - `adi upgrade chain` - Upgrade chain contracts to match ecosystem version
 
@@ -100,13 +101,38 @@ Commands live in `src/commands/`. Each command module:
 
 See `commands/version.rs` for the pattern.
 
-## Docker
+## Docker Architecture
 
-Two-layer image structure:
-1. **Dependencies image**: zkstack CLI + foundry-zksync
-2. **CLI image**: This tool built on top of dependencies
+The CLI orchestrates pre-built toolkit Docker images:
 
-Uses Docker Bake for parameterized builds. State directories mounted from host for persistence.
+```
+Host Machine
+┌─────────────────────────────────────────────────────────┐
+│  adi-cli (Rust binary)                                  │
+│  ├── Commands (Clap)                                    │
+│  ├── Docker Orchestrator (Bollard)                      │
+│  └── Config/State (~/.adi_cli/)                         │
+└────────────────────┬────────────────────────────────────┘
+                     │ Docker API
+┌────────────────────▼────────────────────────────────────┐
+│  Docker Daemon                                          │
+│  └── adi-toolkit:v{VERSION} (ephemeral container)      │
+│      ├── zkstack CLI                                    │
+│      ├── foundry-zksync (forge, cast)                   │
+│      └── era-contracts                                  │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Toolkit Images:**
+- Pre-built images containing all dependencies
+- Tagged by protocol version (e.g., `v29`, `v30`)
+- Default registry: `harbor.io/adi/adi-toolkit`
+- Auto-pulled when missing
+
+**Container Lifecycle:**
+- Ephemeral: containers are created, run, and removed per operation
+- State persists via host volume mounts to `~/.adi_cli/state/`
+- Real-time output streaming to terminal
 
 ## State Backend
 
