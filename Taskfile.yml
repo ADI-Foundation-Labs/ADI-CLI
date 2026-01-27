@@ -33,3 +33,10 @@ tasks:
     cmds:
       - docker buildx bake -f docker/docker-bake.hcl {{.TARGETS}}
       - mkdir -p .task && touch .task/build_docker_{{.TARGETS}}
+
+  push:docker:
+    desc: Build and push Docker images using Docker Bake
+    vars:
+      TARGETS: '{{default "default" .TARGETS}}'
+    cmds:
+      - docker buildx bake -f docker/docker-bake.hcl --push {{.TARGETS}}

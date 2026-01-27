@@ -1,5 +1,6 @@
 variable "REGISTRY" {
-  default = "ghcr.io/adi"
+  // default = "ghcr.io/adi"
+  default = "registry.sre.ideasoft.io/adi-foundation/adi-chain/cli"
 }
 
 variable "PLATFORMS" {

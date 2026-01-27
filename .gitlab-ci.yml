@@ -1,0 +1,36 @@
+stages:
+  - build
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
+  BUILD_TARGET:
+    value: "default"
+    description: "Select the build target (default, toolkit-v29, toolkit-v30)"
+    options:
+      - "default"
+      - "toolkit-v29"
+      - "toolkit-v30"
+
+build-docker:
+  stage: build
+  image: docker:27.5.1
+  services:
+    - docker:27.5.1-dind
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
+    - |
+      for i in $(seq 1 30); do
+        if docker info > /dev/null 2>&1; then
+          echo "Docker daemon is up and running!"
+          break
+        fi
+        echo "Waiting for Docker daemon... $i"
+        sleep 1
+      done
+      docker info
+    - wget -qO- https://taskfile.dev/install.sh | sh -s -- -d -b /usr/local/bin
+  script:
+    - task push:docker TARGETS=$BUILD_TARGET
+  when: manual
