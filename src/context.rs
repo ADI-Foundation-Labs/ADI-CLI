@@ -4,12 +4,13 @@ use crate::{config::Config, log::Logger};
 
 #[derive(Clone)]
 pub struct Context {
+    #[allow(dead_code)] // Will be used when commands need config access
     cfg: Config,
     log: Logger,
 }
 
 impl Context {
-    pub fn new_from_options(options: &super::Opts) -> Result<Self> {
+    pub fn new_from_options(_options: &super::Opts) -> Result<Self> {
         let cfg = Config::new().wrap_err("Failed to load config")?;
 
         Ok(Self {
@@ -18,6 +19,7 @@ impl Context {
         })
     }
 
+    #[allow(dead_code)] // Will be used when commands need config access
     pub fn config(&self) -> &Config {
         &self.cfg
     }
@@ -36,10 +38,12 @@ impl Context {
         self.log.info(msg);
     }
 
+    #[allow(dead_code)] // Will be used by commands for success messages
     pub fn success(&self, msg: &str) {
         self.log.success(msg);
     }
 
+    #[allow(dead_code)] // Will be used by commands for formatted success messages
     pub fn success_fmt(&self, msg: &str) {
         self.log.success_fmt(msg);
     }

@@ -28,6 +28,22 @@ serde = { version = "1", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "6.0"
 
+# Crypto and EVM types (alloy 1.x ecosystem)
+alloy-primitives = { version = "1", default-features = false }
+alloy-signer = { version = "1", default-features = false }
+alloy-signer-local = { version = "1", default-features = false }
+alloy-provider = { version = "1", default-features = false }
+
+# Version handling
+semver = { version = "1", features = ["serde"] }
+
+# Security
+secrecy = { version = "0.8", features = ["serde"] }
+
+# Utilities
+uuid = { version = "1", features = ["v4", "serde"] }
+async-trait = "0.1"
+
 [build-dependencies]
 built = { version = "0.7", features = ["git2"] }
 

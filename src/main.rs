@@ -4,11 +4,16 @@ use clap::{
 };
 use serde::{Deserialize, Serialize};
 
+mod chain;
 mod commands;
 mod config;
 mod context;
+mod ecosystem;
 mod error;
+mod external;
+mod funding;
 mod log;
+mod state;
 
 const STYLES: Styles = Styles::styled()
     .header(Ansi::Green.on_default().bold())

@@ -32,12 +32,12 @@ Based on plan.md structure:
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Add alloy and crypto dependencies (alloy-primitives, alloy-signer, alloy-provider, semver, secrecy, uuid, async-trait) to Cargo.toml
-- [ ] T002 [P] Create src/state/mod.rs with StateBackend trait definition
-- [ ] T003 [P] Create src/ecosystem/mod.rs module structure
-- [ ] T004 [P] Create src/chain/mod.rs module structure
-- [ ] T005 [P] Create src/external/mod.rs module structure
-- [ ] T006 [P] Create src/funding/mod.rs module structure
+- [X] T001 Add alloy and crypto dependencies (alloy-primitives, alloy-signer, alloy-provider, semver, secrecy, uuid, async-trait) to Cargo.toml
+- [X] T002 [P] Create src/state/mod.rs with StateBackend trait definition
+- [X] T003 [P] Create src/ecosystem/mod.rs module structure
+- [X] T004 [P] Create src/chain/mod.rs module structure
+- [X] T005 [P] Create src/external/mod.rs module structure
+- [X] T006 [P] Create src/funding/mod.rs module structure
 
 ---
 

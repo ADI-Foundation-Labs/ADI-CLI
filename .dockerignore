@@ -1,0 +1,37 @@
+# Build artifacts
+target/
+debug/
+
+# Version control
+.git/
+.gitignore
+
+# Environment files
+.env*
+
+# Logs
+*.log
+
+# IDE/Editor directories
+.vscode/
+.idea/
+
+# Claude Code
+.claude/
+
+# Task runner
+.task/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation (except README)
+*.md
+!README.md
+
+# Specification files
+specs/
+
+# Tests (not needed in production image)
+tests/

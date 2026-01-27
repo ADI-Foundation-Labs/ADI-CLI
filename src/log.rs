@@ -24,10 +24,12 @@ impl Logger {
         println!("{}", MessageBuilder::new().info(msg).build());
     }
 
+    #[allow(dead_code)] // Will be used by Context for formatted success messages
     pub fn success_fmt(&self, msg: &str) {
         println!("{}", MessageBuilder::new().success_fmt(msg).build());
     }
 
+    #[allow(dead_code)] // Will be used by Context for success messages
     pub fn success(&self, msg: &str) {
         println!("{}", MessageBuilder::new().success(msg).build());
     }
@@ -75,11 +77,13 @@ impl MessageBuilder {
             .add(msg)
     }
 
+    #[allow(dead_code)] // Will be used by Logger for formatted success messages
     pub fn success_fmt(self, msg: &str) -> Self {
         self.add(&format!("{}", "[Success]: ".green().bold()))
             .add(msg)
     }
 
+    #[allow(dead_code)] // Will be used by Logger for success messages
     pub fn success(self, msg: &str) -> Self {
         self.success_fmt(&format!("{}", msg.green()))
     }
