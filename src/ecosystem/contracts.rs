@@ -17,6 +17,8 @@ use serde::{Deserialize, Serialize};
 /// The actual contracts deployed vary by protocol version. This struct captures
 /// the core contracts used in v0.29.x-v0.30.x. Additional contracts (libraries,
 /// implementations, facets) are tracked separately in deployment output files.
+// Note: Currently unused as commands are implemented in later phases (US1-US6)
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EcosystemContracts {
     // ========================================
@@ -152,6 +154,7 @@ pub struct EcosystemContracts {
     // - chain_type_manager_impl_addr: Address // ChainTypeManager implementation
 }
 
+#[allow(dead_code)]
 impl EcosystemContracts {
     /// Validates that all required contract addresses are non-zero.
     ///

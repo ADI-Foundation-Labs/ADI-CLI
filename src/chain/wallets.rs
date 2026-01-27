@@ -27,6 +27,8 @@ use crate::ecosystem::wallets::Wallet;
 /// | execute_operator | 5 ETH        | -             |
 ///
 /// *CGT (Custom Gas Token) only required when chain uses custom base token.
+// Note: Currently unused as commands are implemented in later phases (US1-US6)
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChainWallets {
     /// The deployer wallet for contract deployment.
@@ -49,6 +51,7 @@ pub struct ChainWallets {
     // - token_multiplier_setter: Wallet // Token multiplier setter
 }
 
+#[allow(dead_code)]
 impl ChainWallets {
     /// Creates new chain wallets from individual wallets.
     pub fn new(

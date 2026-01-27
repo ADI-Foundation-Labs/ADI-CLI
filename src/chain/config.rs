@@ -38,6 +38,8 @@ use super::wallets::ChainWallets;
 ///     decimals: 18,
 /// };
 /// ```
+// Note: Currently unused as commands are implemented in later phases (US1-US6)
+#[allow(dead_code)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum BaseToken {
@@ -57,6 +59,7 @@ pub enum BaseToken {
     },
 }
 
+#[allow(dead_code)]
 impl BaseToken {
     /// The canonical ETH address used in ZkSync.
     pub const ETH_ADDRESS: &'static str = "0x0000000000000000000000000000000000000001";
@@ -104,6 +107,8 @@ impl std::fmt::Display for BaseToken {
 /// Determines how transaction validity proofs are generated:
 /// - `NoProofs`: No ZK proofs (development/testing only)
 /// - `Gpu`: GPU-accelerated proof generation (production)
+// Note: Currently unused as commands are implemented in later phases (US1-US6)
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ProverMode {
@@ -115,6 +120,7 @@ pub enum ProverMode {
     Gpu,
 }
 
+#[allow(dead_code)]
 impl ProverMode {
     /// Returns the zkstack CLI argument for this mode.
     pub fn as_zkstack_arg(self) -> &'static str {
@@ -138,6 +144,8 @@ impl std::fmt::Display for ProverMode {
 ///
 /// Tracks the current state of a chain through its lifecycle from
 /// initialization to running.
+// Note: Currently unused as commands are implemented in later phases (US1-US6)
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ChainState {
@@ -158,6 +166,7 @@ pub enum ChainState {
     Stopped,
 }
 
+#[allow(dead_code)]
 impl ChainState {
     /// Checks if the chain is operational (deployed and running/upgrading).
     pub fn is_operational(self) -> bool {
@@ -197,6 +206,8 @@ impl std::fmt::Display for ChainState {
 ///     ├── genesis.yaml
 ///     └── general.yaml
 /// ```
+// Note: Currently unused as commands are implemented in later phases (US1-US6)
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Chain {
     /// Unique chain name within the ecosystem (alphanumeric with underscores).
@@ -231,6 +242,7 @@ pub struct Chain {
     pub updated_at: DateTime<Utc>,
 }
 
+#[allow(dead_code)]
 impl Chain {
     /// Reserved chain IDs that cannot be used (settlement layer networks).
     pub const RESERVED_CHAIN_IDS: &'static [u64] = &[

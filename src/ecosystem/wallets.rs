@@ -25,6 +25,8 @@ use serde::{Deserialize, Serialize};
 ///     private_key: Some(SecretString::new("0x...".to_string())),
 /// };
 /// ```
+// Note: Currently unused as commands are implemented in later phases (US1-US6)
+#[allow(dead_code)]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Wallet {
     /// The wallet's Ethereum address.
@@ -38,6 +40,7 @@ pub struct Wallet {
     pub private_key: Option<SecretString>,
 }
 
+#[allow(dead_code)]
 impl Wallet {
     /// Creates a new wallet with just an address (no private key).
     ///
@@ -116,6 +119,8 @@ impl std::fmt::Debug for Wallet {
 /// |----------|--------------|
 /// | deployer | 1 ETH        |
 /// | governor | 1 ETH        |
+// Note: Currently unused as commands are implemented in later phases (US1-US6)
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EcosystemWallets {
     /// The deployer wallet for contract deployment.
@@ -133,6 +138,7 @@ pub struct EcosystemWallets {
     // - security_council: Option<Wallet> // Security council wallet
 }
 
+#[allow(dead_code)]
 impl EcosystemWallets {
     /// Creates new ecosystem wallets from deployer and governor wallets.
     pub fn new(deployer: Wallet, governor: Wallet) -> Self {

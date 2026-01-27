@@ -28,6 +28,10 @@ pub mod contracts;
 pub mod wallets;
 
 // Re-export commonly used types
+// Note: Currently unused as commands are implemented in later phases (US1-US6)
+#[allow(unused_imports)]
 pub use config::{BaseToken, Chain, ChainState, ProverMode};
+#[allow(unused_imports)]
 pub use contracts::ChainContracts;
+#[allow(unused_imports)]
 pub use wallets::ChainWallets;

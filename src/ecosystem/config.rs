@@ -31,6 +31,8 @@ use super::wallets::EcosystemWallets;
 ///     chain_id: 12345,
 /// };
 /// ```
+// Note: Currently unused as commands are implemented in later phases (US1-US6)
+#[allow(dead_code)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SettlementNetwork {
@@ -53,6 +55,7 @@ pub enum SettlementNetwork {
     },
 }
 
+#[allow(dead_code)]
 impl SettlementNetwork {
     /// Returns the chain ID for this network.
     ///
@@ -123,6 +126,8 @@ impl std::fmt::Display for SettlementNetwork {
 ///         ├── genesis.yaml
 ///         └── general.yaml
 /// ```
+// Note: Currently unused as commands are implemented in later phases (US1-US6)
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Ecosystem {
     /// Unique ecosystem name (alphanumeric with underscores, max 64 chars).
@@ -155,6 +160,7 @@ pub struct Ecosystem {
     pub updated_at: DateTime<Utc>,
 }
 
+#[allow(dead_code)]
 impl Ecosystem {
     /// Validates the ecosystem configuration.
     ///

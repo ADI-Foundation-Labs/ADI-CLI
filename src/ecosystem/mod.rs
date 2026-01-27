@@ -31,8 +31,12 @@ pub mod contracts;
 pub mod wallets;
 
 // Re-export commonly used types
+// Note: Currently unused as commands are implemented in later phases (US1-US6)
+#[allow(unused_imports)]
 pub use config::{Ecosystem, SettlementNetwork};
+#[allow(unused_imports)]
 pub use contracts::EcosystemContracts;
+#[allow(unused_imports)]
 pub use wallets::{EcosystemWallets, Wallet};
 
 use alloy_primitives::U256;
@@ -57,6 +61,8 @@ use semver::Version;
 /// let v30_0_1 = Version::new(30, 0, 1);
 /// assert_eq!(version_to_hex(&v30_0_1), U256::from(0x1e00000001u64));
 /// ```
+// Note: Currently unused as commands are implemented in later phases (US1-US6)
+#[allow(dead_code)]
 pub fn version_to_hex(version: &Version) -> U256 {
     let major = version.major;
     let minor = version.minor;
@@ -81,6 +87,8 @@ pub fn version_to_hex(version: &Version) -> U256 {
 /// let hex = U256::from(0x1e00000001u64);
 /// assert_eq!(hex_to_version(hex), Version::new(30, 0, 1));
 /// ```
+// Note: Currently unused as commands are implemented in later phases (US1-US6)
+#[allow(dead_code)]
 pub fn hex_to_version(hex: U256) -> Version {
     // Get the lowest limb (first 64 bits) - sufficient for version encoding
     let limbs = hex.as_limbs();

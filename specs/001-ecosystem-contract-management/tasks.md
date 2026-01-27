@@ -71,11 +71,11 @@ Based on plan.md structure:
 
 ### External Tool Wrappers
 
-- [ ] T023 [P] Create ZkstackCli struct with async command execution in src/external/zkstack.rs
-- [ ] T024 [P] Create ForgeCli struct with script execution support in src/external/forge.rs
-- [ ] T025 [P] Create CastCli struct with call/send/calldata methods in src/external/cast.rs
-- [ ] T026 Implement version checking for all external tools in src/external/mod.rs
-- [ ] T027 Export all external tool wrappers from src/external/mod.rs
+- [X] T023 [P] Create ZkstackCli struct with async command execution in src/external/zkstack.rs
+- [X] T024 [P] Create ForgeCli struct with script execution support in src/external/forge.rs
+- [X] T025 [P] Create CastCli struct with call/send/calldata methods in src/external/cast.rs
+- [X] T026 Implement version checking for all external tools in src/external/mod.rs
+- [X] T027 Export all external tool wrappers from src/external/mod.rs
 
 ### Configuration Enhancement
 

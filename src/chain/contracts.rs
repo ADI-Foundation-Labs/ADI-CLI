@@ -16,6 +16,8 @@ use serde::{Deserialize, Serialize};
 /// The actual contracts deployed vary by protocol version. This struct captures
 /// the core contracts used in v0.29.x-v0.30.x. Additional contracts are tracked
 /// separately in deployment output files.
+// Note: Currently unused as commands are implemented in later phases (US1-US6)
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChainContracts {
     // ========================================
@@ -92,6 +94,7 @@ pub struct ChainContracts {
     // - timestamp_asserter_addr: Address          // Timestamp asserter
 }
 
+#[allow(dead_code)]
 impl ChainContracts {
     /// Validates that all required contract addresses are non-zero.
     ///
