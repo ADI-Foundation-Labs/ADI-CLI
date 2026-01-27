@@ -88,10 +88,10 @@ Based on plan.md structure:
 
 ### CLI Base Structure
 
-- [ ] T034 Create src/commands/init/mod.rs with Init subcommand enum
-- [ ] T035 Create src/commands/deploy/mod.rs with Deploy subcommand enum
-- [ ] T036 Create src/commands/upgrade/mod.rs with Upgrade subcommand enum
-- [ ] T037 Register all new command modules in src/commands/mod.rs
+- [X] T034 Create src/commands/init/mod.rs with Init subcommand enum
+- [X] T035 Create src/commands/deploy/mod.rs with Deploy subcommand enum
+- [X] T036 Create src/commands/upgrade/mod.rs with Upgrade subcommand enum
+- [X] T037 Register all new command modules in src/commands/mod.rs
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 
