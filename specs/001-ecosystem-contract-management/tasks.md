@@ -79,12 +79,12 @@ Based on plan.md structure:
 
 ### Configuration Enhancement
 
-- [ ] T028 Add SettlementConfig struct (rpc_url, gas_price) to src/config.rs
-- [ ] T029 Add FunderConfig struct (private_key, cgt_address: Option) to src/config.rs
-- [ ] T030 Add EcosystemConfig struct (name, chain_name, chain_id) to src/config.rs
-- [ ] T031 Add DockerConfig struct (registry, image_name) for toolkit image configuration to src/config.rs
-- [ ] T032 Update Config struct to include settlement, funder, ecosystem, docker fields in src/config.rs
-- [ ] T033 Add environment variable mappings for new config fields (ADI_SETTLEMENT_RPC_URL, ADI_FUNDER_PRIVATE_KEY, etc.) in src/config.rs
+- [X] T028 Add SettlementConfig struct (rpc_url, gas_price) to src/config.rs
+- [X] T029 Add FunderConfig struct (private_key, cgt_address: Option) to src/config.rs
+- [X] T030 Add EcosystemConfig struct (name, chain_name, chain_id) to src/config.rs
+- [X] T031 Add DockerConfig struct (registry, image_name) for toolkit image configuration to src/config.rs
+- [X] T032 Update Config struct to include settlement, funder, ecosystem, docker fields in src/config.rs
+- [X] T033 Add environment variable mappings for new config fields (ADI_SETTLEMENT_RPC_URL, ADI_FUNDER_PRIVATE_KEY, etc.) in src/config.rs
 
 ### CLI Base Structure
 
