@@ -2,9 +2,6 @@
 
 version: "3"
 
-vars:
-  GREETING: Hello, World!
-
 tasks:
   _install_rust:
     internal: true
@@ -18,3 +15,28 @@ tasks:
       - _install_rust
     cmds:
       - cargo build
+
+  build:docker:
+    desc: Build Docker images using Docker Bake
+    vars:
+      TARGETS: '{{default "default" .TARGETS}}'
+    sources:
+      - docker/worker/Dockerfile
+      - docker/docker-bake.hcl
+    generates:
+      - .task/build_docker_{{.TARGETS}}
+    preconditions:
+      # Check if docker is running and have required commands
+      - docker ps
+      - docker buildx version
+      - docker buildx bake --help
+    cmds:
+      - docker buildx bake -f docker/docker-bake.hcl {{.TARGETS}}
+      - mkdir -p .task && touch .task/build_docker_{{.TARGETS}}
+
+  push:docker:
+    desc: Build and push Docker images using Docker Bake
+    vars:
+      TARGETS: '{{default "default" .TARGETS}}'
+    cmds:
+      - docker buildx bake -f docker/docker-bake.hcl --push {{.TARGETS}}

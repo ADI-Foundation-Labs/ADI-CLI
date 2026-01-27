@@ -13,3 +13,5 @@ target/
 .claude/*
 !.claude/commands
 .env
+.task/
+.DS_Store
