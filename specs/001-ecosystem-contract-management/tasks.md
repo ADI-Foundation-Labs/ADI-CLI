@@ -49,18 +49,18 @@ Based on plan.md structure:
 
 ### Data Model Types
 
-- [ ] T007 [P] Create Wallet struct with Address and SecretString in src/ecosystem/wallets.rs
-- [ ] T008 [P] Create SettlementNetwork enum (Mainnet, Sepolia, Localhost, Custom) in src/ecosystem/config.rs
-- [ ] T009 [P] Create BaseToken enum (Eth, Custom) in src/chain/config.rs
-- [ ] T010 [P] Create ProverMode enum (NoProofs, Gpu) in src/chain/config.rs
-- [ ] T011 [P] Create ChainState enum in src/chain/config.rs
-- [ ] T012 Implement EcosystemContracts struct with alloy Address types in src/ecosystem/contracts.rs
-- [ ] T013 Implement EcosystemWallets struct in src/ecosystem/wallets.rs
-- [ ] T014 Implement Ecosystem struct with validation in src/ecosystem/config.rs
-- [ ] T015 [P] Implement ChainContracts struct in src/chain/contracts.rs
-- [ ] T016 [P] Implement ChainWallets struct in src/chain/wallets.rs
-- [ ] T017 Implement Chain struct with validation in src/chain/config.rs
-- [ ] T018 [P] Create protocol version utilities (version_to_hex, hex_to_version) in src/ecosystem/mod.rs
+- [X] T007 [P] Create Wallet struct with Address and SecretString in src/ecosystem/wallets.rs
+- [X] T008 [P] Create SettlementNetwork enum (Mainnet, Sepolia, Localhost, Custom) in src/ecosystem/config.rs
+- [X] T009 [P] Create BaseToken enum (Eth, Custom) in src/chain/config.rs
+- [X] T010 [P] Create ProverMode enum (NoProofs, Gpu) in src/chain/config.rs
+- [X] T011 [P] Create ChainState enum in src/chain/config.rs
+- [X] T012 Implement EcosystemContracts struct with alloy Address types in src/ecosystem/contracts.rs
+- [X] T013 Implement EcosystemWallets struct in src/ecosystem/wallets.rs
+- [X] T014 Implement Ecosystem struct with validation in src/ecosystem/config.rs
+- [X] T015 [P] Implement ChainContracts struct in src/chain/contracts.rs
+- [X] T016 [P] Implement ChainWallets struct in src/chain/wallets.rs
+- [X] T017 Implement Chain struct with validation in src/chain/config.rs
+- [X] T018 [P] Create protocol version utilities (version_to_hex, hex_to_version) in src/ecosystem/mod.rs
 
 ### State Backend
 

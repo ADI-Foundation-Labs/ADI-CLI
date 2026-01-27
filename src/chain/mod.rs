@@ -11,8 +11,23 @@
 //! - Deployed contracts (Diamond Proxy, Chain Admin, bridges)
 //! - Wallet keypairs (deployer, governor, operators)
 //! - State lifecycle (Initialized, Deployed, Running, Upgrading, Stopped)
+//!
+//! # Example
+//!
+//! ```rust
+//! use adi_cli::chain::{Chain, BaseToken, ProverMode, ChainState};
+//!
+//! // Create a chain with ETH as base token
+//! let base_token = BaseToken::Eth;
+//! let prover_mode = ProverMode::NoProofs;
+//! let state = ChainState::Initialized;
+//! ```
 
-// Future submodules (to be created in Phase 2):
-// pub mod config;    // T009 BaseToken, T010 ProverMode, T011 ChainState, T017 Chain struct
-// pub mod contracts; // T015: ChainContracts struct
-// pub mod wallets;   // T016: ChainWallets struct
+pub mod config;
+pub mod contracts;
+pub mod wallets;
+
+// Re-export commonly used types
+pub use config::{BaseToken, Chain, ChainState, ProverMode};
+pub use contracts::ChainContracts;
+pub use wallets::ChainWallets;
