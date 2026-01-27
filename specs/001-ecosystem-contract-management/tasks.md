@@ -64,10 +64,10 @@ Based on plan.md structure:
 
 ### State Backend
 
-- [ ] T019 Implement FilesystemBackend struct in src/state/filesystem.rs
-- [ ] T020 Implement StateBackend trait for FilesystemBackend (get, set, delete, list_keys, exists) in src/state/filesystem.rs
-- [ ] T021 Add atomic write support (temp file + rename) in src/state/filesystem.rs
-- [ ] T022 Export FilesystemBackend from src/state/mod.rs
+- [X] T019 Implement FilesystemBackend struct in src/state/filesystem.rs
+- [X] T020 Implement StateBackend trait for FilesystemBackend (get, set, delete, list_keys, exists) in src/state/filesystem.rs
+- [X] T021 Add atomic write support (temp file + rename) in src/state/filesystem.rs
+- [X] T022 Export FilesystemBackend from src/state/mod.rs
 
 ### External Tool Wrappers
 

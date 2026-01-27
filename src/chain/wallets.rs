@@ -43,7 +43,6 @@ pub struct ChainWallets {
 
     /// The execute operator wallet for batch execution.
     pub execute_operator: Wallet,
-
     // TODO: Include additional wallets for database storage (not currently used by CLI):
     // - blob_operator: Wallet         // Blob operator wallet
     // - fee_account: Wallet           // Fee account wallet

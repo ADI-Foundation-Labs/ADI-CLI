@@ -32,7 +32,7 @@ use super::wallets::EcosystemWallets;
 /// };
 /// ```
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum SettlementNetwork {
     /// Ethereum Mainnet (chain ID: 1).
     Mainnet,

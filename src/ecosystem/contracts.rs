@@ -86,7 +86,6 @@ pub struct EcosystemContracts {
 
     /// Salt used with the Create2 Factory.
     pub create2_factory_salt: B256,
-
     // TODO: Include additional contracts for database storage (v29.11 deploys ~50 ecosystem contracts):
     //
     // Forge Libraries (auto-deployed via Create2 Factory):

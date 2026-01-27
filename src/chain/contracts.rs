@@ -64,7 +64,6 @@ pub struct ChainContracts {
     /// Base token bridge contract (only set for custom gas token chains).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub base_token_bridge: Option<Address>,
-
     // TODO: Include additional contracts for database storage (chain deployment creates ~4-7 contracts):
     //
     // Chain Deployment - Settlement Layer (L1) contracts:

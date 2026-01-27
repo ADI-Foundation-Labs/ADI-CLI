@@ -123,7 +123,6 @@ pub struct EcosystemWallets {
 
     /// The governor wallet for governance operations.
     pub governor: Wallet,
-
     // TODO: Include additional wallets for database storage (not currently used by CLI):
     // - operator: Wallet              // Operator wallet
     // - blob_operator: Wallet         // Blob operator wallet

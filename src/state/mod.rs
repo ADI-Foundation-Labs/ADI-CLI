@@ -3,12 +3,41 @@
 //! This module defines the `StateBackend` trait which provides an abstract
 //! interface for persisting ecosystem and chain state. The default implementation
 //! uses the filesystem, but the trait allows for future database backends.
+//!
+//! # Example
+//!
+//! ```rust,ignore
+//! use adi_cli::state::{FilesystemBackend, StateBackend};
+//! use std::path::PathBuf;
+//!
+//! #[tokio::main]
+//! async fn main() -> eyre::Result<()> {
+//!     // Create a filesystem backend
+//!     let backend = FilesystemBackend::new(PathBuf::from("~/.adi_cli/state"))?;
+//!
+//!     // Store ecosystem metadata
+//!     backend.set("ecosystems/my_ecosystem/metadata", b"data").await?;
+//!
+//!     // Retrieve it later
+//!     if let Some(data) = backend.get("ecosystems/my_ecosystem/metadata").await? {
+//!         println!("Got {} bytes", data.len());
+//!     }
+//!
+//!     Ok(())
+//! }
+//! ```
+
+mod filesystem;
+
+// Re-export FilesystemBackend for external use
+// Note: Currently unused as commands are implemented in later phases
+#[allow(unused_imports)]
+pub use filesystem::FilesystemBackend;
 
 use crate::error::Result;
 use async_trait::async_trait;
 
 /// Abstract interface for state persistence.
-#[allow(dead_code)] // Will be used in Phase 2 when FilesystemBackend is implemented
 ///
 /// Implementations provide key-value storage for ecosystem and chain state.
 /// Keys follow a hierarchical structure:
@@ -33,6 +62,8 @@ use async_trait::async_trait;
 ///     Ok(())
 /// }
 /// ```
+// Note: Trait currently unused as commands are implemented in later phases (US1-US6)
+#[allow(dead_code)]
 #[async_trait]
 pub trait StateBackend: Send + Sync {
     /// Retrieve value by key.
