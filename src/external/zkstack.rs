@@ -370,6 +370,112 @@ impl Default for ZkstackCli {
     }
 }
 
+/// Configuration for chain initialization (contract deployment) via zkstack CLI.
+///
+/// This is used with `zkstack chain init` to deploy chain contracts
+/// to the settlement layer and register with Bridgehub.
+#[derive(Debug, Clone)]
+pub struct ChainInitConfig {
+    /// Path to the ecosystem directory.
+    pub ecosystem_path: std::path::PathBuf,
+    /// Name of the chain to initialize.
+    pub chain_name: String,
+    /// Settlement layer RPC URL.
+    pub l1_rpc_url: String,
+    /// Deployer private key.
+    pub deployer_private_key: String,
+    /// Governor private key.
+    pub governor_private_key: String,
+    /// Whether to skip verifying wallets have sufficient balance.
+    pub skip_balance_check: bool,
+    /// Whether to skip contract verification.
+    pub no_verification: bool,
+    /// Optional gas price in wei.
+    pub gas_price: Option<u64>,
+}
+
+impl ZkstackCli {
+    /// Initialize chain contracts using `zkstack chain init`.
+    ///
+    /// This command deploys chain contracts to the settlement layer and
+    /// registers the chain with Bridgehub. The chain must already be created
+    /// via `adi init chain` before calling this.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Chain initialization configuration
+    ///
+    /// # Returns
+    ///
+    /// A `CommandOutput` with the result of the chain initialization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command fails to execute.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let zkstack = ZkstackCli::new();
+    /// let config = ChainInitConfig {
+    ///     ecosystem_path: PathBuf::from("/path/to/ecosystem"),
+    ///     chain_name: "my_chain".to_string(),
+    ///     l1_rpc_url: "http://localhost:8545".to_string(),
+    ///     deployer_private_key: "0x...".to_string(),
+    ///     governor_private_key: "0x...".to_string(),
+    ///     skip_balance_check: false,
+    ///     no_verification: true,
+    ///     gas_price: None,
+    /// };
+    /// let output = zkstack.chain_init(&config).await?;
+    /// ```
+    pub async fn chain_init(&self, config: &ChainInitConfig) -> Result<CommandOutput> {
+        let mut args = vec![
+            "chain".to_string(),
+            "init".to_string(),
+            "-v".to_string(),
+            "--ecosystem-path".to_string(),
+            config.ecosystem_path.to_string_lossy().to_string(),
+            "--chain-name".to_string(),
+            config.chain_name.clone(),
+            "--l1-rpc-url".to_string(),
+            config.l1_rpc_url.clone(),
+            "--deployer-private-key".to_string(),
+            config.deployer_private_key.clone(),
+            "--governor-private-key".to_string(),
+            config.governor_private_key.clone(),
+        ];
+
+        if config.skip_balance_check {
+            args.push("--skip-balance-check".to_string());
+        }
+
+        if config.no_verification {
+            args.push("--no-verification".to_string());
+        }
+
+        if let Some(gas_price) = config.gas_price {
+            args.push("--gas-price".to_string());
+            args.push(gas_price.to_string());
+        }
+
+        // Add ignore prerequisites for automation
+        args.push("--ignore-prerequisites".to_string());
+
+        let output = self.execute(&args).await?;
+
+        if !output.success() {
+            return Err(eyre::eyre!(
+                "zkstack chain init failed with exit code {}: {}",
+                output.exit_code,
+                output.stderr
+            ));
+        }
+
+        Ok(output)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

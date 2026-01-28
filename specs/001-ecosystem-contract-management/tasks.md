@@ -170,14 +170,14 @@ Based on plan.md structure:
 
 ### Implementation for User Story 3b
 
-- [ ] T066 [US3b] Create DeployChain command struct with Clap options in src/commands/deploy/chain.rs
-- [ ] T067 [US3b] Implement zkstack chain create/register wrapper in src/external/zkstack.rs
-- [ ] T068 [US3b] Implement chain contract address parsing from zkstack output in src/chain/contracts.rs
-- [ ] T069 [US3b] Implement DeployChain::run() - check balances, auto-fund, deploy contracts, register with bridgehub in src/commands/deploy/chain.rs
-- [ ] T070 [US3b] Add deployment progress output for chain contracts in src/commands/deploy/chain.rs
-- [ ] T071 [US3b] Add deployment error handling with actionable guidance in src/commands/deploy/chain.rs
-- [ ] T072 [US3b] Add chain contract state persistence (contracts.yaml) in src/commands/deploy/chain.rs
-- [ ] T073 [US3b] Register DeployChain in src/commands/deploy/mod.rs
+- [X] T066 [US3b] Create DeployChain command struct with Clap options in src/commands/deploy/chain.rs
+- [X] T067 [US3b] Implement zkstack chain create/register wrapper in src/external/zkstack.rs
+- [X] T068 [US3b] Implement chain contract address parsing from zkstack output in src/chain/contracts.rs
+- [X] T069 [US3b] Implement DeployChain::run() - check balances, auto-fund, deploy contracts, register with bridgehub in src/commands/deploy/chain.rs
+- [X] T070 [US3b] Add deployment progress output for chain contracts in src/commands/deploy/chain.rs
+- [X] T071 [US3b] Add deployment error handling with actionable guidance in src/commands/deploy/chain.rs
+- [X] T072 [US3b] Add chain contract state persistence (contracts.yaml) in src/commands/deploy/chain.rs
+- [X] T073 [US3b] Register DeployChain in src/commands/deploy/mod.rs
 
 **Checkpoint**: User Stories 3 AND 3b complete - can initialize and deploy chain
 

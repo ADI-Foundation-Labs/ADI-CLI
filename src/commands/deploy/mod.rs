@@ -1,11 +1,12 @@
 //! Deploy subcommands for deploying ecosystem and chain contracts.
 
+pub mod chain;
 pub mod ecosystem;
 
 use clap::Subcommand;
-use eyre::bail;
 use serde::{Deserialize, Serialize};
 
+pub use chain::DeployChain;
 pub use ecosystem::DeployEcosystem;
 
 use crate::{context::Context, error::Result};
@@ -17,7 +18,7 @@ pub enum DeployCommand {
     /// Deploy ecosystem contracts to the settlement layer
     Ecosystem(DeployEcosystem),
     /// Deploy chain contracts to the settlement layer and register with Bridgehub
-    Chain,
+    Chain(DeployChain),
 }
 
 impl DeployCommand {
@@ -25,14 +26,7 @@ impl DeployCommand {
     pub async fn run(self, context: &Context) -> Result<()> {
         match self {
             DeployCommand::Ecosystem(cmd) => cmd.run(context).await,
-            DeployCommand::Chain => deploy_chain(context).await,
+            DeployCommand::Chain(cmd) => cmd.run(context).await,
         }
     }
-}
-
-/// Deploy chain contracts to the settlement layer and register with Bridgehub.
-///
-/// This is a placeholder that will be implemented in US3b tasks (T066-T073).
-async fn deploy_chain(_context: &Context) -> Result<()> {
-    bail!("deploy chain command not yet implemented")
 }

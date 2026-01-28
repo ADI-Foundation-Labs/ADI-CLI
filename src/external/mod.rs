@@ -45,7 +45,9 @@ pub use cast::{CastCli, CastOutput, SendOptions};
 #[allow(unused_imports)]
 pub use forge::{ForgeCli, ForgeOutput};
 #[allow(unused_imports)]
-pub use zkstack::{CommandOutput, EcosystemCreateConfig, EcosystemInitConfig, ZkstackCli};
+pub use zkstack::{
+    ChainInitConfig, CommandOutput, EcosystemCreateConfig, EcosystemInitConfig, ZkstackCli,
+};
 
 use crate::error::Result;
 
