@@ -3,8 +3,9 @@ spec:
     environment:
       default: staging
       options: [staging, production]
-    deploy_version:
-      description: "The version tag to deploy"
+    build_target:
+      default: default
+      options: [default, toolkit-v29, toolkit-v30]
 ---
 stages:
   - build
