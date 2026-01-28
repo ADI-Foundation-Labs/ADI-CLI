@@ -43,7 +43,10 @@ mod zkstack;
 #[allow(unused_imports)]
 pub use cast::{CastCli, CastOutput, SendOptions};
 #[allow(unused_imports)]
-pub use forge::{ForgeCli, ForgeOutput};
+pub use forge::{
+    generate_upgrade_input_config, parse_upgrade_script_output, ForgeCli, ForgeOutput,
+    GovernanceCall, GovernanceCalls, UpgradeInputConfig, UpgradeScriptOutput,
+};
 #[allow(unused_imports)]
 pub use zkstack::{
     ChainInitConfig, CommandOutput, EcosystemCreateConfig, EcosystemInitConfig, ZkstackCli,

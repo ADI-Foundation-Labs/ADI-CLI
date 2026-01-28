@@ -191,18 +191,18 @@ Based on plan.md structure:
 
 ### Implementation for User Story 5
 
-- [ ] T074 [US4] Create Upgrade struct with status, calldata, versions in src/ecosystem/config.rs
-- [ ] T075 [US4] Create UpgradeCalldata struct (schedule_transparent, execute, governance_address) in src/ecosystem/config.rs
-- [ ] T076 [US4] Create UpgradeStatus enum (Prepared, Scheduled, Executed, Failed) in src/ecosystem/config.rs
-- [ ] T077 [US4] Implement upgrade input TOML generation from ecosystem state in src/external/forge.rs
-- [ ] T078 [US4] Implement forge script execution for upgrade simulation in src/external/forge.rs
-- [ ] T079 [US4] Implement calldata extraction from forge script output in src/external/forge.rs
-- [ ] T080 [US4] Create UpgradeEcosystem command struct with --to, --execute, --output-dir options in src/commands/upgrade/ecosystem.rs
-- [ ] T081 [US4] Implement UpgradeEcosystem::run() - generate calldata, optionally execute in src/commands/upgrade/ecosystem.rs
-- [ ] T082 [US4] Add calldata file output to upgrade-output directory in src/commands/upgrade/ecosystem.rs
-- [ ] T082a [US4] Save forge script deployment output as v{VERSION}-ecosystem.toml to upgrade-output directory in src/commands/upgrade/ecosystem.rs
-- [ ] T083 [US4] Add execution instructions output for governance in src/commands/upgrade/ecosystem.rs
-- [ ] T084 [US4] Register UpgradeEcosystem in src/commands/upgrade/mod.rs
+- [X] T074 [US4] Create Upgrade struct with status, calldata, versions in src/ecosystem/config.rs
+- [X] T075 [US4] Create UpgradeCalldata struct (schedule_transparent, execute, governance_address) in src/ecosystem/config.rs
+- [X] T076 [US4] Create UpgradeStatus enum (Prepared, Scheduled, Executed, Failed) in src/ecosystem/config.rs
+- [X] T077 [US4] Implement upgrade input TOML generation from ecosystem state in src/external/forge.rs
+- [X] T078 [US4] Implement forge script execution for upgrade simulation in src/external/forge.rs
+- [X] T079 [US4] Implement calldata extraction from forge script output in src/external/forge.rs
+- [X] T080 [US4] Create UpgradeEcosystem command struct with --to, --execute, --output-dir options in src/commands/upgrade/ecosystem.rs
+- [X] T081 [US4] Implement UpgradeEcosystem::run() - generate calldata, optionally execute in src/commands/upgrade/ecosystem.rs
+- [X] T082 [US4] Add calldata file output to upgrade-output directory in src/commands/upgrade/ecosystem.rs
+- [X] T082a [US4] Save forge script deployment output as v{VERSION}-ecosystem.toml to upgrade-output directory in src/commands/upgrade/ecosystem.rs
+- [X] T083 [US4] Add execution instructions output for governance in src/commands/upgrade/ecosystem.rs
+- [X] T084 [US4] Register UpgradeEcosystem in src/commands/upgrade/mod.rs
 
 **Checkpoint**: Can prepare ecosystem upgrades
 

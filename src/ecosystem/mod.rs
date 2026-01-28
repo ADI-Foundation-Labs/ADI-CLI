@@ -33,7 +33,7 @@ pub mod wallets;
 // Re-export commonly used types
 // Note: Currently unused as commands are implemented in later phases (US1-US6)
 #[allow(unused_imports)]
-pub use config::{Ecosystem, SettlementNetwork};
+pub use config::{Ecosystem, SettlementNetwork, Upgrade, UpgradeCalldata, UpgradeStatus};
 #[allow(unused_imports)]
 pub use contracts::EcosystemContracts;
 #[allow(unused_imports)]

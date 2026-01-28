@@ -3,6 +3,8 @@
 //! This module defines the contract address structures for ecosystem-level
 //! contracts deployed on the settlement layer.
 
+use std::collections::HashMap;
+
 use alloy_primitives::{Address, B256};
 use serde::{Deserialize, Serialize};
 
@@ -434,5 +436,74 @@ impl EcosystemContracts {
             create2_factory_salt: find_b256(value, &create2_factory_salt_keys)
                 .wrap_err("Missing create2 factory salt")?,
         })
+    }
+
+    /// Converts the contract addresses to a HashMap for use in upgrade scripts.
+    ///
+    /// Returns a map of contract names to their addresses, suitable for
+    /// generating upgrade input TOML files.
+    ///
+    /// # Returns
+    ///
+    /// A `HashMap<String, Address>` with all contract addresses.
+    pub fn to_address_map(&self) -> HashMap<String, Address> {
+        let mut map = HashMap::new();
+
+        // Core infrastructure
+        map.insert(
+            "bridgehub_proxy_address".to_string(),
+            self.bridgehub_proxy_addr,
+        );
+        map.insert(
+            "state_transition_proxy_address".to_string(),
+            self.state_transition_proxy_addr,
+        );
+        map.insert("governance_address".to_string(), self.governance_addr);
+        map.insert("chain_admin_address".to_string(), self.chain_admin_addr);
+
+        // Verifiers
+        map.insert("verifier_address".to_string(), self.verifier_addr);
+        if let Some(addr) = self.verifier_fflonk_addr {
+            map.insert("verifier_fflonk_address".to_string(), addr);
+        }
+        if let Some(addr) = self.verifier_plonk_addr {
+            map.insert("verifier_plonk_address".to_string(), addr);
+        }
+
+        // DA infrastructure
+        map.insert(
+            "l1_rollup_da_manager_address".to_string(),
+            self.l1_rollup_da_manager,
+        );
+        map.insert(
+            "rollup_l1_da_validator_address".to_string(),
+            self.rollup_l1_da_validator,
+        );
+
+        // Token infrastructure
+        map.insert(
+            "native_token_vault_address".to_string(),
+            self.native_token_vault_addr,
+        );
+        map.insert("l1_nullifier_address".to_string(), self.l1_nullifier_addr);
+        map.insert("l1_asset_router_address".to_string(), self.l1_asset_router);
+
+        // Timelock & Server
+        map.insert(
+            "validator_timelock_address".to_string(),
+            self.validator_timelock_addr,
+        );
+        map.insert(
+            "server_notifier_proxy_address".to_string(),
+            self.server_notifier_proxy_addr,
+        );
+
+        // Factory
+        map.insert(
+            "create2_factory_address".to_string(),
+            self.create2_factory_addr,
+        );
+
+        map
     }
 }
