@@ -216,12 +216,12 @@ Based on plan.md structure:
 
 ### Implementation for User Story 5
 
-- [ ] T085 [US5] Implement zkstack generate-chain-upgrade wrapper in src/external/zkstack.rs
-- [ ] T086 [US5] Create UpgradeChain command struct with --to, --chain-name, --execute options in src/commands/upgrade/chain.rs
-- [ ] T087 [US5] Implement UpgradeChain::run() - validate ecosystem version, generate chain calldata in src/commands/upgrade/chain.rs
-- [ ] T087a [US5] Save forge script deployment output as v{VERSION}-{chain-name}.toml to upgrade-output directory in src/commands/upgrade/chain.rs
-- [ ] T088 [US5] Add DA validator pair update instructions in upgrade output in src/commands/upgrade/chain.rs
-- [ ] T089 [US5] Register UpgradeChain in src/commands/upgrade/mod.rs
+- [X] T085 [US5] Implement zkstack generate-chain-upgrade wrapper in src/external/zkstack.rs
+- [X] T086 [US5] Create UpgradeChain command struct with --to, --chain-name, --execute options in src/commands/upgrade/chain.rs
+- [X] T087 [US5] Implement UpgradeChain::run() - validate ecosystem version, generate chain calldata in src/commands/upgrade/chain.rs
+- [X] T087a [US5] Save forge script deployment output as v{VERSION}-{chain-name}.toml to upgrade-output directory in src/commands/upgrade/chain.rs
+- [X] T088 [US5] Add DA validator pair update instructions in upgrade output in src/commands/upgrade/chain.rs
+- [X] T089 [US5] Register UpgradeChain in src/commands/upgrade/mod.rs
 
 **Checkpoint**: Can prepare chain upgrades after ecosystem upgrades
 

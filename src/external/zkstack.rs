@@ -476,6 +476,97 @@ impl ZkstackCli {
     }
 }
 
+/// Configuration for generating chain upgrade calldata via zkstack CLI.
+///
+/// This is used with `zkstack dev generate-chain-upgrade` to prepare upgrade
+/// calldata for a specific chain after the ecosystem has been upgraded.
+// Note: Currently unused as upgrade commands use forge scripts; will be used when
+// integrating with zkstack in Docker containers (Phase 9)
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct ChainUpgradeConfig {
+    /// Path to the ecosystem directory.
+    pub ecosystem_path: std::path::PathBuf,
+    /// Name of the chain to upgrade.
+    pub chain_name: String,
+    /// Target upgrade version (e.g., "v30").
+    pub upgrade_version: String,
+    /// Settlement layer RPC URL.
+    pub l1_rpc_url: String,
+    /// Chain RPC URL (L2).
+    pub l2_rpc_url: Option<String>,
+}
+
+#[allow(dead_code)]
+impl ZkstackCli {
+    /// Generate chain upgrade calldata using `zkstack dev generate-chain-upgrade`.
+    ///
+    /// This command generates upgrade calldata for a specific chain after the
+    /// ecosystem has been upgraded to a new protocol version. The chain upgrade
+    /// must match the ecosystem's target version.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Chain upgrade configuration
+    ///
+    /// # Returns
+    ///
+    /// A `CommandOutput` with the result of the chain upgrade generation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command fails to execute.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let zkstack = ZkstackCli::new();
+    /// let config = ChainUpgradeConfig {
+    ///     ecosystem_path: PathBuf::from("/path/to/ecosystem"),
+    ///     chain_name: "my_chain".to_string(),
+    ///     upgrade_version: "v30".to_string(),
+    ///     l1_rpc_url: "http://localhost:8545".to_string(),
+    ///     l2_rpc_url: Some("http://localhost:3050".to_string()),
+    /// };
+    /// let output = zkstack.generate_chain_upgrade(&config).await?;
+    /// ```
+    pub async fn generate_chain_upgrade(&self, config: &ChainUpgradeConfig) -> Result<CommandOutput> {
+        let mut args = vec![
+            "dev".to_string(),
+            "generate-chain-upgrade".to_string(),
+            "-v".to_string(),
+            "--ecosystem-path".to_string(),
+            config.ecosystem_path.to_string_lossy().to_string(),
+            "--chain-name".to_string(),
+            config.chain_name.clone(),
+            "--upgrade-version".to_string(),
+            config.upgrade_version.clone(),
+            "--l1-rpc-url".to_string(),
+            config.l1_rpc_url.clone(),
+        ];
+
+        if let Some(ref l2_rpc_url) = config.l2_rpc_url {
+            args.push("--l2-rpc-url".to_string());
+            args.push(l2_rpc_url.clone());
+        }
+
+        // Add ignore prerequisites for automation
+        args.push("--ignore-prerequisites".to_string());
+
+        let output = self.execute(&args).await?;
+
+        if !output.success() {
+            return Err(eyre::eyre!(
+                "zkstack dev generate-chain-upgrade failed with exit code {}: {}",
+                output.exit_code,
+                output.stderr
+            ));
+        }
+
+        Ok(output)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
