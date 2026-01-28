@@ -51,4 +51,4 @@ build-docker:
     - docker buildx inspect --bootstrap
 
   script:
-    - task push:docker TARGETS=${{ inputs.build_target }}
+    - task push:docker TARGETS=$[[inputs.build_target]]
