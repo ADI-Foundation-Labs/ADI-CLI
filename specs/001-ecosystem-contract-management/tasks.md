@@ -126,18 +126,18 @@ Based on plan.md structure:
 
 ### Implementation for User Story 2
 
-- [ ] T048 [US2] Implement balance checking for ETH using cast in src/funding/transfer.rs
-- [ ] T049 [US2] Implement balance checking for ERC-20 tokens using cast in src/funding/transfer.rs
-- [ ] T050 [US2] Implement ETH transfer using cast send in src/funding/transfer.rs
-- [ ] T051 [US2] Implement ERC-20 transfer using cast send in src/funding/transfer.rs
-- [ ] T052 [US2] Implement fund_wallets() with pre-flight balance validation in src/funding/mod.rs
-- [ ] T053 [US2] Create DeployEcosystem command struct with Clap options in src/commands/deploy/ecosystem.rs
-- [ ] T054 [US2] Implement zkstack ecosystem init wrapper for contract deployment in src/external/zkstack.rs
-- [ ] T055 [US2] Implement contract address parsing from zkstack output YAML in src/ecosystem/contracts.rs
-- [ ] T056 [US2] Implement DeployEcosystem::run() - check balances, auto-fund, deploy, persist addresses in src/commands/deploy/ecosystem.rs
-- [ ] T057 [US2] Add progress output for multi-step deployment in src/commands/deploy/ecosystem.rs
-- [ ] T058 [US2] Add deployment error handling with actionable resolution guidance in src/commands/deploy/ecosystem.rs
-- [ ] T059 [US2] Register DeployEcosystem in src/commands/deploy/mod.rs
+- [X] T048 [US2] Implement balance checking for ETH using cast in src/funding/transfer.rs
+- [X] T049 [US2] Implement balance checking for ERC-20 tokens using cast in src/funding/transfer.rs
+- [X] T050 [US2] Implement ETH transfer using cast send in src/funding/transfer.rs
+- [X] T051 [US2] Implement ERC-20 transfer using cast send in src/funding/transfer.rs
+- [X] T052 [US2] Implement fund_wallets() with pre-flight balance validation in src/funding/mod.rs
+- [X] T053 [US2] Create DeployEcosystem command struct with Clap options in src/commands/deploy/ecosystem.rs
+- [X] T054 [US2] Implement zkstack ecosystem init wrapper for contract deployment in src/external/zkstack.rs
+- [X] T055 [US2] Implement contract address parsing from zkstack output YAML in src/ecosystem/contracts.rs
+- [X] T056 [US2] Implement DeployEcosystem::run() - check balances, auto-fund, deploy, persist addresses in src/commands/deploy/ecosystem.rs
+- [X] T057 [US2] Add progress output for multi-step deployment in src/commands/deploy/ecosystem.rs
+- [X] T058 [US2] Add deployment error handling with actionable resolution guidance in src/commands/deploy/ecosystem.rs
+- [X] T059 [US2] Register DeployEcosystem in src/commands/deploy/mod.rs
 
 **Checkpoint**: User Stories 1 AND 2 complete - can initialize and deploy ecosystem
 

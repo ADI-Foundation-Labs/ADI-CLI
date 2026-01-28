@@ -264,6 +264,106 @@ pub struct EcosystemCreateConfig {
     pub start_containers: bool,
 }
 
+/// Configuration for ecosystem initialization (contract deployment) via zkstack CLI.
+///
+/// This is used with `zkstack ecosystem init` to deploy ecosystem contracts
+/// to the settlement layer.
+#[derive(Debug, Clone)]
+pub struct EcosystemInitConfig {
+    /// Path to the ecosystem directory.
+    pub ecosystem_path: std::path::PathBuf,
+    /// Settlement layer RPC URL.
+    pub l1_rpc_url: String,
+    /// Deployer private key.
+    pub deployer_private_key: String,
+    /// Governor private key.
+    pub governor_private_key: String,
+    /// Whether to skip verifying wallets have sufficient balance.
+    pub skip_balance_check: bool,
+    /// Whether to skip contract verification.
+    pub no_verification: bool,
+    /// Optional gas price in wei.
+    pub gas_price: Option<u64>,
+}
+
+impl ZkstackCli {
+    /// Initialize ecosystem contracts using `zkstack ecosystem init`.
+    ///
+    /// This command deploys ecosystem contracts to the settlement layer,
+    /// including Bridgehub, Governance, Verifier, and other infrastructure contracts.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Ecosystem initialization configuration
+    ///
+    /// # Returns
+    ///
+    /// A `CommandOutput` with the result of the ecosystem initialization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command fails to execute.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let zkstack = ZkstackCli::new();
+    /// let config = EcosystemInitConfig {
+    ///     ecosystem_path: PathBuf::from("/path/to/ecosystem"),
+    ///     l1_rpc_url: "http://localhost:8545".to_string(),
+    ///     deployer_private_key: "0x...".to_string(),
+    ///     governor_private_key: "0x...".to_string(),
+    ///     skip_balance_check: false,
+    ///     no_verification: true,
+    ///     gas_price: None,
+    /// };
+    /// let output = zkstack.ecosystem_init(&config).await?;
+    /// ```
+    pub async fn ecosystem_init(&self, config: &EcosystemInitConfig) -> Result<CommandOutput> {
+        let mut args = vec![
+            "ecosystem".to_string(),
+            "init".to_string(),
+            "-v".to_string(),
+            "--ecosystem-path".to_string(),
+            config.ecosystem_path.to_string_lossy().to_string(),
+            "--l1-rpc-url".to_string(),
+            config.l1_rpc_url.clone(),
+            "--deployer-private-key".to_string(),
+            config.deployer_private_key.clone(),
+            "--governor-private-key".to_string(),
+            config.governor_private_key.clone(),
+        ];
+
+        if config.skip_balance_check {
+            args.push("--skip-balance-check".to_string());
+        }
+
+        if config.no_verification {
+            args.push("--no-verification".to_string());
+        }
+
+        if let Some(gas_price) = config.gas_price {
+            args.push("--gas-price".to_string());
+            args.push(gas_price.to_string());
+        }
+
+        // Add ignore prerequisites for automation
+        args.push("--ignore-prerequisites".to_string());
+
+        let output = self.execute(&args).await?;
+
+        if !output.success() {
+            return Err(eyre::eyre!(
+                "zkstack ecosystem init failed with exit code {}: {}",
+                output.exit_code,
+                output.stderr
+            ));
+        }
+
+        Ok(output)
+    }
+}
+
 impl Default for ZkstackCli {
     fn default() -> Self {
         Self::new()
