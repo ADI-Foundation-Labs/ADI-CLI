@@ -267,9 +267,9 @@ Based on plan.md structure:
 
 ### Development Automation
 
-- [ ] T105 Update Taskfile.yml with toolkit image build targets
-- [ ] T106 [P] Add Taskfile task for running tests
-- [ ] T107 [P] Add Taskfile task for local Anvil deployment testing
+- [X] T105 Update Taskfile.yml with toolkit image build targets
+- [X] T106 [P] Add Taskfile task for running tests
+- [X] T107 [P] Add Taskfile task for local Anvil deployment testing
 
 ### Final Validation
 
