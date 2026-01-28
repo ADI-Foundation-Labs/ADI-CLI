@@ -25,6 +25,7 @@ colored = "3"
 eyre = "0.6"
 built = { version = "0.7", features = ["git2"] }
 serde = { version = "1", features = ["derive"] }
+serde_yaml = { version = "0.9", default-features = false }
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "6.0"
 
