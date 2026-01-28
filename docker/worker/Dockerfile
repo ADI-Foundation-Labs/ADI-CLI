@@ -31,17 +31,34 @@ ENV PATH="/root/.foundry/bin:${PATH}"
 RUN foundryup-zksync
 
 # Install zkstack CLI from specific commit
+# Set global cargo target dir for caching
+ENV CARGO_TARGET_DIR=/cargo-target
 WORKDIR /deps
 RUN git clone https://github.com/matter-labs/zksync-era.git zksync-era
 WORKDIR /deps/zksync-era
 RUN git checkout ${ZKSYNC_ERA_COMMIT}
+RUN git submodule update --init --recursive
+# Patch yanked parity-scale-codec version
+RUN echo "[patch.crates-io]" >> Cargo.toml && \
+  echo "parity-scale-codec = { version = \"3.6.12\" }" >> Cargo.toml
+
+# example:
+#  RUN --mount=type=cache,target=/app/target/ \
+#     --mount=type=cache,target=/usr/local/cargo/git/db \
+#     --mount=type=cache,target=/usr/local/cargo/registry/ \
+#     cargo build
+
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
-  cargo install --path zkstack_cli/crates/zkstack --force --locked
+  --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+  --mount=type=cache,target=/cargo-target,sharing=locked \
+  --mount=type=cache,target=/usr/local/rustup,sharing=locked \
+  cargo build --release --manifest-path zkstack_cli/crates/zkstack/Cargo.toml && \
+  cp /cargo-target/release/zkstack /usr/local/bin/zkstack
 
 # zksync-os-integration and submodules (conditional)
 RUN if [ -n "$ZKSYNC_ERA_OS_INTEGRATION_COMMIT" ]; then \
   git fetch && \
-  git checkout ${ZKSYNC_ERA_OS_INTEGRATION_COMMIT} && \
+  git checkout --force ${ZKSYNC_ERA_OS_INTEGRATION_COMMIT} && \
   git submodule update --init --recursive; \
   fi
 
