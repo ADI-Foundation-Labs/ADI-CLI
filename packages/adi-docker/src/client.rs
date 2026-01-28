@@ -39,6 +39,7 @@ impl DockerClient {
     ///
     /// Returns an error if connection to Docker daemon fails.
     pub async fn new() -> Result<Self> {
+        log::debug!("Connecting to Docker daemon...");
         let docker = Docker::connect_with_defaults()
             .map_err(|e: bollard::errors::Error| DockerError::DaemonNotRunning(e.to_string()))?;
 
@@ -47,6 +48,7 @@ impl DockerClient {
         // Verify connection works
         client.is_daemon_running().await?;
 
+        log::debug!("Successfully connected to Docker daemon");
         Ok(client)
     }
 
@@ -56,10 +58,12 @@ impl DockerClient {
     ///
     /// Returns an error if daemon is not accessible.
     pub async fn is_daemon_running(&self) -> Result<bool> {
+        log::debug!("Pinging Docker daemon...");
         self.inner
             .ping()
             .await
             .map_err(|e| DockerError::DaemonNotRunning(e.to_string()))?;
+        log::debug!("Docker daemon ping successful");
         Ok(true)
     }
 
@@ -69,8 +73,11 @@ impl DockerClient {
     ///
     /// * `image_ref` - The image reference to check.
     pub async fn image_exists(&self, image_ref: &ImageReference) -> Result<bool> {
+        log::debug!("Checking if image exists: {}", image_ref.full_uri());
         let image_manager = ImageManager::new(self.inner.clone());
-        image_manager.exists(image_ref).await
+        let exists = image_manager.exists(image_ref).await?;
+        log::debug!("Image {} exists: {}", image_ref.full_uri(), exists);
+        Ok(exists)
     }
 
     /// Pull an image from registry if not available locally.
@@ -86,6 +93,7 @@ impl DockerClient {
     /// - Network issues
     /// - Image does not exist in registry
     pub async fn pull_image(&self, image_ref: &ImageReference) -> Result<()> {
+        log::debug!("Ensuring image is available: {}", image_ref.full_uri());
         let image_manager = ImageManager::new(self.inner.clone());
         image_manager.pull_if_missing(image_ref).await
     }

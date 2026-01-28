@@ -23,6 +23,11 @@ const STYLES: Styles = Styles::styled()
 #[clap(about)]
 #[command(styles = STYLES)]
 pub struct Opts {
+    /// Enable debug logging
+    #[arg(global = true, short = 'd', long)]
+    #[serde(default)]
+    pub debug: bool,
+
     #[command(subcommand)]
     cmd: commands::Commands,
 }
@@ -30,9 +35,11 @@ pub struct Opts {
 /// Initialize the logger with colored output.
 ///
 /// Uses env_logger with custom formatting to match the CLI style.
-/// Default log level is `info`, controllable via `RUST_LOG` environment variable.
-fn init_logger() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+/// Default log level is `info`, or `debug` if debug mode is enabled.
+/// Controllable via `RUST_LOG` environment variable (takes precedence).
+fn init_logger(debug: bool) {
+    let default_level = if debug { "debug" } else { "info" };
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(default_level))
         .format(|buf, record| {
             let level_style = match record.level() {
                 ::log::Level::Error => Style::new().fg_color(Some(AnsiColor::Red.into())).bold(),
@@ -61,9 +68,15 @@ fn init_logger() {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    init_logger();
-
     let opts: Opts = Opts::parse();
+    let cfg = config::Config::new()?;
+
+    // CLI flag takes precedence over config file
+    let debug_enabled = opts.debug || cfg.debug;
+    init_logger(debug_enabled);
+
+    log::debug!("Debug mode enabled");
+
     let ctx = context::Context::new_from_options(&opts)?;
     if let Some(err) = opts.cmd.run(&ctx).await.err() {
         ::log::error!("{:?}", err);

@@ -77,6 +77,13 @@ impl ToolkitRunner {
     ) -> Result<i64> {
         let image_ref = self.config.image_reference(protocol_version);
 
+        log::debug!(
+            "Running command: {:?} (image: {}, state_dir: {})",
+            command,
+            image_ref.full_uri(),
+            state_dir.display()
+        );
+
         // Ensure image is available
         self.client.pull_image(&image_ref).await?;
 
@@ -91,8 +98,22 @@ impl ToolkitRunner {
             ..Default::default()
         };
 
+        log::debug!(
+            "Container config: working_dir={}, timeout={}s, env_vars={:?}",
+            container_config.working_dir,
+            container_config.timeout_seconds,
+            container_config
+                .env_vars
+                .iter()
+                .map(|(k, _)| k)
+                .collect::<Vec<_>>()
+        );
+
         let manager = ContainerManager::new(self.client.inner().clone());
-        manager.run(&image_ref, &container_config).await
+        let exit_code = manager.run(&image_ref, &container_config).await?;
+
+        log::debug!("Command completed with exit code: {}", exit_code);
+        Ok(exit_code)
     }
 
     /// Execute zkstack CLI command in toolkit container.
@@ -134,6 +155,7 @@ impl ToolkitRunner {
         state_dir: &Path,
         protocol_version: &Version,
     ) -> Result<i64> {
+        log::debug!("Running zkstack with args: {:?}", args);
         let mut command = vec!["zkstack"];
         command.extend(args);
 
@@ -158,6 +180,7 @@ impl ToolkitRunner {
         state_dir: &Path,
         protocol_version: &Version,
     ) -> Result<i64> {
+        log::debug!("Running forge with args: {:?}", args);
         let mut command = vec!["forge"];
         command.extend(args);
 
@@ -177,16 +200,14 @@ impl ToolkitRunner {
     /// # Returns
     ///
     /// Container exit code.
-    pub async fn run_cast(
-        &self,
-        args: &[&str],
-        protocol_version: &Version,
-    ) -> Result<i64> {
+    pub async fn run_cast(&self, args: &[&str], protocol_version: &Version) -> Result<i64> {
+        log::debug!("Running cast with args: {:?}", args);
         let mut command = vec!["cast"];
         command.extend(args);
 
         // Cast typically doesn't need state directory
         let temp_dir = std::env::temp_dir();
+        log::debug!("Using temp directory for cast: {}", temp_dir.display());
         self.run_command(&command, &temp_dir, protocol_version, &[])
             .await
     }

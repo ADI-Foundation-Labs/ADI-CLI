@@ -27,15 +27,17 @@ impl ContainerManager {
     /// Run a container to completion and return exit code.
     ///
     /// Lifecycle: create -> start -> attach streams -> wait -> remove
-    pub async fn run(
-        &self,
-        image_ref: &ImageReference,
-        config: &ContainerConfig,
-    ) -> Result<i64> {
+    pub async fn run(&self, image_ref: &ImageReference, config: &ContainerConfig) -> Result<i64> {
+        log::debug!(
+            "Starting container lifecycle for image: {}",
+            image_ref.full_uri()
+        );
         let container_id = self.create(image_ref, config).await?;
 
         // Ensure cleanup on any exit path
-        let result = self.run_and_wait(&container_id, config.timeout_seconds).await;
+        let result = self
+            .run_and_wait(&container_id, config.timeout_seconds)
+            .await;
 
         // Always attempt to remove, even if run failed
         if let Err(e) = self.remove(&container_id).await {
@@ -45,11 +47,14 @@ impl ContainerManager {
         result
     }
 
-    async fn create(
-        &self,
-        image_ref: &ImageReference,
-        config: &ContainerConfig,
-    ) -> Result<String> {
+    async fn create(&self, image_ref: &ImageReference, config: &ContainerConfig) -> Result<String> {
+        log::debug!(
+            "Creating container: image={}, working_dir={}, mount={}:/workspace",
+            image_ref.full_uri(),
+            config.working_dir,
+            config.state_dir.display()
+        );
+
         let mount = Mount {
             target: Some("/workspace".to_string()),
             source: Some(config.state_dir.to_string_lossy().to_string()),
@@ -104,11 +109,19 @@ impl ContainerManager {
     }
 
     async fn run_and_wait(&self, container_id: &str, timeout_seconds: u64) -> Result<i64> {
+        log::debug!(
+            "Starting container: {} (timeout: {}s)",
+            container_id,
+            timeout_seconds
+        );
+
         // Start container
         self.docker
             .start_container(container_id, None::<StartContainerOptions<String>>)
             .await
             .map_err(|e| DockerError::ContainerCreateFailed(e.to_string()))?;
+
+        log::debug!("Container started, streaming output...");
 
         // Stream output to terminal
         let streamer = OutputStreamer::new(self.docker.clone());
@@ -120,10 +133,8 @@ impl ContainerManager {
         let wait_future = self.wait_for_exit(container_id);
 
         // Run streaming in background, wait for exit with timeout
-        let (stream_result, wait_result) = tokio::join!(
-            stream_future,
-            timeout(duration, wait_future)
-        );
+        let (stream_result, wait_result) =
+            tokio::join!(stream_future, timeout(duration, wait_future));
 
         // Check for timeout
         let exit_code = match wait_result {
@@ -131,7 +142,9 @@ impl ContainerManager {
             Err(_) => {
                 // Timeout occurred, try to stop the container
                 let _ = self.docker.stop_container(container_id, None).await;
-                return Err(DockerError::Timeout { seconds: timeout_seconds });
+                return Err(DockerError::Timeout {
+                    seconds: timeout_seconds,
+                });
             }
         };
 

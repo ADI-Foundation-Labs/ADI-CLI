@@ -13,6 +13,11 @@ pub struct Config {
     /// Default: `~/.adi_cli/state`
     #[serde(default = "default_state_dir")]
     pub state_dir: PathBuf,
+
+    /// Enable debug logging.
+    /// Default: `false`
+    #[serde(default)]
+    pub debug: bool,
 }
 
 impl Config {

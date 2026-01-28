@@ -80,10 +80,17 @@ impl DockerConfig {
     ///
     /// An `ImageReference` with the full image URI.
     pub fn image_reference(&self, version: &Version) -> ImageReference {
+        let tag = format!("v{}.{}.{}", version.major, version.minor, version.patch);
+        log::debug!(
+            "Building image reference: registry={}, image={}, tag={}",
+            self.registry,
+            self.image_name,
+            tag
+        );
         ImageReference {
             registry: self.registry.clone(),
             image_name: self.image_name.clone(),
-            tag: format!("v{}.{}.{}", version.major, version.minor, version.patch),
+            tag,
         }
     }
 }
@@ -196,8 +203,7 @@ mod tests {
 
     #[test]
     fn test_custom_config() {
-        let config = DockerConfig::new("my-registry.io", "my-toolkit")
-            .with_timeout(3600);
+        let config = DockerConfig::new("my-registry.io", "my-toolkit").with_timeout(3600);
 
         assert_eq!(config.registry, "my-registry.io");
         assert_eq!(config.image_name, "my-toolkit");
