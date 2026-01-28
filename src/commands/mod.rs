@@ -3,22 +3,22 @@ use serde::{Deserialize, Serialize};
 
 use crate::{context::Context, error::Result};
 
-mod version;
+mod show;
 
 #[derive(Clone, Subcommand, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Commands {
-    /// Show version information
-    Version {
+    /// Show various information (version, config)
+    Show {
         #[command(subcommand)]
-        command: version::VersionCommand,
+        command: show::ShowCommand,
     },
 }
 
 impl Commands {
     pub async fn run(self, context: &Context) -> Result<()> {
         match self {
-            Commands::Version { command } => command.run(context).await,
+            Commands::Show { command } => command.run(context).await,
         }
     }
 }

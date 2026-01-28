@@ -1,14 +1,16 @@
+use std::io::Write;
+
 use clap::{
     builder::styling::{AnsiColor as Ansi, Styles},
     Parser,
 };
+use env_logger::fmt::style::{AnsiColor, Style};
 use serde::{Deserialize, Serialize};
 
 mod commands;
 mod config;
 mod context;
 mod error;
-mod log;
 
 const STYLES: Styles = Styles::styled()
     .header(Ansi::Green.on_default().bold())
@@ -25,12 +27,46 @@ pub struct Opts {
     cmd: commands::Commands,
 }
 
+/// Initialize the logger with colored output.
+///
+/// Uses env_logger with custom formatting to match the CLI style.
+/// Default log level is `info`, controllable via `RUST_LOG` environment variable.
+fn init_logger() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .format(|buf, record| {
+            let level_style = match record.level() {
+                ::log::Level::Error => Style::new().fg_color(Some(AnsiColor::Red.into())).bold(),
+                ::log::Level::Warn => Style::new().fg_color(Some(AnsiColor::Yellow.into())).bold(),
+                ::log::Level::Info => Style::new().fg_color(Some(AnsiColor::Cyan.into())).bold(),
+                ::log::Level::Debug => Style::new().fg_color(Some(AnsiColor::Blue.into())).bold(),
+                ::log::Level::Trace => Style::new()
+                    .fg_color(Some(AnsiColor::Magenta.into()))
+                    .bold(),
+            };
+            let reset = Style::new();
+            let prefix = Style::new().fg_color(Some(AnsiColor::Yellow.into())).bold();
+
+            writeln!(
+                buf,
+                "{prefix}[adi-cli]:{reset} {style}[{level}]:{reset} {args}",
+                prefix = prefix,
+                reset = reset,
+                style = level_style,
+                level = record.level(),
+                args = record.args()
+            )
+        })
+        .init();
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    init_logger();
+
     let opts: Opts = Opts::parse();
     let ctx = context::Context::new_from_options(&opts)?;
     if let Some(err) = opts.cmd.run(&ctx).await.err() {
-        eprintln!("{:?}", err);
+        ::log::error!("{:?}", err);
         std::process::exit(1);
     }
 
