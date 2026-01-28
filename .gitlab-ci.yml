@@ -1,6 +1,15 @@
 stages:
   - build
 
+spec:
+  inputs:
+    environment:
+      default: staging
+      options: [staging, production]
+      type: enum
+    deploy_version:
+      description: "The version tag to deploy"
+
 variables:
   DOCKER_DRIVER: overlay2
   DOCKER_HOST: tcp://docker:2375
@@ -19,6 +28,7 @@ build-docker:
   stage: build
   image: docker:27.5.1
   tags: [k8s, azure, dev]
+  when: manual
   services:
     - name: docker:27.5.1-dind
       alias: docker
