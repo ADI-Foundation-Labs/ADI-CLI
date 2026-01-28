@@ -13,11 +13,13 @@ stages:
   - build
 
 variables:
+
   DOCKER_DRIVER: overlay2
   DOCKER_HOST: tcp://docker:2375
   DOCKER_TLS_CERTDIR: ""
   DOCKER_BUILDKIT: "1"
   BUILDKIT_PROGRESS: plain
+  RUNNER_SCRIPT_TIMEOUT: 2h
 
 build-docker:
   stage: build
