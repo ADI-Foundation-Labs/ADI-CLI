@@ -3,9 +3,11 @@
 //! This module provides wallet structures for managing keypairs used in
 //! chain deployment and operations.
 
+use eyre::WrapErr;
 use serde::{Deserialize, Serialize};
 
 use crate::ecosystem::wallets::Wallet;
+use crate::error::Result;
 
 /// Wallets used for chain-level operations.
 ///
@@ -97,5 +99,45 @@ impl ChainWallets {
             ("prove_operator", &self.prove_operator, FIVE_ETH),
             ("execute_operator", &self.execute_operator, FIVE_ETH),
         ]
+    }
+
+    /// Generates new chain wallets with random private keys.
+    ///
+    /// Creates all required chain wallets (deployer, governor, operator,
+    /// prove_operator, execute_operator) with cryptographically secure
+    /// random private keys.
+    ///
+    /// # Returns
+    ///
+    /// New chain wallets with generated private keys.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if wallet generation fails.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let wallets = ChainWallets::generate()?;
+    /// assert!(wallets.deployer.has_private_key());
+    /// assert!(wallets.governor.has_private_key());
+    /// assert!(wallets.operator.has_private_key());
+    /// ```
+    pub fn generate() -> Result<Self> {
+        let deployer = Wallet::generate().wrap_err("Failed to generate chain deployer wallet")?;
+        let governor = Wallet::generate().wrap_err("Failed to generate chain governor wallet")?;
+        let operator = Wallet::generate().wrap_err("Failed to generate chain operator wallet")?;
+        let prove_operator =
+            Wallet::generate().wrap_err("Failed to generate chain prove_operator wallet")?;
+        let execute_operator =
+            Wallet::generate().wrap_err("Failed to generate chain execute_operator wallet")?;
+
+        Ok(Self {
+            deployer,
+            governor,
+            operator,
+            prove_operator,
+            execute_operator,
+        })
     }
 }

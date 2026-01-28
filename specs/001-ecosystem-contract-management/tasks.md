@@ -151,12 +151,12 @@ Based on plan.md structure:
 
 ### Implementation for User Story 3
 
-- [ ] T060 [US3] Implement chain wallet generation in src/chain/wallets.rs
-- [ ] T061 [US3] Implement chain directory structure creation in src/chain/config.rs
-- [ ] T062 [US3] Create InitChain command struct with Clap options (NO deployment options) in src/commands/init/chain.rs
-- [ ] T063 [US3] Implement InitChain::run() - validate ecosystem, create chain config in src/commands/init/chain.rs
-- [ ] T064 [US3] Add chain state persistence (wallets.yaml, genesis.yaml) in src/commands/init/chain.rs
-- [ ] T065 [US3] Register InitChain in src/commands/init/mod.rs
+- [X] T060 [US3] Implement chain wallet generation in src/chain/wallets.rs
+- [X] T061 [US3] Implement chain directory structure creation in src/chain/config.rs
+- [X] T062 [US3] Create InitChain command struct with Clap options (NO deployment options) in src/commands/init/chain.rs
+- [X] T063 [US3] Implement InitChain::run() - validate ecosystem, create chain config in src/commands/init/chain.rs
+- [X] T064 [US3] Add chain state persistence (wallets.yaml, genesis.yaml) in src/commands/init/chain.rs
+- [X] T065 [US3] Register InitChain in src/commands/init/mod.rs
 
 **Checkpoint**: User Story 3 complete - can initialize chain configuration
 

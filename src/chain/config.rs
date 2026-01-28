@@ -3,11 +3,16 @@
 //! This module defines the core configuration types for ZkSync chains
 //! within an ecosystem.
 
+use std::path::{Path, PathBuf};
+
 use chrono::{DateTime, Utc};
-use eyre::{ensure, Result};
+use eyre::{ensure, WrapErr};
 use serde::{Deserialize, Serialize};
+use tokio::fs;
 
 use alloy_primitives::Address;
+
+use crate::error::Result;
 
 use super::contracts::ChainContracts;
 use super::wallets::ChainWallets;
@@ -298,5 +303,66 @@ impl Chain {
     /// Checks if the chain uses a custom base token (CGT).
     pub fn uses_custom_gas_token(&self) -> bool {
         self.base_token.is_custom()
+    }
+
+    /// Creates the chain directory structure within an ecosystem.
+    ///
+    /// Creates the following directory structure:
+    /// ```text
+    /// {ecosystem_path}/chains/{chain_name}/
+    /// └── configs/
+    /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `ecosystem_path` - Path to the parent ecosystem directory
+    ///
+    /// # Returns
+    ///
+    /// The path to the created chain directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if directory creation fails.
+    pub async fn create_directory_structure(&self, ecosystem_path: &Path) -> Result<PathBuf> {
+        let chain_dir = ecosystem_path.join("chains").join(&self.name);
+        fs::create_dir_all(&chain_dir).await.wrap_err_with(|| {
+            format!("Failed to create chain directory: {}", chain_dir.display())
+        })?;
+
+        let configs_dir = chain_dir.join("configs");
+        fs::create_dir_all(&configs_dir).await.wrap_err_with(|| {
+            format!(
+                "Failed to create chain configs directory: {}",
+                configs_dir.display()
+            )
+        })?;
+
+        Ok(chain_dir)
+    }
+
+    /// Returns the path to the chain directory within an ecosystem.
+    pub fn chain_path(&self, ecosystem_path: &Path) -> PathBuf {
+        ecosystem_path.join("chains").join(&self.name)
+    }
+
+    /// Returns the path to the chain's configs directory.
+    pub fn configs_path(&self, ecosystem_path: &Path) -> PathBuf {
+        self.chain_path(ecosystem_path).join("configs")
+    }
+
+    /// Returns the path to the chain's wallets.yaml file.
+    pub fn wallets_path(&self, ecosystem_path: &Path) -> PathBuf {
+        self.configs_path(ecosystem_path).join("wallets.yaml")
+    }
+
+    /// Returns the path to the chain's genesis.yaml file.
+    pub fn genesis_path(&self, ecosystem_path: &Path) -> PathBuf {
+        self.configs_path(ecosystem_path).join("genesis.yaml")
+    }
+
+    /// Returns the path to the chain's contracts.yaml file.
+    pub fn contracts_path(&self, ecosystem_path: &Path) -> PathBuf {
+        self.configs_path(ecosystem_path).join("contracts.yaml")
     }
 }
