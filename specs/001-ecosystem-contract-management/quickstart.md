@@ -4,9 +4,101 @@ This guide covers the basic setup and usage of the ADI CLI for managing ZkSync e
 
 ## Prerequisites
 
-- Docker installed and running
+- Docker installed and running (Docker Desktop 4.x+ or Docker Engine 20.10+)
 - Access to a settlement layer RPC endpoint (Mainnet, Sepolia, or local Anvil)
 - Funder wallet with sufficient ETH for deployments
+- Minimum 8GB RAM available for Docker containers
+
+## Docker Toolkit Architecture
+
+The ADI CLI orchestrates pre-built Docker toolkit images containing all required ZkSync development tools. This architecture ensures reproducible deployments with version-pinned dependencies.
+
+### Toolkit Image Contents
+
+Each toolkit image (`adi-toolkit`) contains:
+- **zkstack CLI**: ZkSync ecosystem management tool (from specific commit)
+- **foundry-zksync**: ZkSync-compatible forge and cast tools
+- **era-contracts**: Smart contract sources for upgrade scripts
+- **Python dependencies**: eth-abi, eth-hash for upgrade calldata encoding
+
+### Version-Specific Images
+
+| Image Tag | Protocol Version | Era Contracts | Use Case |
+|-----------|------------------|---------------|----------|
+| `adi-toolkit:v29` | v0.29.x | zkos-v0.29.11 | Initial deployment |
+| `adi-toolkit:v30` | v0.30.x | v30-zksync-os-upgrade | Upgrade target |
+
+### Building Toolkit Images
+
+Build toolkit images locally using Docker Bake:
+
+```bash
+# Build all toolkit versions (v29 + v30)
+docker buildx bake -f docker/docker-bake.hcl
+
+# Build specific version
+docker buildx bake -f docker/docker-bake.hcl toolkit-v29
+
+# Build with custom registry
+REGISTRY=my-registry.io/project docker buildx bake -f docker/docker-bake.hcl
+```
+
+### Pulling Pre-Built Images
+
+Pre-built images are available from the configured registry:
+
+```bash
+# Pull v29 toolkit
+docker pull registry.sre.ideasoft.io/adi-foundation/adi-chain/cli/adi-toolkit:v29
+
+# Pull v30 toolkit
+docker pull registry.sre.ideasoft.io/adi-foundation/adi-chain/cli/adi-toolkit:v30
+```
+
+### Container Execution Model
+
+The CLI uses ephemeral containers for each operation:
+
+1. **Container Creation**: A new container is created from the toolkit image
+2. **Volume Mounts**: State directory (`~/.adi_cli/state/`) is mounted for persistence
+3. **Command Execution**: zkstack/forge commands run inside the container
+4. **Output Streaming**: Real-time output is streamed to the terminal
+5. **Container Cleanup**: Container is removed after operation completes
+
+```text
+Host Machine
+┌─────────────────────────────────────────────────────────┐
+│  adi-cli (Rust binary)                                  │
+│  ├── Commands (Clap)                                    │
+│  ├── Docker Orchestrator (Bollard)                      │
+│  └── Config/State (~/.adi_cli/)                         │
+└────────────────────┬────────────────────────────────────┘
+                     │ Docker API
+┌────────────────────▼────────────────────────────────────┐
+│  Docker Daemon                                          │
+│  └── adi-toolkit:v{VERSION} (ephemeral container)       │
+│      ├── zkstack CLI                                    │
+│      ├── foundry-zksync (forge, cast)                   │
+│      └── era-contracts                                  │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Docker Configuration
+
+Configure the toolkit image source in `~/.adi_cli/.adi.yml`:
+
+```yaml
+docker:
+  registry: registry.sre.ideasoft.io/adi-foundation/adi-chain/cli
+  image_name: adi-toolkit
+```
+
+Override via environment variables:
+
+```bash
+export ADI_DOCKER_REGISTRY=my-registry.io/project
+export ADI_DOCKER_IMAGE_NAME=adi-toolkit
+```
 
 ## Configuration
 
@@ -229,16 +321,61 @@ adi state restore ecosystems/my_ecosystem/metadata
 **Error: Docker daemon not running**
 
 ```bash
+# Check Docker status
+docker info
+
 # Start Docker
 open -a Docker  # macOS
 sudo systemctl start docker  # Linux
+
+# Verify Docker is accessible
+docker ps
 ```
 
 **Error: Toolkit image not found**
 
 ```bash
-# Pull manually
-docker pull harbor.io/adi/adi-toolkit:v29.0.11
+# Pull specific version
+docker pull registry.sre.ideasoft.io/adi-foundation/adi-chain/cli/adi-toolkit:v29
+
+# Or build locally
+docker buildx bake -f docker/docker-bake.hcl toolkit-v29
+```
+
+**Error: Insufficient Docker resources**
+
+The toolkit build requires significant resources. Ensure Docker has:
+- At least 8GB RAM allocated
+- At least 20GB disk space available
+
+```bash
+# Check Docker resource usage
+docker system df
+
+# Clean up unused resources
+docker system prune -a
+```
+
+**Error: Build cache issues**
+
+```bash
+# Clear Docker build cache
+docker builder prune --all
+
+# Rebuild without cache
+docker buildx bake -f docker/docker-bake.hcl --no-cache
+```
+
+**Error: Container network issues**
+
+If containers cannot reach the settlement layer RPC:
+
+```bash
+# Test connectivity from container
+docker run --rm adi-toolkit:v29 curl -s https://sepolia.infura.io/health
+
+# Use host network mode if needed (configured in CLI)
+# The CLI handles network configuration automatically
 ```
 
 ### Deployment Issues

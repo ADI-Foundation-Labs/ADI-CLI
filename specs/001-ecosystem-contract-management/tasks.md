@@ -261,9 +261,9 @@ Based on plan.md structure:
 
 ### Toolkit Image Building
 
-- [ ] T102 Create docker/Dockerfile for toolkit image (zkstack + foundry-zksync + era-contracts)
-- [ ] T103 Create docker/docker-bake.hcl with parameterized build configuration
-- [ ] T104 Add Docker requirements and usage to quickstart.md
+- [X] T102 Create docker/Dockerfile for toolkit image (zkstack + foundry-zksync + era-contracts)
+- [X] T103 Create docker/docker-bake.hcl with parameterized build configuration
+- [X] T104 Add Docker requirements and usage to quickstart.md
 
 ### Development Automation
 
