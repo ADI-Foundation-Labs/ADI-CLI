@@ -250,14 +250,14 @@ Based on plan.md structure:
 
 ### Docker Orchestration Modules
 
-- [ ] T094 [P] Create src/docker/client.rs with Bollard client wrapper
-- [ ] T095 [P] Create src/docker/image.rs with image pulling/management
-- [ ] T096 [P] Create src/docker/container.rs with container lifecycle
-- [ ] T097 [P] Create src/docker/stream.rs with real-time output streaming
-- [ ] T098 Create src/docker/mod.rs exporting all Docker modules
-- [ ] T099 [P] Create src/toolkit/config.rs with image reference builder
-- [ ] T100 [P] Create src/toolkit/runner.rs with zkstack/forge execution via containers
-- [ ] T101 Create src/toolkit/mod.rs exporting toolkit modules
+- [X] T094 [P] Create src/docker/client.rs with Bollard client wrapper
+- [X] T095 [P] Create src/docker/image.rs with image pulling/management
+- [X] T096 [P] Create src/docker/container.rs with container lifecycle
+- [X] T097 [P] Create src/docker/stream.rs with real-time output streaming
+- [X] T098 Create src/docker/mod.rs exporting all Docker modules
+- [X] T099 [P] Create src/toolkit/config.rs with image reference builder
+- [X] T100 [P] Create src/toolkit/runner.rs with zkstack/forge execution via containers
+- [X] T101 Create src/toolkit/mod.rs exporting toolkit modules
 
 ### Toolkit Image Building
 

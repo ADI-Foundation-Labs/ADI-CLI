@@ -11,12 +11,14 @@ mod chain;
 mod commands;
 mod config;
 mod context;
+mod docker;
 mod ecosystem;
 mod error;
 mod external;
 mod funding;
 mod log;
 mod state;
+mod toolkit;
 
 const STYLES: Styles = Styles::styled()
     .header(Ansi::Green.on_default().bold())
