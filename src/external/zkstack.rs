@@ -530,7 +530,10 @@ impl ZkstackCli {
     /// };
     /// let output = zkstack.generate_chain_upgrade(&config).await?;
     /// ```
-    pub async fn generate_chain_upgrade(&self, config: &ChainUpgradeConfig) -> Result<CommandOutput> {
+    pub async fn generate_chain_upgrade(
+        &self,
+        config: &ChainUpgradeConfig,
+    ) -> Result<CommandOutput> {
         let mut args = vec![
             "dev".to_string(),
             "generate-chain-upgrade".to_string(),

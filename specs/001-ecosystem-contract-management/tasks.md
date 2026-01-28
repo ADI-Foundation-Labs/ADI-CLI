@@ -235,10 +235,10 @@ Based on plan.md structure:
 
 ### Implementation for User Story 6
 
-- [ ] T090 [US6] Implement state integrity validation on startup in src/state/filesystem.rs
-- [ ] T091 [US6] Add state directory validation and error reporting in src/state/filesystem.rs
-- [ ] T092 [US6] Add state backup before destructive operations in src/state/filesystem.rs
-- [ ] T093 [US6] Document state directory structure in quickstart.md
+- [X] T090 [US6] Implement state integrity validation on startup in src/state/filesystem.rs
+- [X] T091 [US6] Add state directory validation and error reporting in src/state/filesystem.rs
+- [X] T092 [US6] Add state backup before destructive operations in src/state/filesystem.rs
+- [X] T093 [US6] Document state directory structure in quickstart.md
 
 **Checkpoint**: All user stories complete
 

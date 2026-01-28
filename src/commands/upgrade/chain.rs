@@ -269,7 +269,10 @@ impl UpgradeChain {
 
         let mut contract_addresses = ecosystem_contracts.to_address_map();
         // Add chain-specific contracts
-        contract_addresses.insert("diamond_proxy".to_string(), chain_contracts.diamond_proxy_addr);
+        contract_addresses.insert(
+            "diamond_proxy".to_string(),
+            chain_contracts.diamond_proxy_addr,
+        );
         contract_addresses.insert("chain_admin".to_string(), chain_contracts.chain_admin_addr);
 
         let settlement_chain_id = ecosystem.settlement_network.chain_id();
@@ -357,8 +360,7 @@ impl UpgradeChain {
         // Phase 5: Save deployment output file (T087a)
         ::log::info!("{}", "Phase 5: Saving deployment output...".bright_white());
 
-        let deployment_output_filename =
-            format!("v{}-{}.toml", target_version, self.chain_name);
+        let deployment_output_filename = format!("v{}-{}.toml", target_version, self.chain_name);
         let deployment_output_path = self.output_dir.join(&deployment_output_filename);
 
         // Create deployment output TOML
@@ -624,7 +626,9 @@ impl UpgradeChain {
             "After executing the chain upgrade to v{}, you must update the DA validator pair.",
             target_version
         );
-        println!("This ensures the chain uses the correct validators for the new protocol version.");
+        println!(
+            "This ensures the chain uses the correct validators for the new protocol version."
+        );
         println!();
         println!("{}", "Steps to update DA validator pair:".bright_white());
         println!();
@@ -636,15 +640,13 @@ impl UpgradeChain {
                 .cyan()
         );
         println!();
-        println!(
-            "  2. Update the chain's DA validator pair using the ChainAdmin contract:"
-        );
+        println!("  2. Update the chain's DA validator pair using the ChainAdmin contract:");
         println!(
             "     {}",
-            "cast send <CHAIN_ADMIN_ADDR> \"setDAValidatorPair(address,address)\" \\"
-                .cyan()
+            "cast send <CHAIN_ADMIN_ADDR> \"setDAValidatorPair(address,address)\" \\".cyan()
         );
-        println!("       {}",
+        println!(
+            "       {}",
             "  <NEW_L1_DA_VALIDATOR> <NEW_L2_DA_VALIDATOR> --private-key <GOVERNOR_PK>".cyan()
         );
         println!();
