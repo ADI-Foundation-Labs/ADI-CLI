@@ -1,0 +1,22 @@
+[package]
+name = "adi-docker"
+version.workspace = true
+edition.workspace = true
+description = "Docker orchestration SDK for ADI toolkit containers"
+
+[lints]
+workspace = true
+
+[lib]
+name = "adi_docker"
+path = "src/lib.rs"
+
+[dependencies]
+tokio = { workspace = true }
+eyre = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+log = { workspace = true }
+semver = { workspace = true }
+futures-util = { workspace = true }
+bollard = { workspace = true }
