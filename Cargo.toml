@@ -62,7 +62,7 @@ config = { version = "0.15", default-features = false, features = ["yaml"] }
 tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "macros", "time", "io-util"] }
 
 # Error handling
-eyre = { version = "0.6", default-features = false }
+eyre = { version = "0.6", default-features = false, features = ["auto-install"] }
 thiserror = { version = "2", default-features = false }
 
 # Serialization
@@ -74,11 +74,12 @@ log = { version = "0.4", default-features = false }
 env_logger = { version = "0.11", default-features = false, features = ["auto-color"] }
 
 # Docker
-bollard = { version = "0.18", default-features = false, features = ["ssl"] }
+bollard = { version = "0.18" }
 futures-util = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 
 # Version handling
 semver = { version = "1", default-features = false, features = ["serde"] }
+strum = { version = "0.26", default-features = false, features = ["derive"] }
 
 # Utilities
 dirs = { version = "6.0", default-features = false }

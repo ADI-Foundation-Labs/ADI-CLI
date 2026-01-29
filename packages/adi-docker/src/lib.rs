@@ -88,6 +88,7 @@ mod error;
 mod image;
 mod runner;
 mod stream;
+mod version;
 
 // Public re-exports
 pub use client::DockerClient;
@@ -95,3 +96,4 @@ pub use config::{ContainerConfig, DockerConfig, ImageReference};
 pub use config::{DEFAULT_IMAGE_NAME, DEFAULT_REGISTRY, DEFAULT_TIMEOUT_SECONDS};
 pub use error::{DockerError, Result};
 pub use runner::ToolkitRunner;
+pub use version::{ParseError, ProtocolVersion};

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{context::Context, error::Result};
 
+mod init;
 mod show;
 
 #[derive(Clone, Subcommand, Debug, Serialize, Deserialize)]
@@ -13,12 +14,18 @@ pub enum Commands {
         #[command(subcommand)]
         command: show::ShowCommand,
     },
+    /// Initialize ecosystem or chain
+    Init {
+        #[command(subcommand)]
+        command: init::InitCommand,
+    },
 }
 
 impl Commands {
     pub async fn run(self, context: &Context) -> Result<()> {
         match self {
             Commands::Show { command } => command.run(context).await,
+            Commands::Init { command } => command.run(context).await,
         }
     }
 }
