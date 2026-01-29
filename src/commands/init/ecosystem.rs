@@ -55,7 +55,7 @@ pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
         return Err(eyre::eyre!(
             "genesis.json not found in state directory.\n\
              Please place the genesis.json file at: {}\n\
-             You can download it from: https://raw.githubusercontent.com/matter-labs/zksync-os-server/ec996154d7cb0f3bd2857ff015d061781a9fbbe6/genesis/genesis.json",
+             You can download it from: https://raw.githubusercontent.com/matter-labs/zksync-os-server/48650acecd1182c56c0f6d86f3c471f8d72159c6/genesis/genesis.json",
             genesis_path.display()
         ));
     }
