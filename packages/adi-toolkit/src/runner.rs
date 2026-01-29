@@ -26,7 +26,7 @@ pub const GENESIS_CONTAINER_PATH: &str = "/deps/zksync-era/etc/env/file_based/ge
 /// # async fn example() -> adi_toolkit::Result<()> {
 /// let runner = ToolkitRunner::new().await?;
 ///
-/// let version = Version::new(29, 0, 11);
+/// let version = Version::new(30, 0, 2);
 /// let state_dir = Path::new("/home/user/.adi_cli/state");
 ///
 /// // Run zkstack command
@@ -161,7 +161,7 @@ impl ToolkitRunner {
     /// # use std::path::Path;
     /// # async fn example() -> adi_toolkit::Result<()> {
     /// # let runner = ToolkitRunner::new().await?;
-    /// let version = Version::new(29, 0, 11);
+    /// let version = Version::new(30, 0, 2);
     /// let state_dir = Path::new("/home/user/.adi_cli/state");
     ///
     /// // Run: zkstack ecosystem init

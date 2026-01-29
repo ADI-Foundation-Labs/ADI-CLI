@@ -7,11 +7,10 @@ variables:
   DOCKER_TLS_CERTDIR: ""
   BUILD_TARGET:
     value: "default"
-    description: "Select the build target (default, toolkit-v29, toolkit-v30)"
+    description: "Select the build target (default, toolkit-v30-0-2)"
     options:
       - "default"
-      - "toolkit-v29"
-      - "toolkit-v30"
+      - "toolkit-v30-0-2"
 
 build-docker:
   stage: build

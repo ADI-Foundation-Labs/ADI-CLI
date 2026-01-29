@@ -22,25 +22,25 @@ pub enum ParseError {
 /// # Parsing
 ///
 /// Versions can be parsed from strings in several formats:
-/// - With prefix: `v29.0.11`
-/// - Without prefix: `29.0.11`
+/// - With prefix: `v30.0.2`
+/// - Without prefix: `30.0.2`
 ///
 /// # Example
 ///
 /// ```rust
 /// use adi_toolkit::ProtocolVersion;
 ///
-/// let version = ProtocolVersion::parse("v29.0.11").unwrap();
-/// assert_eq!(version.to_semver(), semver::Version::new(29, 0, 11));
+/// let version = ProtocolVersion::parse("v30.0.2").unwrap();
+/// assert_eq!(version.to_semver(), semver::Version::new(30, 0, 2));
 /// ```
 #[derive(
     Clone, Copy, Debug, Default, EnumString, EnumIter, Serialize, Deserialize, PartialEq, Eq,
 )]
 pub enum ProtocolVersion {
-    /// Protocol version 29.0.11
+    /// Protocol version 30.0.2
     #[default]
-    #[strum(serialize = "v29.0.11", serialize = "29.0.11")]
-    V29_0_11,
+    #[strum(serialize = "v30.0.2", serialize = "30.0.2")]
+    V30_0_2,
 }
 
 impl ProtocolVersion {
@@ -61,8 +61,8 @@ impl ProtocolVersion {
     /// ```rust
     /// use adi_toolkit::ProtocolVersion;
     ///
-    /// let version = ProtocolVersion::parse("v29.0.11").unwrap();
-    /// let version2 = ProtocolVersion::parse("29.0.11").unwrap();
+    /// let version = ProtocolVersion::parse("v30.0.2").unwrap();
+    /// let version2 = ProtocolVersion::parse("30.0.2").unwrap();
     /// assert_eq!(version, version2);
     /// ```
     pub fn parse(s: &str) -> Result<Self, ParseError> {
@@ -90,16 +90,16 @@ impl ProtocolVersion {
     /// ```rust
     /// use adi_toolkit::ProtocolVersion;
     ///
-    /// let version = ProtocolVersion::V29_0_11;
+    /// let version = ProtocolVersion::V30_0_2;
     /// let semver = version.to_semver();
-    /// assert_eq!(semver.major, 29);
+    /// assert_eq!(semver.major, 30);
     /// assert_eq!(semver.minor, 0);
-    /// assert_eq!(semver.patch, 11);
+    /// assert_eq!(semver.patch, 2);
     /// ```
     #[must_use]
     pub fn to_semver(self) -> semver::Version {
         match self {
-            ProtocolVersion::V29_0_11 => semver::Version::new(29, 0, 11),
+            ProtocolVersion::V30_0_2 => semver::Version::new(30, 0, 2),
         }
     }
 
@@ -129,14 +129,14 @@ mod tests {
 
     #[test]
     fn test_parse_with_prefix() {
-        let version = ProtocolVersion::parse("v29.0.11").unwrap();
-        assert_eq!(version, ProtocolVersion::V29_0_11);
+        let version = ProtocolVersion::parse("v30.0.2").unwrap();
+        assert_eq!(version, ProtocolVersion::V30_0_2);
     }
 
     #[test]
     fn test_parse_without_prefix() {
-        let version = ProtocolVersion::parse("29.0.11").unwrap();
-        assert_eq!(version, ProtocolVersion::V29_0_11);
+        let version = ProtocolVersion::parse("30.0.2").unwrap();
+        assert_eq!(version, ProtocolVersion::V30_0_2);
     }
 
     #[test]
@@ -147,14 +147,14 @@ mod tests {
 
     #[test]
     fn test_to_semver() {
-        let version = ProtocolVersion::V29_0_11;
+        let version = ProtocolVersion::V30_0_2;
         let semver = version.to_semver();
-        assert_eq!(semver, semver::Version::new(29, 0, 11));
+        assert_eq!(semver, semver::Version::new(30, 0, 2));
     }
 
     #[test]
     fn test_display() {
-        let version = ProtocolVersion::V29_0_11;
-        assert_eq!(format!("{}", version), "v29.0.11");
+        let version = ProtocolVersion::V30_0_2;
+        assert_eq!(format!("{}", version), "v30.0.2");
     }
 }

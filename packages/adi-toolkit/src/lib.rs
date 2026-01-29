@@ -28,7 +28,7 @@
 //! let runner = ToolkitRunner::new().await?;
 //!
 //! // Parse version
-//! let version = ProtocolVersion::parse("v29.0.11").expect("valid version");
+//! let version = ProtocolVersion::parse("v30.0.2").expect("valid version");
 //! let state_dir = Path::new("/home/user/.adi_cli/state");
 //!
 //! // Run zkstack command (genesis.json must be in state_dir)

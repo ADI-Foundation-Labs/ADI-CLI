@@ -103,10 +103,10 @@ impl ToolkitConfig {
 /// use semver::Version;
 ///
 /// let config = ToolkitConfig::default();
-/// let version = Version::new(29, 0, 11);
+/// let version = Version::new(30, 0, 2);
 /// let image_ref = config.image_reference(&version);
 ///
-/// assert_eq!(image_ref.full_uri(), "harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:v29.0.11");
+/// assert_eq!(image_ref.full_uri(), "harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:v30.0.2");
 /// ```
 #[derive(Debug, Clone)]
 pub struct ImageReference {
@@ -145,12 +145,12 @@ mod tests {
     #[test]
     fn test_image_reference_format() {
         let config = ToolkitConfig::default();
-        let version = Version::new(29, 0, 11);
+        let version = Version::new(30, 0, 2);
         let image_ref = config.image_reference(&version);
 
         assert_eq!(
             image_ref.full_uri(),
-            "harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:v29.0.11"
+            "harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:v30.0.2"
         );
     }
 
