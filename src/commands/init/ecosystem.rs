@@ -1,6 +1,6 @@
 //! Ecosystem initialization command implementation.
 
-use adi_docker::{DockerClient, DockerConfig, ProtocolVersion};
+use adi_toolkit::{DockerClient, DockerConfig, ProtocolVersion};
 
 use super::EcosystemArgs;
 use crate::context::Context;

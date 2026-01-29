@@ -12,9 +12,9 @@ use bollard::Docker;
 /// # Example
 ///
 /// ```rust,no_run
-/// use adi_docker::DockerClient;
+/// use adi_toolkit::DockerClient;
 ///
-/// # async fn example() -> adi_docker::Result<()> {
+/// # async fn example() -> adi_toolkit::Result<()> {
 /// let client = DockerClient::new().await?;
 ///
 /// // Check if Docker daemon is running

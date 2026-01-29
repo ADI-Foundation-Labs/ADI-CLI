@@ -27,7 +27,7 @@ pub struct ParseError {
 /// # Example
 ///
 /// ```rust
-/// use adi_docker::ProtocolVersion;
+/// use adi_toolkit::ProtocolVersion;
 /// use std::str::FromStr;
 ///
 /// let version = ProtocolVersion::from_str("v29.0.11").unwrap();

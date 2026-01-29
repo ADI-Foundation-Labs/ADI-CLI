@@ -14,11 +14,11 @@ use std::path::Path;
 /// # Example
 ///
 /// ```rust,no_run
-/// use adi_docker::{DockerClient, DockerConfig, ToolkitRunner};
+/// use adi_toolkit::{DockerClient, DockerConfig, ToolkitRunner};
 /// use semver::Version;
 /// use std::path::Path;
 ///
-/// # async fn example() -> adi_docker::Result<()> {
+/// # async fn example() -> adi_toolkit::Result<()> {
 /// let client = DockerClient::new().await?;
 /// let config = DockerConfig::default();
 /// let runner = ToolkitRunner::new(client, config);
@@ -131,10 +131,10 @@ impl ToolkitRunner {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use adi_docker::{DockerClient, DockerConfig, ToolkitRunner};
+    /// # use adi_toolkit::{DockerClient, DockerConfig, ToolkitRunner};
     /// # use semver::Version;
     /// # use std::path::Path;
-    /// # async fn example() -> adi_docker::Result<()> {
+    /// # async fn example() -> adi_toolkit::Result<()> {
     /// # let client = DockerClient::new().await?;
     /// # let runner = ToolkitRunner::new(client, DockerConfig::default());
     /// let version = Version::new(29, 0, 11);

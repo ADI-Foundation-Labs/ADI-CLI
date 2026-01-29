@@ -21,7 +21,7 @@ pub const DEFAULT_TIMEOUT_SECONDS: u64 = 1800;
 /// # Example
 ///
 /// ```rust
-/// use adi_docker::DockerConfig;
+/// use adi_toolkit::DockerConfig;
 ///
 /// let config = DockerConfig::default();
 /// assert_eq!(config.registry, "harbor.sde.adifoundation.ai/adi-chain/cli");
@@ -100,7 +100,7 @@ impl DockerConfig {
 /// # Example
 ///
 /// ```rust
-/// use adi_docker::{DockerConfig, ImageReference};
+/// use adi_toolkit::{DockerConfig, ImageReference};
 /// use semver::Version;
 ///
 /// let config = DockerConfig::default();
@@ -129,7 +129,7 @@ impl ImageReference {
     /// # Example
     ///
     /// ```rust
-    /// use adi_docker::ImageReference;
+    /// use adi_toolkit::ImageReference;
     ///
     /// let image_ref = ImageReference {
     ///     registry: "harbor.sde.adifoundation.ai/adi-chain/cli".to_string(),

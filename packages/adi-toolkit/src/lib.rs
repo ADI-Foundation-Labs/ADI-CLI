@@ -1,4 +1,4 @@
-//! Docker orchestration SDK for ADI toolkit containers.
+//! SDK for running ADI toolkit containers (zkstack, forge, cast).
 //!
 //! This crate provides a high-level interface for managing Docker containers
 //! that run the ADI toolkit (zkstack, foundry-zksync, era-contracts).
@@ -28,11 +28,11 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use adi_docker::{DockerClient, DockerConfig, ToolkitRunner};
+//! use adi_toolkit::{DockerClient, DockerConfig, ToolkitRunner};
 //! use semver::Version;
 //! use std::path::Path;
 //!
-//! # async fn example() -> adi_docker::Result<()> {
+//! # async fn example() -> adi_toolkit::Result<()> {
 //! // Create client and verify Docker is running
 //! let client = DockerClient::new().await?;
 //!

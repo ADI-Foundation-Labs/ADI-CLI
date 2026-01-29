@@ -6,7 +6,7 @@ version = 4
 name = "adi-cli"
 version = "0.1.0"
 dependencies = [
- "adi-docker",
+ "adi-toolkit",
  "built",
  "chrono",
  "clap",
@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "adi-docker"
+name = "adi-toolkit"
 version = "0.1.0"
 dependencies = [
  "bollard",
