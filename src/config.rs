@@ -47,14 +47,12 @@ impl Config {
     pub fn new(config_path: Option<&Path>) -> Result<Self> {
         // 1. Global config (lowest file priority)
         let global_config_path = path_with_home_dir(DEFAULT_CONFIG_FILE_NAME);
-        let mut builder = config::Config::builder().add_source(
-            config::File::from(Path::new(&global_config_path)).required(false),
-        );
+        let mut builder = config::Config::builder()
+            .add_source(config::File::from(Path::new(&global_config_path)).required(false));
 
         // 2. ADI_CONFIG environment variable (higher priority)
         if let Ok(env_path) = std::env::var(CONFIG_ENV_VAR) {
-            builder =
-                builder.add_source(config::File::from(Path::new(&env_path)).required(true));
+            builder = builder.add_source(config::File::from(Path::new(&env_path)).required(true));
         }
 
         // 3. CLI --config flag (highest file priority)
