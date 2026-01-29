@@ -19,8 +19,8 @@ impl Context {
     /// # Errors
     ///
     /// Returns an error if configuration loading fails.
-    pub fn new_from_options(_options: &super::Opts) -> Result<Self> {
-        let cfg = Config::new().wrap_err("Failed to load config")?;
+    pub fn new_from_options(options: &super::Opts) -> Result<Self> {
+        let cfg = Config::new(options.config.as_deref()).wrap_err("Failed to load config")?;
         Ok(Self { cfg })
     }
 

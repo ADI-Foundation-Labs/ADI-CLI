@@ -1,4 +1,5 @@
 use std::io::Write;
+use std::path::PathBuf;
 
 use clap::{
     builder::styling::{AnsiColor as Ansi, Styles},
@@ -23,6 +24,11 @@ const STYLES: Styles = Styles::styled()
 #[clap(about)]
 #[command(styles = STYLES)]
 pub struct Opts {
+    /// Path to config file (overrides default locations)
+    #[arg(global = true, short = 'c', long = "config")]
+    #[serde(default)]
+    pub config: Option<PathBuf>,
+
     /// Enable debug logging
     #[arg(global = true, short = 'd', long)]
     #[serde(default)]
@@ -69,7 +75,7 @@ fn init_logger(debug: bool) {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opts: Opts = Opts::parse();
-    let cfg = config::Config::new()?;
+    let cfg = config::Config::new(opts.config.as_deref())?;
 
     // CLI flag takes precedence over config file
     let debug_enabled = opts.debug || cfg.debug;

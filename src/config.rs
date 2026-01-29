@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::error::{Result, WrapErr};
 use adi_ecosystem::EcosystemConfig;
@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_CONFIG_FILE_NAME: &str = ".adi.yml";
 pub const DEFAULT_STATE_DIR: &str = ".adi_cli/state";
-pub const LOCAL_CONFIG_FILE_NAME: &str = ".adi.yml";
+/// Environment variable for specifying config file path.
+pub const CONFIG_ENV_VAR: &str = "ADI_CONFIG";
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
@@ -30,32 +31,38 @@ impl Config {
     /// Load configuration from file and environment variables.
     ///
     /// Configuration is loaded from multiple sources with the following priority:
-    /// 1. Environment variables with `ADI_` prefix (highest)
-    /// 2. Local config file at `./.adi.yml` (current directory)
-    /// 3. Global config file at `~/.adi_cli/.adi.yml`
-    /// 4. Built-in defaults (lowest)
+    /// 1. Environment variables with `ADI__` prefix (highest)
+    /// 2. CLI `--config` flag
+    /// 3. `ADI_CONFIG` environment variable
+    /// 4. Global config file at `~/.adi_cli/.adi.yml`
+    /// 5. Built-in defaults (lowest)
     ///
-    /// Local config values override global config values, allowing project-specific
-    /// configuration for development and testing.
+    /// # Arguments
+    /// * `config_path` - Optional path to config file from CLI `--config` flag
     ///
     /// # Errors
     /// Returns an error if configuration cannot be loaded or deserialized.
-    pub fn new() -> Result<Self> {
+    /// If a config path is explicitly provided (via CLI or `ADI_CONFIG` env var)
+    /// and the file doesn't exist, an error is returned.
+    pub fn new(config_path: Option<&Path>) -> Result<Self> {
+        // 1. Global config (lowest file priority)
         let global_config_path = path_with_home_dir(DEFAULT_CONFIG_FILE_NAME);
+        let mut builder = config::Config::builder().add_source(
+            config::File::from(Path::new(&global_config_path)).required(false),
+        );
 
-        let mut builder = config::Config::builder()
-            // 1. Global config (lowest file priority)
-            .add_source(
-                config::File::from(std::path::Path::new(&global_config_path)).required(false),
-            );
-
-        // 2. Local config (higher priority, overrides global)
-        if let Ok(current_dir) = std::env::current_dir() {
-            let local_config_path = current_dir.join(LOCAL_CONFIG_FILE_NAME);
-            builder = builder.add_source(config::File::from(local_config_path).required(false));
+        // 2. ADI_CONFIG environment variable (higher priority)
+        if let Ok(env_path) = std::env::var(CONFIG_ENV_VAR) {
+            builder =
+                builder.add_source(config::File::from(Path::new(&env_path)).required(true));
         }
 
-        // 3. Environment variables (highest priority)
+        // 3. CLI --config flag (highest file priority)
+        if let Some(path) = config_path {
+            builder = builder.add_source(config::File::from(path).required(true));
+        }
+
+        // 4. Environment variables ADI__* (highest overall priority)
         builder
             .add_source(
                 config::Environment::with_prefix("ADI")
