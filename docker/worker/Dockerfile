@@ -17,6 +17,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   nodejs \
   npm \
   python3-pip \
+  docker.io \
+  docker-compose \
   && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies for upgrade scripts

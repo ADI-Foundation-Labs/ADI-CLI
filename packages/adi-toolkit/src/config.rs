@@ -1,8 +1,7 @@
-//! Configuration types for Docker operations.
+//! Configuration types for toolkit operations.
 
 use semver::Version;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 /// Default registry for ADI toolkit images.
 pub const DEFAULT_REGISTRY: &str = "harbor.sde.adifoundation.ai/adi-chain/cli";
@@ -13,32 +12,32 @@ pub const DEFAULT_IMAGE_NAME: &str = "adi-toolkit";
 /// Default timeout in seconds (30 minutes).
 pub const DEFAULT_TIMEOUT_SECONDS: u64 = 1800;
 
-/// Configuration for Docker toolkit image orchestration.
+/// Configuration for toolkit image orchestration.
 ///
-/// This configuration is used to specify where to pull toolkit images from
+/// This configuration specifies where to pull toolkit images from
 /// and how long to wait for container operations.
 ///
 /// # Example
 ///
 /// ```rust
-/// use adi_toolkit::DockerConfig;
+/// use adi_toolkit::ToolkitConfig;
 ///
-/// let config = DockerConfig::default();
+/// let config = ToolkitConfig::default();
 /// assert_eq!(config.registry, "harbor.sde.adifoundation.ai/adi-chain/cli");
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DockerConfig {
-    /// Container registry URL (e.g., "harbor.sde.adifoundation.ai/adi-chain/cli").
+pub struct ToolkitConfig {
+    /// Container registry URL.
     pub registry: String,
 
-    /// Base image name (e.g., "adi-toolkit").
+    /// Base image name.
     pub image_name: String,
 
     /// Timeout for container operations in seconds.
     pub timeout_seconds: u64,
 }
 
-impl Default for DockerConfig {
+impl Default for ToolkitConfig {
     fn default() -> Self {
         Self {
             registry: DEFAULT_REGISTRY.to_string(),
@@ -48,8 +47,8 @@ impl Default for DockerConfig {
     }
 }
 
-impl DockerConfig {
-    /// Create a new DockerConfig with custom values.
+impl ToolkitConfig {
+    /// Create a new ToolkitConfig with custom values.
     ///
     /// # Arguments
     ///
@@ -100,10 +99,10 @@ impl DockerConfig {
 /// # Example
 ///
 /// ```rust
-/// use adi_toolkit::{DockerConfig, ImageReference};
+/// use adi_toolkit::{ToolkitConfig, ImageReference};
 /// use semver::Version;
 ///
-/// let config = DockerConfig::default();
+/// let config = ToolkitConfig::default();
 /// let version = Version::new(29, 0, 11);
 /// let image_ref = config.image_reference(&version);
 ///
@@ -125,58 +124,9 @@ impl ImageReference {
     /// Returns the full image URI.
     ///
     /// Format: `{registry}/{image_name}:{tag}`
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use adi_toolkit::ImageReference;
-    ///
-    /// let image_ref = ImageReference {
-    ///     registry: "harbor.sde.adifoundation.ai/adi-chain/cli".to_string(),
-    ///     image_name: "adi-toolkit".to_string(),
-    ///     tag: "v29.0.11".to_string(),
-    /// };
-    ///
-    /// assert_eq!(image_ref.full_uri(), "harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:v29.0.11");
-    /// ```
     #[must_use]
     pub fn full_uri(&self) -> String {
         format!("{}/{}:{}", self.registry, self.image_name, self.tag)
-    }
-}
-
-/// Configuration for creating a container.
-#[derive(Debug, Clone)]
-pub struct ContainerConfig {
-    /// Working directory inside the container.
-    pub working_dir: String,
-
-    /// Host directory to mount as /workspace.
-    pub state_dir: PathBuf,
-
-    /// Command to execute.
-    pub command: Vec<String>,
-
-    /// Environment variables as (key, value) pairs.
-    pub env_vars: Vec<(String, String)>,
-
-    /// Use host network mode.
-    pub host_network: bool,
-
-    /// Timeout in seconds.
-    pub timeout_seconds: u64,
-}
-
-impl Default for ContainerConfig {
-    fn default() -> Self {
-        Self {
-            working_dir: "/workspace".to_string(),
-            state_dir: PathBuf::new(),
-            command: Vec::new(),
-            env_vars: Vec::new(),
-            host_network: true,
-            timeout_seconds: DEFAULT_TIMEOUT_SECONDS,
-        }
     }
 }
 
@@ -186,7 +136,7 @@ mod tests {
 
     #[test]
     fn test_default_config() {
-        let config = DockerConfig::default();
+        let config = ToolkitConfig::default();
         assert_eq!(config.registry, "harbor.sde.adifoundation.ai/adi-chain/cli");
         assert_eq!(config.image_name, "adi-toolkit");
         assert_eq!(config.timeout_seconds, 1800);
@@ -194,16 +144,19 @@ mod tests {
 
     #[test]
     fn test_image_reference_format() {
-        let config = DockerConfig::default();
+        let config = ToolkitConfig::default();
         let version = Version::new(29, 0, 11);
         let image_ref = config.image_reference(&version);
 
-        assert_eq!(image_ref.full_uri(), "harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:v29.0.11");
+        assert_eq!(
+            image_ref.full_uri(),
+            "harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:v29.0.11"
+        );
     }
 
     #[test]
     fn test_custom_config() {
-        let config = DockerConfig::new("my-registry.io", "my-toolkit").with_timeout(3600);
+        let config = ToolkitConfig::new("my-registry.io", "my-toolkit").with_timeout(3600);
 
         assert_eq!(config.registry, "my-registry.io");
         assert_eq!(config.image_name, "my-toolkit");

@@ -6,6 +6,7 @@ version = 4
 name = "adi-cli"
 version = "0.1.0"
 dependencies = [
+ "adi-ecosystem",
  "adi-toolkit",
  "built",
  "chrono",
@@ -22,12 +23,35 @@ dependencies = [
 ]
 
 [[package]]
-name = "adi-toolkit"
+name = "adi-docker"
 version = "0.1.0"
 dependencies = [
  "bollard",
  "eyre",
  "futures-util",
+ "log",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "adi-ecosystem"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "eyre",
+ "log",
+ "serde",
+ "strum",
+ "thiserror",
+]
+
+[[package]]
+name = "adi-toolkit"
+version = "0.1.0"
+dependencies = [
+ "adi-docker",
+ "eyre",
  "log",
  "semver",
  "serde",

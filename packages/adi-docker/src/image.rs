@@ -1,6 +1,5 @@
 //! Image pulling and management.
 
-use crate::config::ImageReference;
 use crate::error::{DockerError, Result};
 use bollard::image::CreateImageOptions;
 use bollard::Docker;
@@ -18,9 +17,8 @@ impl ImageManager {
     }
 
     /// Check if an image exists locally.
-    pub async fn exists(&self, image_ref: &ImageReference) -> Result<bool> {
-        let full_uri = image_ref.full_uri();
-        match self.docker.inspect_image(&full_uri).await {
+    pub async fn exists(&self, image_uri: &str) -> Result<bool> {
+        match self.docker.inspect_image(image_uri).await {
             Ok(_) => Ok(true),
             Err(bollard::errors::Error::DockerResponseServerError {
                 status_code: 404, ..
@@ -30,22 +28,21 @@ impl ImageManager {
     }
 
     /// Pull an image from registry if not available locally.
-    pub async fn pull_if_missing(&self, image_ref: &ImageReference) -> Result<()> {
-        if self.exists(image_ref).await? {
-            log::debug!("Image {} already exists locally", image_ref.full_uri());
+    pub async fn pull_if_missing(&self, image_uri: &str) -> Result<()> {
+        if self.exists(image_uri).await? {
+            log::debug!("Image {} already exists locally", image_uri);
             return Ok(());
         }
 
-        self.pull(image_ref).await
+        self.pull(image_uri).await
     }
 
     /// Pull an image from registry.
-    async fn pull(&self, image_ref: &ImageReference) -> Result<()> {
-        let full_uri = image_ref.full_uri();
-        log::info!("Pulling image: {}", full_uri);
+    async fn pull(&self, image_uri: &str) -> Result<()> {
+        log::info!("Pulling image: {}", image_uri);
 
         let options = CreateImageOptions {
-            from_image: full_uri.clone(),
+            from_image: image_uri.to_string(),
             ..Default::default()
         };
 
@@ -59,21 +56,21 @@ impl ImageManager {
                     }
                     if let Some(error) = info.error {
                         return Err(DockerError::PullFailed {
-                            image: full_uri,
+                            image: image_uri.to_string(),
                             reason: error,
                         });
                     }
                 }
                 Err(e) => {
                     return Err(DockerError::PullFailed {
-                        image: full_uri,
+                        image: image_uri.to_string(),
                         reason: e.to_string(),
                     });
                 }
             }
         }
 
-        log::info!("Successfully pulled image: {}", image_ref.full_uri());
+        log::info!("Successfully pulled image: {}", image_uri);
         Ok(())
     }
 }

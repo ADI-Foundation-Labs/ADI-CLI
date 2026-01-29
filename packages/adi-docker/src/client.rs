@@ -1,6 +1,5 @@
 //! Docker client wrapper with helper methods.
 
-use crate::config::ImageReference;
 use crate::error::{DockerError, Result};
 use crate::image::ImageManager;
 use bollard::Docker;
@@ -12,9 +11,9 @@ use bollard::Docker;
 /// # Example
 ///
 /// ```rust,no_run
-/// use adi_toolkit::DockerClient;
+/// use adi_docker::DockerClient;
 ///
-/// # async fn example() -> adi_toolkit::Result<()> {
+/// # async fn example() -> adi_docker::Result<()> {
 /// let client = DockerClient::new().await?;
 ///
 /// // Check if Docker daemon is running
@@ -67,16 +66,16 @@ impl DockerClient {
         Ok(true)
     }
 
-    /// Check if an image exists locally.
+    /// Check if an image exists locally by full URI.
     ///
     /// # Arguments
     ///
-    /// * `image_ref` - The image reference to check.
-    pub async fn image_exists(&self, image_ref: &ImageReference) -> Result<bool> {
-        log::debug!("Checking if image exists: {}", image_ref.full_uri());
+    /// * `image_uri` - The full image URI (e.g., "registry/image:tag").
+    pub async fn image_exists(&self, image_uri: &str) -> Result<bool> {
+        log::debug!("Checking if image exists: {}", image_uri);
         let image_manager = ImageManager::new(self.inner.clone());
-        let exists = image_manager.exists(image_ref).await?;
-        log::debug!("Image {} exists: {}", image_ref.full_uri(), exists);
+        let exists = image_manager.exists(image_uri).await?;
+        log::debug!("Image {} exists: {}", image_uri, exists);
         Ok(exists)
     }
 
@@ -84,7 +83,7 @@ impl DockerClient {
     ///
     /// # Arguments
     ///
-    /// * `image_ref` - The image reference to pull.
+    /// * `image_uri` - The full image URI (e.g., "registry/image:tag").
     ///
     /// # Errors
     ///
@@ -92,15 +91,15 @@ impl DockerClient {
     /// - Registry authentication required (run `docker login` first)
     /// - Network issues
     /// - Image does not exist in registry
-    pub async fn pull_image(&self, image_ref: &ImageReference) -> Result<()> {
-        log::debug!("Ensuring image is available: {}", image_ref.full_uri());
+    pub async fn pull_image(&self, image_uri: &str) -> Result<()> {
+        log::debug!("Ensuring image is available: {}", image_uri);
         let image_manager = ImageManager::new(self.inner.clone());
-        image_manager.pull_if_missing(image_ref).await
+        image_manager.pull_if_missing(image_uri).await
     }
 
     /// Get a reference to the inner bollard Docker client.
     #[must_use]
-    pub(crate) fn inner(&self) -> &Docker {
+    pub fn inner(&self) -> &Docker {
         &self.inner
     }
 }

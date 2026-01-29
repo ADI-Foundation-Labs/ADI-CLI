@@ -32,6 +32,8 @@ impl OutputStreamer {
         let mut stream = self.docker.logs(container_id, Some(options));
         let mut stdout = io::stdout();
 
+        println!();
+
         while let Some(result) = stream.next().await {
             match result {
                 Ok(output) => {
@@ -50,6 +52,8 @@ impl OutputStreamer {
                 }
             }
         }
+
+        println!();
 
         Ok(())
     }

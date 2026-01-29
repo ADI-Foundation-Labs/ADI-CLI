@@ -1,6 +1,6 @@
 //! Container lifecycle management.
 
-use crate::config::{ContainerConfig, ImageReference};
+use crate::config::ContainerConfig;
 use crate::error::{DockerError, Result};
 use crate::stream::OutputStreamer;
 use bollard::container::{
@@ -14,7 +14,7 @@ use std::time::Duration;
 use tokio::time::timeout;
 
 /// Manages container lifecycle (create, start, wait, remove).
-pub(crate) struct ContainerManager {
+pub struct ContainerManager {
     docker: Docker,
 }
 
@@ -27,12 +27,9 @@ impl ContainerManager {
     /// Run a container to completion and return exit code.
     ///
     /// Lifecycle: create -> start -> attach streams -> wait -> remove
-    pub async fn run(&self, image_ref: &ImageReference, config: &ContainerConfig) -> Result<i64> {
-        log::debug!(
-            "Starting container lifecycle for image: {}",
-            image_ref.full_uri()
-        );
-        let container_id = self.create(image_ref, config).await?;
+    pub async fn run(&self, image_uri: &str, config: &ContainerConfig) -> Result<i64> {
+        log::debug!("Starting container lifecycle for image: {}", image_uri);
+        let container_id = self.create(image_uri, config).await?;
 
         // Ensure cleanup on any exit path
         let result = self
@@ -40,6 +37,7 @@ impl ContainerManager {
             .await;
 
         // Always attempt to remove, even if run failed
+        log::info!("Cleaning up container...");
         if let Err(e) = self.remove(&container_id).await {
             log::warn!("Failed to remove container {}: {}", container_id, e);
         }
@@ -47,15 +45,15 @@ impl ContainerManager {
         result
     }
 
-    async fn create(&self, image_ref: &ImageReference, config: &ContainerConfig) -> Result<String> {
+    async fn create(&self, image_uri: &str, config: &ContainerConfig) -> Result<String> {
         log::debug!(
             "Creating container: image={}, working_dir={}, mount={}:/workspace",
-            image_ref.full_uri(),
+            image_uri,
             config.working_dir,
             config.state_dir.display()
         );
 
-        let mount = Mount {
+        let workspace_mount = Mount {
             target: Some("/workspace".to_string()),
             source: Some(config.state_dir.to_string_lossy().to_string()),
             typ: Some(MountTypeEnum::BIND),
@@ -63,8 +61,17 @@ impl ContainerManager {
             ..Default::default()
         };
 
+        // Mount Docker socket to allow container to communicate with host Docker daemon
+        let docker_socket_mount = Mount {
+            target: Some("/var/run/docker.sock".to_string()),
+            source: Some("/var/run/docker.sock".to_string()),
+            typ: Some(MountTypeEnum::BIND),
+            read_only: Some(false),
+            ..Default::default()
+        };
+
         let host_config = HostConfig {
-            mounts: Some(vec![mount]),
+            mounts: Some(vec![workspace_mount, docker_socket_mount]),
             network_mode: if config.host_network {
                 Some("host".to_string())
             } else {
@@ -81,8 +88,9 @@ impl ContainerManager {
             .collect();
 
         let container_config = Config {
-            image: Some(image_ref.full_uri()),
+            image: Some(image_uri.to_string()),
             cmd: Some(config.command.clone()),
+            entrypoint: Some(vec![]), // Clear image entrypoint to run command directly
             working_dir: Some(config.working_dir.clone()),
             env: Some(env_vars),
             host_config: Some(host_config),
@@ -104,7 +112,8 @@ impl ContainerManager {
             .await
             .map_err(|e| DockerError::ContainerCreateFailed(e.to_string()))?;
 
-        log::debug!("Created container: {} ({})", container_name, response.id);
+        log::info!("Container created: {}", container_name);
+        log::debug!("Container ID: {}", response.id);
         Ok(response.id)
     }
 
@@ -121,7 +130,7 @@ impl ContainerManager {
             .await
             .map_err(|e| DockerError::ContainerCreateFailed(e.to_string()))?;
 
-        log::debug!("Container started, streaming output...");
+        log::info!("Container started, streaming output...");
 
         // Stream output to terminal
         let streamer = OutputStreamer::new(self.docker.clone());
@@ -199,5 +208,5 @@ fn generate_container_name() -> String {
         .map(|d| d.as_nanos())
         .unwrap_or(0);
 
-    format!("adi-toolkit-{:x}", timestamp & 0xFFFF_FFFF)
+    format!("adi-docker-{:x}", timestamp & 0xFFFF_FFFF)
 }

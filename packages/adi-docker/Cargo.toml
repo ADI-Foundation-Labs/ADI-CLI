@@ -1,22 +1,20 @@
 [package]
-name = "adi-toolkit"
+name = "adi-docker"
 version.workspace = true
 edition.workspace = true
-description = "SDK for running ADI toolkit containers (zkstack, forge, cast)"
+description = "Pure Docker management SDK for container orchestration"
 
 [lints]
 workspace = true
 
 [lib]
-name = "adi_toolkit"
+name = "adi_docker"
 path = "src/lib.rs"
 
 [dependencies]
-adi-docker = { workspace = true }
 tokio = { workspace = true }
 eyre = { workspace = true }
 thiserror = { workspace = true }
-serde = { workspace = true }
 log = { workspace = true }
-semver = { workspace = true }
-strum = { workspace = true }
+futures-util = { workspace = true }
+bollard = { workspace = true }

@@ -1,7 +1,10 @@
 //! SDK for running ADI toolkit containers (zkstack, forge, cast).
 //!
-//! This crate provides a high-level interface for managing Docker containers
-//! that run the ADI toolkit (zkstack, foundry-zksync, era-contracts).
+//! This crate provides a high-level interface for executing commands in
+//! Docker toolkit containers. It knows about:
+//! - Protocol versions and image tagging
+//! - Registry configuration
+//! - zkstack, forge, and cast command execution
 //!
 //! # Overview
 //!
@@ -14,42 +17,25 @@
 //! - `cast` - Foundry EVM interaction tool
 //! - `era-contracts` - Smart contract upgrade scripts
 //!
-//! # Container Lifecycle
-//!
-//! All containers are ephemeral (created, run, removed per operation):
-//!
-//! 1. **Check daemon** - Verify Docker is running
-//! 2. **Pull image** - Download if not available locally
-//! 3. **Create container** - With volume mount and host network
-//! 4. **Start + stream** - Run with real-time output streaming
-//! 5. **Wait** - Wait for completion with configurable timeout
-//! 6. **Remove** - Clean up container
-//!
 //! # Example
 //!
 //! ```rust,no_run
-//! use adi_toolkit::{DockerClient, DockerConfig, ToolkitRunner};
-//! use semver::Version;
+//! use adi_toolkit::{ToolkitRunner, ProtocolVersion};
 //! use std::path::Path;
 //!
 //! # async fn example() -> adi_toolkit::Result<()> {
-//! // Create client and verify Docker is running
-//! let client = DockerClient::new().await?;
+//! // Create runner (connects to Docker)
+//! let runner = ToolkitRunner::new().await?;
 //!
-//! // Configure with defaults (harbor.io/adi, 30min timeout)
-//! let config = DockerConfig::default();
-//!
-//! // Create runner
-//! let runner = ToolkitRunner::new(client, config);
-//!
-//! // Run zkstack command
-//! let version = Version::new(29, 0, 11);
+//! // Parse version
+//! let version = ProtocolVersion::parse("v29.0.11").expect("valid version");
 //! let state_dir = Path::new("/home/user/.adi_cli/state");
 //!
+//! // Run zkstack command (genesis.json must be in state_dir)
 //! let exit_code = runner.run_zkstack(
 //!     &["ecosystem", "init"],
 //!     state_dir,
-//!     &version
+//!     &version.to_semver(),
 //! ).await?;
 //!
 //! if exit_code == 0 {
@@ -61,39 +47,24 @@
 //!
 //! # Configuration
 //!
-//! The [`DockerConfig`] struct controls:
-//! - Registry URL (default: `harbor.io/adi`)
+//! The [`ToolkitConfig`] struct controls:
+//! - Registry URL (default: `harbor.sde.adifoundation.ai/adi-chain/cli`)
 //! - Image name (default: `adi-toolkit`)
 //! - Operation timeout (default: 30 minutes)
 //!
 //! Image tags are derived from the protocol version: `v{major}.{minor}.{patch}`
-//!
-//! # Error Handling
-//!
-//! All operations return [`Result<T>`] with [`DockerError`] variants for
-//! specific failure modes:
-//!
-//! - [`DockerError::DaemonNotRunning`] - Docker daemon not accessible
-//! - [`DockerError::PullFailed`] - Image pull failed (check `docker login`)
-//! - [`DockerError::Timeout`] - Operation exceeded timeout
-//! - [`DockerError::ContainerFailed`] - Container exited with error
 
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 
-mod client;
 mod config;
-mod container;
 mod error;
-mod image;
 mod runner;
-mod stream;
 mod version;
 
 // Public re-exports
-pub use client::DockerClient;
-pub use config::{ContainerConfig, DockerConfig, ImageReference};
+pub use config::{ImageReference, ToolkitConfig};
 pub use config::{DEFAULT_IMAGE_NAME, DEFAULT_REGISTRY, DEFAULT_TIMEOUT_SECONDS};
-pub use error::{DockerError, Result};
-pub use runner::ToolkitRunner;
+pub use error::{Result, ToolkitError};
+pub use runner::{ToolkitRunner, GENESIS_FILENAME};
 pub use version::{ParseError, ProtocolVersion};

@@ -1,11 +1,16 @@
 //! Toolkit command execution via Docker containers.
 
-use crate::client::DockerClient;
-use crate::config::{ContainerConfig, DockerConfig};
-use crate::container::ContainerManager;
+use crate::config::ToolkitConfig;
 use crate::error::Result;
+use adi_docker::{ContainerConfig, ContainerManager, DockerClient};
 use semver::Version;
 use std::path::Path;
+
+/// Genesis file name expected in state directory.
+pub const GENESIS_FILENAME: &str = "genesis.json";
+
+/// Path where genesis.json should be copied in the container.
+pub const GENESIS_CONTAINER_PATH: &str = "/deps/zksync-era/etc/env/file_based/genesis.json";
 
 /// Executes commands inside Docker toolkit containers.
 ///
@@ -14,14 +19,12 @@ use std::path::Path;
 /// # Example
 ///
 /// ```rust,no_run
-/// use adi_toolkit::{DockerClient, DockerConfig, ToolkitRunner};
+/// use adi_toolkit::ToolkitRunner;
 /// use semver::Version;
 /// use std::path::Path;
 ///
 /// # async fn example() -> adi_toolkit::Result<()> {
-/// let client = DockerClient::new().await?;
-/// let config = DockerConfig::default();
-/// let runner = ToolkitRunner::new(client, config);
+/// let runner = ToolkitRunner::new().await?;
 ///
 /// let version = Version::new(29, 0, 11);
 /// let state_dir = Path::new("/home/user/.adi_cli/state");
@@ -33,19 +36,37 @@ use std::path::Path;
 /// ```
 pub struct ToolkitRunner {
     client: DockerClient,
-    config: DockerConfig,
+    config: ToolkitConfig,
 }
 
 impl ToolkitRunner {
-    /// Create a new ToolkitRunner.
+    /// Create a new ToolkitRunner by connecting to Docker.
+    ///
+    /// Uses default toolkit configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if connection to Docker daemon fails.
+    pub async fn new() -> Result<Self> {
+        let client = DockerClient::new().await?;
+        Ok(Self {
+            client,
+            config: ToolkitConfig::default(),
+        })
+    }
+
+    /// Create a new ToolkitRunner with custom configuration.
     ///
     /// # Arguments
     ///
-    /// * `client` - Docker client for container operations.
-    /// * `config` - Docker configuration with registry and timeout settings.
-    #[must_use]
-    pub fn new(client: DockerClient, config: DockerConfig) -> Self {
-        Self { client, config }
+    /// * `config` - Custom toolkit configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if connection to Docker daemon fails.
+    pub async fn with_config(config: ToolkitConfig) -> Result<Self> {
+        let client = DockerClient::new().await?;
+        Ok(Self { client, config })
     }
 
     /// Execute a generic command in the toolkit container.
@@ -76,16 +97,17 @@ impl ToolkitRunner {
         env_vars: &[(&str, &str)],
     ) -> Result<i64> {
         let image_ref = self.config.image_reference(protocol_version);
+        let image_uri = image_ref.full_uri();
 
+        log::info!("Using toolkit image: {}", image_uri);
         log::debug!(
-            "Running command: {:?} (image: {}, state_dir: {})",
+            "Running command: {:?} (state_dir: {})",
             command,
-            image_ref.full_uri(),
             state_dir.display()
         );
 
         // Ensure image is available
-        self.client.pull_image(&image_ref).await?;
+        self.client.pull_image(&image_uri).await?;
 
         let container_config = ContainerConfig {
             state_dir: state_dir.to_path_buf(),
@@ -110,13 +132,16 @@ impl ToolkitRunner {
         );
 
         let manager = ContainerManager::new(self.client.inner().clone());
-        let exit_code = manager.run(&image_ref, &container_config).await?;
+        let exit_code = manager.run(&image_uri, &container_config).await?;
 
         log::debug!("Command completed with exit code: {}", exit_code);
         Ok(exit_code)
     }
 
     /// Execute zkstack CLI command in toolkit container.
+    ///
+    /// Automatically copies genesis.json from /workspace to the required location
+    /// before running the zkstack command.
     ///
     /// # Arguments
     ///
@@ -131,12 +156,11 @@ impl ToolkitRunner {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use adi_toolkit::{DockerClient, DockerConfig, ToolkitRunner};
+    /// # use adi_toolkit::ToolkitRunner;
     /// # use semver::Version;
     /// # use std::path::Path;
     /// # async fn example() -> adi_toolkit::Result<()> {
-    /// # let client = DockerClient::new().await?;
-    /// # let runner = ToolkitRunner::new(client, DockerConfig::default());
+    /// # let runner = ToolkitRunner::new().await?;
     /// let version = Version::new(29, 0, 11);
     /// let state_dir = Path::new("/home/user/.adi_cli/state");
     ///
@@ -144,7 +168,7 @@ impl ToolkitRunner {
     /// let exit_code = runner.run_zkstack(
     ///     &["ecosystem", "init"],
     ///     state_dir,
-    ///     &version
+    ///     &version,
     /// ).await?;
     /// # Ok(())
     /// # }
@@ -156,8 +180,20 @@ impl ToolkitRunner {
         protocol_version: &Version,
     ) -> Result<i64> {
         log::debug!("Running zkstack with args: {:?}", args);
-        let mut command = vec!["zkstack"];
-        command.extend(args);
+
+        // Build zkstack command string
+        let zkstack_cmd = format!("zkstack {}", args.join(" "));
+
+        // Build shell command that copies genesis.json first, then runs zkstack
+        // The genesis.json is expected in /workspace (mounted state_dir)
+        let shell_cmd = format!(
+            "cp /workspace/{} {} && {}",
+            GENESIS_FILENAME, GENESIS_CONTAINER_PATH, zkstack_cmd
+        );
+
+        log::info!("Copying genesis.json to {}", GENESIS_CONTAINER_PATH);
+
+        let command = vec!["sh", "-c", &shell_cmd];
 
         self.run_command(&command, state_dir, protocol_version, &[])
             .await

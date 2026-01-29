@@ -1,82 +1,124 @@
-//! Protocol version definitions for ADI toolkit images.
+//! Protocol version handling.
 //!
-//! This module defines the supported protocol versions that determine
-//! which Docker image tag to use for toolkit operations.
+//! Defines supported protocol versions and provides parsing utilities.
 
-use std::str::FromStr;
-
-use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
+use serde::{Deserialize, Serialize};
+use std::fmt;
+use strum::{EnumIter, EnumString};
 use thiserror::Error;
 
-/// Error type for protocol version parsing.
+/// Error type for version parsing failures.
 #[derive(Error, Debug)]
-#[error(
-    "Unsupported protocol version: {input}. Supported versions: {}",
-    ProtocolVersion::supported_versions_string()
-)]
-pub struct ParseError {
-    input: String,
+pub enum ParseError {
+    /// Unknown protocol version.
+    #[error("Unknown protocol version '{version}'. Supported versions: {supported}", version = .0, supported = ProtocolVersion::supported_versions_string())]
+    UnknownVersion(String),
 }
 
-/// Supported protocol versions for ADI toolkit images.
+/// Supported protocol versions.
 ///
-/// Each variant corresponds to a specific toolkit image tag.
-/// The version determines which era-contracts, zkstack, and foundry-zksync
-/// versions are bundled in the toolkit image.
+/// Each version maps to a specific toolkit Docker image tag.
+///
+/// # Parsing
+///
+/// Versions can be parsed from strings in several formats:
+/// - With prefix: `v29.0.11`
+/// - Without prefix: `29.0.11`
 ///
 /// # Example
 ///
 /// ```rust
 /// use adi_toolkit::ProtocolVersion;
-/// use std::str::FromStr;
 ///
-/// let version = ProtocolVersion::from_str("v29.0.11").unwrap();
-/// assert_eq!(version, ProtocolVersion::V29_0_11);
-/// assert_eq!(version.to_string(), "v29.0.11");
+/// let version = ProtocolVersion::parse("v29.0.11").unwrap();
+/// assert_eq!(version.to_semver(), semver::Version::new(29, 0, 11));
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, EnumString, EnumIter)]
+#[derive(
+    Clone, Copy, Debug, Default, EnumString, EnumIter, Serialize, Deserialize, PartialEq, Eq,
+)]
 pub enum ProtocolVersion {
     /// Protocol version 29.0.11
+    #[default]
     #[strum(serialize = "v29.0.11", serialize = "29.0.11")]
     V29_0_11,
 }
 
 impl ProtocolVersion {
-    /// Converts the protocol version to a semver::Version.
+    /// Parse a protocol version from a string.
+    ///
+    /// Accepts both `vX.Y.Z` and `X.Y.Z` formats.
+    ///
+    /// # Arguments
+    ///
+    /// * `s` - The version string to parse.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ParseError::UnknownVersion` if the version is not recognized.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use adi_toolkit::ProtocolVersion;
+    ///
+    /// let version = ProtocolVersion::parse("v29.0.11").unwrap();
+    /// let version2 = ProtocolVersion::parse("29.0.11").unwrap();
+    /// assert_eq!(version, version2);
+    /// ```
+    pub fn parse(s: &str) -> Result<Self, ParseError> {
+        // Normalize: remove 'v' prefix if present
+        let normalized = s.trim().to_lowercase();
+
+        // Try direct parsing
+        if let Ok(version) = normalized.parse::<ProtocolVersion>() {
+            return Ok(version);
+        }
+
+        // Try with 'v' prefix
+        let with_prefix = format!("v{}", normalized.trim_start_matches('v'));
+        if let Ok(version) = with_prefix.parse::<ProtocolVersion>() {
+            return Ok(version);
+        }
+
+        Err(ParseError::UnknownVersion(s.to_string()))
+    }
+
+    /// Convert to semver::Version for image tagging.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use adi_toolkit::ProtocolVersion;
+    ///
+    /// let version = ProtocolVersion::V29_0_11;
+    /// let semver = version.to_semver();
+    /// assert_eq!(semver.major, 29);
+    /// assert_eq!(semver.minor, 0);
+    /// assert_eq!(semver.patch, 11);
+    /// ```
     #[must_use]
-    pub fn to_semver(&self) -> semver::Version {
+    pub fn to_semver(self) -> semver::Version {
         match self {
             ProtocolVersion::V29_0_11 => semver::Version::new(29, 0, 11),
         }
     }
 
-    /// Returns a comma-separated string of all supported versions.
+    /// Get a string listing all supported versions.
+    ///
+    /// Used for error messages.
     #[must_use]
     pub fn supported_versions_string() -> String {
+        use strum::IntoEnumIterator;
         Self::iter()
-            .map(|v| v.to_string())
+            .map(|v| format!("v{}", v.to_semver()))
             .collect::<Vec<_>>()
             .join(", ")
     }
+}
 
-    /// Parse from string with custom error type.
-    ///
-    /// # Errors
-    ///
-    /// Returns `ParseError` if the version string is not recognized.
-    pub fn parse(s: &str) -> Result<Self, ParseError> {
-        log::debug!("Parsing protocol version from: {}", s);
-
-        let result = Self::from_str(s.trim());
-
-        match &result {
-            Ok(version) => log::debug!("Matched protocol version: {:?}", version),
-            Err(_) => log::debug!("No match for version: {}", s),
-        }
-
-        result.map_err(|_| ParseError {
-            input: s.to_string(),
-        })
+impl fmt::Display for ProtocolVersion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "v{}", self.to_semver())
     }
 }
 
@@ -86,7 +128,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_with_v_prefix() {
+    fn test_parse_with_prefix() {
         let version = ProtocolVersion::parse("v29.0.11").unwrap();
         assert_eq!(version, ProtocolVersion::V29_0_11);
     }
@@ -98,8 +140,8 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_unsupported_version() {
-        let result = ProtocolVersion::parse("v99.0.0");
+    fn test_parse_unknown() {
+        let result = ProtocolVersion::parse("1.0.0");
         assert!(result.is_err());
     }
 
@@ -107,13 +149,12 @@ mod tests {
     fn test_to_semver() {
         let version = ProtocolVersion::V29_0_11;
         let semver = version.to_semver();
-        assert_eq!(semver.major, 29);
-        assert_eq!(semver.minor, 0);
-        assert_eq!(semver.patch, 11);
+        assert_eq!(semver, semver::Version::new(29, 0, 11));
     }
 
     #[test]
     fn test_display() {
-        assert_eq!(ProtocolVersion::V29_0_11.to_string(), "v29.0.11");
+        let version = ProtocolVersion::V29_0_11;
+        assert_eq!(format!("{}", version), "v29.0.11");
     }
 }

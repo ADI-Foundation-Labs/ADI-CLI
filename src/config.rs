@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use crate::error::{Result, WrapErr};
+use adi_ecosystem::EcosystemConfig;
 use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_CONFIG_FILE_NAME: &str = ".adi.yml";
@@ -18,6 +19,11 @@ pub struct Config {
     /// Default: `false`
     #[serde(default)]
     pub debug: bool,
+
+    /// Default ecosystem configuration values.
+    /// These can be overridden by CLI flags.
+    #[serde(default)]
+    pub ecosystem: EcosystemConfig,
 }
 
 impl Config {
