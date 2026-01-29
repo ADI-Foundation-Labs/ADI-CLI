@@ -41,7 +41,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
 # zksync-os-integration and submodules (conditional)
 RUN if [ -n "$ZKSYNC_ERA_OS_INTEGRATION_COMMIT" ]; then \
   git fetch && \
-  git checkout ${ZKSYNC_ERA_OS_INTEGRATION_COMMIT} && \
+  git checkout --force ${ZKSYNC_ERA_OS_INTEGRATION_COMMIT} && \
   git submodule update --init --recursive; \
   fi
 

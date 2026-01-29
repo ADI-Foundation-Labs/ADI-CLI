@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// Default registry for ADI toolkit images.
-pub const DEFAULT_REGISTRY: &str = "harbor.io/adi";
+pub const DEFAULT_REGISTRY: &str = "harbor.sde.adifoundation.ai/adi-chain/cli";
 
 /// Default image name for ADI toolkit.
 pub const DEFAULT_IMAGE_NAME: &str = "adi-toolkit";
@@ -24,11 +24,11 @@ pub const DEFAULT_TIMEOUT_SECONDS: u64 = 1800;
 /// use adi_docker::DockerConfig;
 ///
 /// let config = DockerConfig::default();
-/// assert_eq!(config.registry, "harbor.io/adi");
+/// assert_eq!(config.registry, "harbor.sde.adifoundation.ai/adi-chain/cli");
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DockerConfig {
-    /// Container registry URL (e.g., "harbor.io/adi").
+    /// Container registry URL (e.g., "harbor.sde.adifoundation.ai/adi-chain/cli").
     pub registry: String,
 
     /// Base image name (e.g., "adi-toolkit").
@@ -107,7 +107,7 @@ impl DockerConfig {
 /// let version = Version::new(29, 0, 11);
 /// let image_ref = config.image_reference(&version);
 ///
-/// assert_eq!(image_ref.full_uri(), "harbor.io/adi/adi-toolkit:v29.0.11");
+/// assert_eq!(image_ref.full_uri(), "harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:v29.0.11");
 /// ```
 #[derive(Debug, Clone)]
 pub struct ImageReference {
@@ -132,12 +132,12 @@ impl ImageReference {
     /// use adi_docker::ImageReference;
     ///
     /// let image_ref = ImageReference {
-    ///     registry: "harbor.io/adi".to_string(),
+    ///     registry: "harbor.sde.adifoundation.ai/adi-chain/cli".to_string(),
     ///     image_name: "adi-toolkit".to_string(),
     ///     tag: "v29.0.11".to_string(),
     /// };
     ///
-    /// assert_eq!(image_ref.full_uri(), "harbor.io/adi/adi-toolkit:v29.0.11");
+    /// assert_eq!(image_ref.full_uri(), "harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:v29.0.11");
     /// ```
     #[must_use]
     pub fn full_uri(&self) -> String {
@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = DockerConfig::default();
-        assert_eq!(config.registry, "harbor.io/adi");
+        assert_eq!(config.registry, "harbor.sde.adifoundation.ai/adi-chain/cli");
         assert_eq!(config.image_name, "adi-toolkit");
         assert_eq!(config.timeout_seconds, 1800);
     }
@@ -198,7 +198,7 @@ mod tests {
         let version = Version::new(29, 0, 11);
         let image_ref = config.image_reference(&version);
 
-        assert_eq!(image_ref.full_uri(), "harbor.io/adi/adi-toolkit:v29.0.11");
+        assert_eq!(image_ref.full_uri(), "harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:v29.0.11");
     }
 
     #[test]

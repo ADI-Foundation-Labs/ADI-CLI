@@ -33,28 +33,31 @@ tasks:
     deps:
       - _install_rust
     cmds:
-      - cargo test
+      - cargo test --workspace
 
   test:unit:
-    desc: Run unit tests only
+    desc: Run unit tests only (library crates)
     deps:
       - _install_rust
     cmds:
-      - cargo test --lib
+      - cargo test --workspace --lib
 
   test:integration:
     desc: Run integration tests only
     deps:
       - _install_rust
+    preconditions:
+      - sh: 'find . -path ./target -prune -o -type f -path "*/tests/*.rs" -print -quit | grep -q .'
+        msg: "No integration tests found (no */tests/*.rs files)"
     cmds:
-      - cargo test --test '*'
+      - cargo test --workspace --test '*'
 
   lint:
     desc: Run clippy linter with strict rules
     deps:
       - _install_rust
     cmds:
-      - cargo clippy -- -D warnings
+      - cargo clippy --workspace -- -D warnings
 
   fmt:
     desc: Format code with rustfmt
@@ -120,6 +123,31 @@ tasks:
       - task: build:docker
         vars:
           TARGETS: toolkit-v30
+
+  build:toolkit:local:
+    desc: Build toolkit image for local testing (current platform, faster)
+    vars:
+      VERSION: '{{default "v29" .VERSION}}'
+      REGISTRY: harbor.sde.adifoundation.ai/adi-chain/cli
+    preconditions:
+      - docker ps
+      - docker buildx version
+    cmds:
+      - docker buildx build -t {{.REGISTRY}}/adi-toolkit:{{.VERSION}} --load --file docker/worker/Dockerfile .
+
+  build:toolkit:local:v29:
+    desc: Build toolkit v29 image for local testing
+    cmds:
+      - task: build:toolkit:local
+        vars:
+          VERSION: v29
+
+  build:toolkit:local:v30:
+    desc: Build toolkit v30 image for local testing
+    cmds:
+      - task: build:toolkit:local
+        vars:
+          VERSION: v30
 
   push:docker:
     desc: Build and push Docker images using Docker Bake
