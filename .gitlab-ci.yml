@@ -1,8 +1,5 @@
 spec:
   inputs:
-    environment:
-      default: staging
-      options: [staging, production]
     build_target:
       default: default
       options: [default, toolkit-v29, toolkit-v30]
@@ -51,4 +48,4 @@ build-docker:
     - docker buildx inspect --bootstrap
 
   script:
-    - task push:docker TARGETS=$[[inputs.build_target]]
+    - task push:docker TARGETS=$[[inputs.build_target]] 
