@@ -89,10 +89,15 @@ colored = { version = "3", default-features = false }
 # Build
 built = { version = "0.7", default-features = false, features = ["git2"] }
 
+# EVM types
+alloy-primitives = { version = "0.8", default-features = false, features = ["serde"] }
+secrecy = { version = "0.10", default-features = false, features = ["serde"] }
+
 # Internal packages
 adi-docker = { path = "packages/adi-docker" }
 adi-toolkit = { path = "packages/adi-toolkit" }
 adi-ecosystem = { path = "packages/adi-ecosystem" }
+adi-types = { path = "packages/adi-types" }
 
 [lints]
 workspace = true

@@ -1,0 +1,20 @@
+[package]
+name = "adi-types"
+version.workspace = true
+edition.workspace = true
+description = "Shared domain types for ADI CLI ecosystem"
+
+[lib]
+name = "adi_types"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+strum = { workspace = true }
+clap = { workspace = true }
+alloy-primitives = { workspace = true }
+secrecy = { workspace = true }

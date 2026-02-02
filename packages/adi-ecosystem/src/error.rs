@@ -10,7 +10,7 @@ pub type Result<T> = std::result::Result<T, EcosystemError>;
 #[derive(Error, Debug)]
 pub enum EcosystemError {
     /// Required file is missing.
-    #[error("Required file is missing: {0}")]
+    #[error("Required file is missing: {}", .0.display())]
     MissingFile(PathBuf),
 
     /// Invalid configuration.
