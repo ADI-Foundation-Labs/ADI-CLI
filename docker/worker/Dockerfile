@@ -33,7 +33,7 @@ RUN foundryup-zksync
 
 # Install zkstack CLI from specific commit
 # Set global cargo target dir for caching
-ENV CARGO_TARGET_DIR=/cargo-target
+ENV CARGO_TARGET_DIR=/cargo-target/${ZKSYNC_ERA_COMMIT}
 WORKDIR /deps
 RUN git clone https://github.com/matter-labs/zksync-era.git zksync-era
 WORKDIR /deps/zksync-era
@@ -51,10 +51,10 @@ RUN echo "[patch.crates-io]" >> Cargo.toml && \
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
   --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
-  --mount=type=cache,target=/cargo-target,sharing=locked \
+  --mount=type=cache,target=/cargo-target \
   --mount=type=cache,target=/usr/local/rustup,sharing=locked \
   cargo build --release --manifest-path zkstack_cli/crates/zkstack/Cargo.toml && \
-  cp /cargo-target/release/zkstack /usr/local/bin/zkstack
+  cp ${CARGO_TARGET_DIR}/release/zkstack /usr/local/bin/zkstack
 
 # zksync-os-integration and submodules (conditional)
 RUN if [ -n "$ZKSYNC_ERA_OS_INTEGRATION_COMMIT" ]; then \
