@@ -74,6 +74,26 @@ impl StateManager {
         }
     }
 
+    /// Create a state manager with the specified backend type.
+    ///
+    /// # Arguments
+    ///
+    /// * `backend_type` - The backend type to use.
+    /// * `ecosystem_path` - Path to the ecosystem directory.
+    #[must_use]
+    pub fn with_backend_type(backend_type: BackendType, ecosystem_path: &Path) -> Self {
+        log::debug!(
+            "Creating StateManager with {:?} backend at {}",
+            backend_type,
+            ecosystem_path.display()
+        );
+        let backend = create_backend(backend_type, ecosystem_path);
+        Self {
+            backend: Arc::from(backend),
+            base_path: ecosystem_path.to_path_buf(),
+        }
+    }
+
     /// Get ecosystem-level state operations.
     #[must_use]
     pub fn ecosystem(&self) -> EcosystemStateOps {
@@ -119,23 +139,4 @@ impl StateManager {
         log::debug!("Found {} chains: {:?}", chains.len(), chains);
         Ok(chains)
     }
-}
-
-/// Helper to deserialize YAML content with proper error context.
-pub(crate) fn deserialize_yaml<T: serde::de::DeserializeOwned>(
-    content: &str,
-    path: &Path,
-) -> Result<T> {
-    serde_yaml::from_str(content).map_err(|e| crate::error::StateError::YamlParseFailed {
-        path: path.to_path_buf(),
-        source: e,
-    })
-}
-
-/// Helper to serialize value to YAML with proper error context.
-pub(crate) fn serialize_yaml<T: serde::Serialize>(value: &T, path: &Path) -> Result<String> {
-    serde_yaml::to_string(value).map_err(|e| crate::error::StateError::YamlSerializeFailed {
-        path: path.to_path_buf(),
-        source: e,
-    })
 }

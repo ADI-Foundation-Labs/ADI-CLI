@@ -89,7 +89,10 @@ mod tests {
     fn test_ecosystem_paths() {
         assert_eq!(ecosystem_wallets_path(), "configs/wallets.yaml");
         assert_eq!(ecosystem_contracts_path(), "configs/contracts.yaml");
-        assert_eq!(initial_deployments_path(), "configs/initial_deployments.yaml");
+        assert_eq!(
+            initial_deployments_path(),
+            "configs/initial_deployments.yaml"
+        );
         assert_eq!(erc20_deployments_path(), "configs/erc20_deployments.yaml");
         assert_eq!(apps_path(), "configs/apps.yaml");
     }
@@ -97,8 +100,17 @@ mod tests {
     #[test]
     fn test_chain_paths() {
         assert_eq!(chain_dir("mychain"), "chains/mychain");
-        assert_eq!(chain_metadata_path("mychain"), "chains/mychain/ZkStack.yaml");
-        assert_eq!(chain_wallets_path("mychain"), "chains/mychain/configs/wallets.yaml");
-        assert_eq!(chain_contracts_path("mychain"), "chains/mychain/configs/contracts.yaml");
+        assert_eq!(
+            chain_metadata_path("mychain"),
+            "chains/mychain/ZkStack.yaml"
+        );
+        assert_eq!(
+            chain_wallets_path("mychain"),
+            "chains/mychain/configs/wallets.yaml"
+        );
+        assert_eq!(
+            chain_contracts_path("mychain"),
+            "chains/mychain/configs/contracts.yaml"
+        );
     }
 }

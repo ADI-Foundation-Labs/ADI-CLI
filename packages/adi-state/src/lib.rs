@@ -50,18 +50,22 @@
 
 pub mod backend;
 mod error;
+mod exporter;
+mod importer;
 mod manager;
 mod paths;
 
 // Public re-exports
 pub use backend::{BackendType, FilesystemBackend, StateBackend};
 pub use error::{Result, StateError};
+pub use exporter::{export_chain_state, export_ecosystem_state};
+pub use importer::import_ecosystem_state;
 pub use manager::{ChainStateOps, EcosystemStateOps, StateManager};
 
 // Path constants
 pub use paths::{
     apps_path, chain_contracts_path, chain_dir, chain_metadata_path, chain_wallets_path,
     ecosystem_contracts_path, ecosystem_wallets_path, erc20_deployments_path,
-    initial_deployments_path, APPS_FILE, CHAIN_METADATA, CHAINS_DIR, CONFIGS_DIR, CONTRACTS_FILE,
+    initial_deployments_path, APPS_FILE, CHAINS_DIR, CHAIN_METADATA, CONFIGS_DIR, CONTRACTS_FILE,
     ECOSYSTEM_METADATA, ERC20_DEPLOYMENTS_FILE, INITIAL_DEPLOYMENTS_FILE, WALLETS_FILE,
 };

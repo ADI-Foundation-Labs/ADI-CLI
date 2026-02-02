@@ -2,13 +2,11 @@
 
 use crate::backend::StateBackend;
 use crate::error::Result;
-use crate::manager::{deserialize_yaml, serialize_yaml};
 use crate::paths;
 use adi_types::{
     Apps, EcosystemContracts, EcosystemMetadata, Erc20Deployments, InitialDeployments,
     PartialEcosystemMetadata, Wallets,
 };
-use std::path::PathBuf;
 use std::sync::Arc;
 
 /// Ecosystem-level state operations.
@@ -32,16 +30,7 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn metadata(&self) -> Result<EcosystemMetadata> {
-        log::debug!("Reading ecosystem metadata from {}", paths::ECOSYSTEM_METADATA);
-        let content = self.backend.read(paths::ECOSYSTEM_METADATA).await?;
-        let metadata: EcosystemMetadata =
-            deserialize_yaml(&content, &PathBuf::from(paths::ECOSYSTEM_METADATA))?;
-        log::debug!(
-            "Loaded ecosystem metadata: name={}, l1_network={:?}",
-            metadata.name,
-            metadata.l1_network
-        );
-        Ok(metadata)
+        self.backend.read_ecosystem_metadata().await
     }
 
     /// Update ecosystem metadata with partial values.
@@ -56,8 +45,7 @@ impl EcosystemStateOps {
         log::debug!("Updating ecosystem metadata with partial values");
         let current = self.metadata().await?;
         let merged = merge_ecosystem_metadata(current, partial);
-        let yaml = serialize_yaml(&merged, &PathBuf::from(paths::ECOSYSTEM_METADATA))?;
-        self.backend.write(paths::ECOSYSTEM_METADATA, &yaml).await?;
+        self.backend.write_ecosystem_metadata(&merged).await?;
         log::debug!("Ecosystem metadata updated successfully");
         Ok(())
     }
@@ -70,16 +58,7 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn wallets(&self) -> Result<Wallets> {
-        let key = paths::ecosystem_wallets_path();
-        log::debug!("Reading ecosystem wallets from {}", key);
-        let content = self.backend.read(&key).await?;
-        let wallets: Wallets = deserialize_yaml(&content, &PathBuf::from(&key))?;
-        log::debug!(
-            "Loaded ecosystem wallets: deployer={}, governor={}",
-            wallets.deployer.is_some(),
-            wallets.governor.is_some()
-        );
-        Ok(wallets)
+        self.backend.read_ecosystem_wallets().await
     }
 
     /// Update ecosystem wallets.
@@ -90,12 +69,10 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_wallets(&self, partial: &Wallets) -> Result<()> {
-        let key = paths::ecosystem_wallets_path();
         log::debug!("Updating ecosystem wallets");
         let current = self.wallets().await?;
         let merged = merge_wallets(current, partial);
-        let yaml = serialize_yaml(&merged, &PathBuf::from(&key))?;
-        self.backend.write(&key, &yaml).await?;
+        self.backend.write_ecosystem_wallets(&merged).await?;
         log::debug!("Ecosystem wallets updated successfully");
         Ok(())
     }
@@ -110,12 +87,7 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn contracts(&self) -> Result<EcosystemContracts> {
-        let key = paths::ecosystem_contracts_path();
-        log::debug!("Reading ecosystem contracts from {}", key);
-        let content = self.backend.read(&key).await?;
-        let contracts: EcosystemContracts = deserialize_yaml(&content, &PathBuf::from(&key))?;
-        log::debug!("Loaded ecosystem contracts successfully");
-        Ok(contracts)
+        self.backend.read_ecosystem_contracts().await
     }
 
     /// Check if contracts file exists.
@@ -136,10 +108,8 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_contracts(&self, contracts: &EcosystemContracts) -> Result<()> {
-        let key = paths::ecosystem_contracts_path();
         log::debug!("Updating ecosystem contracts");
-        let yaml = serialize_yaml(contracts, &PathBuf::from(&key))?;
-        self.backend.write(&key, &yaml).await?;
+        self.backend.write_ecosystem_contracts(contracts).await?;
         log::debug!("Ecosystem contracts updated successfully");
         Ok(())
     }
@@ -152,12 +122,7 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn initial_deployments(&self) -> Result<InitialDeployments> {
-        let key = paths::initial_deployments_path();
-        log::debug!("Reading initial deployments from {}", key);
-        let content = self.backend.read(&key).await?;
-        let deployments: InitialDeployments = deserialize_yaml(&content, &PathBuf::from(&key))?;
-        log::debug!("Loaded initial deployments successfully");
-        Ok(deployments)
+        self.backend.read_initial_deployments().await
     }
 
     /// Update initial deployments.
@@ -166,10 +131,8 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_initial_deployments(&self, deployments: &InitialDeployments) -> Result<()> {
-        let key = paths::initial_deployments_path();
         log::debug!("Updating initial deployments");
-        let yaml = serialize_yaml(deployments, &PathBuf::from(&key))?;
-        self.backend.write(&key, &yaml).await?;
+        self.backend.write_initial_deployments(deployments).await?;
         log::debug!("Initial deployments updated successfully");
         Ok(())
     }
@@ -182,12 +145,7 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn erc20_deployments(&self) -> Result<Erc20Deployments> {
-        let key = paths::erc20_deployments_path();
-        log::debug!("Reading ERC20 deployments from {}", key);
-        let content = self.backend.read(&key).await?;
-        let deployments: Erc20Deployments = deserialize_yaml(&content, &PathBuf::from(&key))?;
-        log::debug!("Loaded ERC20 deployments successfully");
-        Ok(deployments)
+        self.backend.read_erc20_deployments().await
     }
 
     /// Update ERC20 deployments.
@@ -196,10 +154,8 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_erc20_deployments(&self, deployments: &Erc20Deployments) -> Result<()> {
-        let key = paths::erc20_deployments_path();
         log::debug!("Updating ERC20 deployments");
-        let yaml = serialize_yaml(deployments, &PathBuf::from(&key))?;
-        self.backend.write(&key, &yaml).await?;
+        self.backend.write_erc20_deployments(deployments).await?;
         log::debug!("ERC20 deployments updated successfully");
         Ok(())
     }
@@ -212,12 +168,7 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn apps(&self) -> Result<Apps> {
-        let key = paths::apps_path();
-        log::debug!("Reading apps config from {}", key);
-        let content = self.backend.read(&key).await?;
-        let apps: Apps = deserialize_yaml(&content, &PathBuf::from(&key))?;
-        log::debug!("Loaded apps config successfully");
-        Ok(apps)
+        self.backend.read_apps().await
     }
 
     /// Update apps config.
@@ -226,11 +177,87 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_apps(&self, apps: &Apps) -> Result<()> {
-        let key = paths::apps_path();
         log::debug!("Updating apps config");
-        let yaml = serialize_yaml(apps, &PathBuf::from(&key))?;
-        self.backend.write(&key, &yaml).await?;
+        self.backend.write_apps(apps).await?;
         log::debug!("Apps config updated successfully");
+        Ok(())
+    }
+
+    // ========== CREATE OPERATIONS ==========
+
+    /// Create ecosystem metadata (ZkStack.yaml).
+    ///
+    /// # Arguments
+    ///
+    /// * `metadata` - The ecosystem metadata to create.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if file already exists or creation fails.
+    pub async fn create_metadata(&self, metadata: &EcosystemMetadata) -> Result<()> {
+        log::debug!("Creating ecosystem metadata");
+        self.backend.create_ecosystem_metadata(metadata).await?;
+        log::debug!("Ecosystem metadata created successfully");
+        Ok(())
+    }
+
+    /// Create ecosystem wallets (configs/wallets.yaml).
+    ///
+    /// # Errors
+    ///
+    /// Returns error if file already exists or creation fails.
+    pub async fn create_wallets(&self, wallets: &Wallets) -> Result<()> {
+        log::debug!("Creating ecosystem wallets");
+        self.backend.create_ecosystem_wallets(wallets).await?;
+        log::debug!("Ecosystem wallets created successfully");
+        Ok(())
+    }
+
+    /// Create ecosystem contracts (configs/contracts.yaml).
+    ///
+    /// # Errors
+    ///
+    /// Returns error if file already exists or creation fails.
+    pub async fn create_contracts(&self, contracts: &EcosystemContracts) -> Result<()> {
+        log::debug!("Creating ecosystem contracts");
+        self.backend.create_ecosystem_contracts(contracts).await?;
+        log::debug!("Ecosystem contracts created successfully");
+        Ok(())
+    }
+
+    /// Create initial deployments (configs/initial_deployments.yaml).
+    ///
+    /// # Errors
+    ///
+    /// Returns error if file already exists or creation fails.
+    pub async fn create_initial_deployments(&self, deployments: &InitialDeployments) -> Result<()> {
+        log::debug!("Creating initial deployments");
+        self.backend.create_initial_deployments(deployments).await?;
+        log::debug!("Initial deployments created successfully");
+        Ok(())
+    }
+
+    /// Create ERC20 deployments (configs/erc20_deployments.yaml).
+    ///
+    /// # Errors
+    ///
+    /// Returns error if file already exists or creation fails.
+    pub async fn create_erc20_deployments(&self, deployments: &Erc20Deployments) -> Result<()> {
+        log::debug!("Creating ERC20 deployments");
+        self.backend.create_erc20_deployments(deployments).await?;
+        log::debug!("ERC20 deployments created successfully");
+        Ok(())
+    }
+
+    /// Create apps config (configs/apps.yaml).
+    ///
+    /// # Errors
+    ///
+    /// Returns error if file already exists or creation fails.
+    pub async fn create_apps(&self, apps: &Apps) -> Result<()> {
+        log::debug!("Creating apps config");
+        self.backend.create_apps(apps).await?;
+        log::debug!("Apps config created successfully");
         Ok(())
     }
 }

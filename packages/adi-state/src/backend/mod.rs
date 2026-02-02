@@ -5,21 +5,29 @@ mod filesystem;
 pub use filesystem::FilesystemBackend;
 
 use crate::error::Result;
+use adi_types::{
+    Apps, ChainContracts, ChainMetadata, EcosystemContracts, EcosystemMetadata, Erc20Deployments,
+    InitialDeployments, Wallets,
+};
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 /// Backend type for state storage.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum BackendType {
     /// Filesystem-based storage (default).
     #[default]
     Filesystem,
 }
 
-/// Abstract state storage backend.
+/// Abstract state storage backend with typed operations.
 ///
-/// Provides low-level key-value operations for state persistence.
-/// Keys are relative paths within the state directory.
+/// Provides typed read/write operations for domain types.
+/// Serialization format is implementation-defined:
+/// - `FilesystemBackend`: YAML files
+/// - `DatabaseBackend`: native JSON/binary storage (future)
 ///
 /// # Example
 ///
@@ -30,8 +38,8 @@ pub enum BackendType {
 /// # async fn example() -> adi_state::Result<()> {
 /// let backend = FilesystemBackend::new(Path::new("/home/user/.adi_cli/state/my_ecosystem"));
 ///
-/// // Read raw YAML content
-/// let content = backend.read("configs/wallets.yaml").await?;
+/// // Read typed data
+/// let metadata = backend.read_ecosystem_metadata().await?;
 ///
 /// // Check if file exists
 /// let exists = backend.exists("ZkStack.yaml").await?;
@@ -40,6 +48,8 @@ pub enum BackendType {
 /// ```
 #[async_trait]
 pub trait StateBackend: Send + Sync {
+    // ========== RAW OPERATIONS ==========
+
     /// Read raw content from the given key (relative path).
     ///
     /// # Arguments
@@ -50,7 +60,7 @@ pub trait StateBackend: Send + Sync {
     ///
     /// Returns `StateError::NotFound` if the file does not exist.
     /// Returns `StateError::ReadFailed` for I/O errors.
-    async fn read(&self, key: &str) -> Result<String>;
+    async fn read_raw(&self, key: &str) -> Result<String>;
 
     /// Write raw content to the given key (relative path).
     ///
@@ -63,7 +73,22 @@ pub trait StateBackend: Send + Sync {
     ///
     /// Returns `StateError::NotFound` if the file does not exist.
     /// Returns `StateError::WriteFailed` for I/O errors.
-    async fn write(&self, key: &str, content: &str) -> Result<()>;
+    async fn write_raw(&self, key: &str, content: &str) -> Result<()>;
+
+    /// Create a new raw entry at the given key (relative path).
+    ///
+    /// Creates parent directories if they don't exist.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - Relative path within state directory.
+    /// * `content` - Raw content to write.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::AlreadyExists` if the file already exists.
+    /// Returns `StateError::WriteFailed` for I/O errors.
+    async fn create_raw(&self, key: &str, content: &str) -> Result<()>;
 
     /// Check if a key (relative path) exists.
     ///
@@ -80,6 +105,117 @@ pub trait StateBackend: Send + Sync {
     ///
     /// Returns list of relative paths (directory names only for directories).
     async fn list(&self, prefix: &str) -> Result<Vec<String>>;
+
+    /// Delete an entry at the given key (relative path).
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - Relative path within state directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::NotFound` if the file does not exist.
+    /// Returns `StateError::DeleteFailed` for I/O errors.
+    async fn delete(&self, key: &str) -> Result<()>;
+
+    // ========== ECOSYSTEM METADATA ==========
+
+    /// Read ecosystem metadata (ZkStack.yaml).
+    async fn read_ecosystem_metadata(&self) -> Result<EcosystemMetadata>;
+
+    /// Write ecosystem metadata (ZkStack.yaml).
+    async fn write_ecosystem_metadata(&self, data: &EcosystemMetadata) -> Result<()>;
+
+    /// Create ecosystem metadata (ZkStack.yaml).
+    async fn create_ecosystem_metadata(&self, data: &EcosystemMetadata) -> Result<()>;
+
+    // ========== ECOSYSTEM WALLETS ==========
+
+    /// Read ecosystem wallets (configs/wallets.yaml).
+    async fn read_ecosystem_wallets(&self) -> Result<Wallets>;
+
+    /// Write ecosystem wallets (configs/wallets.yaml).
+    async fn write_ecosystem_wallets(&self, data: &Wallets) -> Result<()>;
+
+    /// Create ecosystem wallets (configs/wallets.yaml).
+    async fn create_ecosystem_wallets(&self, data: &Wallets) -> Result<()>;
+
+    // ========== ECOSYSTEM CONTRACTS ==========
+
+    /// Read ecosystem contracts (configs/contracts.yaml).
+    async fn read_ecosystem_contracts(&self) -> Result<EcosystemContracts>;
+
+    /// Write ecosystem contracts (configs/contracts.yaml).
+    async fn write_ecosystem_contracts(&self, data: &EcosystemContracts) -> Result<()>;
+
+    /// Create ecosystem contracts (configs/contracts.yaml).
+    async fn create_ecosystem_contracts(&self, data: &EcosystemContracts) -> Result<()>;
+
+    // ========== INITIAL DEPLOYMENTS ==========
+
+    /// Read initial deployments (configs/initial_deployments.yaml).
+    async fn read_initial_deployments(&self) -> Result<InitialDeployments>;
+
+    /// Write initial deployments (configs/initial_deployments.yaml).
+    async fn write_initial_deployments(&self, data: &InitialDeployments) -> Result<()>;
+
+    /// Create initial deployments (configs/initial_deployments.yaml).
+    async fn create_initial_deployments(&self, data: &InitialDeployments) -> Result<()>;
+
+    // ========== ERC20 DEPLOYMENTS ==========
+
+    /// Read ERC20 deployments (configs/erc20_deployments.yaml).
+    async fn read_erc20_deployments(&self) -> Result<Erc20Deployments>;
+
+    /// Write ERC20 deployments (configs/erc20_deployments.yaml).
+    async fn write_erc20_deployments(&self, data: &Erc20Deployments) -> Result<()>;
+
+    /// Create ERC20 deployments (configs/erc20_deployments.yaml).
+    async fn create_erc20_deployments(&self, data: &Erc20Deployments) -> Result<()>;
+
+    // ========== APPS ==========
+
+    /// Read apps config (configs/apps.yaml).
+    async fn read_apps(&self) -> Result<Apps>;
+
+    /// Write apps config (configs/apps.yaml).
+    async fn write_apps(&self, data: &Apps) -> Result<()>;
+
+    /// Create apps config (configs/apps.yaml).
+    async fn create_apps(&self, data: &Apps) -> Result<()>;
+
+    // ========== CHAIN METADATA ==========
+
+    /// Read chain metadata (chains/{chain}/ZkStack.yaml).
+    async fn read_chain_metadata(&self, chain: &str) -> Result<ChainMetadata>;
+
+    /// Write chain metadata (chains/{chain}/ZkStack.yaml).
+    async fn write_chain_metadata(&self, chain: &str, data: &ChainMetadata) -> Result<()>;
+
+    /// Create chain metadata (chains/{chain}/ZkStack.yaml).
+    async fn create_chain_metadata(&self, chain: &str, data: &ChainMetadata) -> Result<()>;
+
+    // ========== CHAIN WALLETS ==========
+
+    /// Read chain wallets (chains/{chain}/configs/wallets.yaml).
+    async fn read_chain_wallets(&self, chain: &str) -> Result<Wallets>;
+
+    /// Write chain wallets (chains/{chain}/configs/wallets.yaml).
+    async fn write_chain_wallets(&self, chain: &str, data: &Wallets) -> Result<()>;
+
+    /// Create chain wallets (chains/{chain}/configs/wallets.yaml).
+    async fn create_chain_wallets(&self, chain: &str, data: &Wallets) -> Result<()>;
+
+    // ========== CHAIN CONTRACTS ==========
+
+    /// Read chain contracts (chains/{chain}/configs/contracts.yaml).
+    async fn read_chain_contracts(&self, chain: &str) -> Result<ChainContracts>;
+
+    /// Write chain contracts (chains/{chain}/configs/contracts.yaml).
+    async fn write_chain_contracts(&self, chain: &str, data: &ChainContracts) -> Result<()>;
+
+    /// Create chain contracts (chains/{chain}/configs/contracts.yaml).
+    async fn create_chain_contracts(&self, chain: &str, data: &ChainContracts) -> Result<()>;
 }
 
 /// Create a backend instance based on backend type.

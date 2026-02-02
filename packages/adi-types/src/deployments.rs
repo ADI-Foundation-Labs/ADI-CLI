@@ -182,6 +182,9 @@ tokens:
 "#;
         let deployments: Erc20Deployments = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(deployments.tokens.len(), 2);
-        assert_eq!(deployments.tokens.first().map(|t| &t.symbol), Some(&"DAI".to_string()));
+        assert_eq!(
+            deployments.tokens.first().map(|t| &t.symbol),
+            Some(&"DAI".to_string())
+        );
     }
 }

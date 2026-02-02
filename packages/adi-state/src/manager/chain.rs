@@ -3,10 +3,8 @@
 use crate::backend::StateBackend;
 use crate::error::Result;
 use crate::manager::ecosystem::merge_wallets;
-use crate::manager::{deserialize_yaml, serialize_yaml};
 use crate::paths;
 use adi_types::{ChainContracts, ChainMetadata, PartialChainMetadata, Wallets};
-use std::path::PathBuf;
 use std::sync::Arc;
 
 /// Chain-level state operations.
@@ -20,7 +18,10 @@ pub struct ChainStateOps {
 impl ChainStateOps {
     /// Create new chain state operations.
     pub(crate) fn new(backend: Arc<dyn StateBackend>, chain_name: String) -> Self {
-        Self { backend, chain_name }
+        Self {
+            backend,
+            chain_name,
+        }
     }
 
     /// Get the chain name.
@@ -37,16 +38,7 @@ impl ChainStateOps {
     ///
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn metadata(&self) -> Result<ChainMetadata> {
-        let key = paths::chain_metadata_path(&self.chain_name);
-        log::debug!("Reading chain '{}' metadata from {}", self.chain_name, key);
-        let content = self.backend.read(&key).await?;
-        let metadata: ChainMetadata = deserialize_yaml(&content, &PathBuf::from(&key))?;
-        log::debug!(
-            "Loaded chain metadata: name={}, chain_id={}",
-            metadata.name,
-            metadata.chain_id
-        );
-        Ok(metadata)
+        self.backend.read_chain_metadata(&self.chain_name).await
     }
 
     /// Update chain metadata with partial values.
@@ -57,12 +49,15 @@ impl ChainStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_metadata(&self, partial: &PartialChainMetadata) -> Result<()> {
-        log::debug!("Updating chain '{}' metadata with partial values", self.chain_name);
+        log::debug!(
+            "Updating chain '{}' metadata with partial values",
+            self.chain_name
+        );
         let current = self.metadata().await?;
         let merged = merge_chain_metadata(current, partial);
-        let key = paths::chain_metadata_path(&self.chain_name);
-        let yaml = serialize_yaml(&merged, &PathBuf::from(&key))?;
-        self.backend.write(&key, &yaml).await?;
+        self.backend
+            .write_chain_metadata(&self.chain_name, &merged)
+            .await?;
         log::debug!("Chain '{}' metadata updated successfully", self.chain_name);
         Ok(())
     }
@@ -75,17 +70,7 @@ impl ChainStateOps {
     ///
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn wallets(&self) -> Result<Wallets> {
-        let key = paths::chain_wallets_path(&self.chain_name);
-        log::debug!("Reading chain '{}' wallets from {}", self.chain_name, key);
-        let content = self.backend.read(&key).await?;
-        let wallets: Wallets = deserialize_yaml(&content, &PathBuf::from(&key))?;
-        log::debug!(
-            "Loaded chain '{}' wallets: deployer={}, governor={}",
-            self.chain_name,
-            wallets.deployer.is_some(),
-            wallets.governor.is_some()
-        );
-        Ok(wallets)
+        self.backend.read_chain_wallets(&self.chain_name).await
     }
 
     /// Update chain wallets.
@@ -99,9 +84,9 @@ impl ChainStateOps {
         log::debug!("Updating chain '{}' wallets", self.chain_name);
         let current = self.wallets().await?;
         let merged = merge_wallets(current, partial);
-        let key = paths::chain_wallets_path(&self.chain_name);
-        let yaml = serialize_yaml(&merged, &PathBuf::from(&key))?;
-        self.backend.write(&key, &yaml).await?;
+        self.backend
+            .write_chain_wallets(&self.chain_name, &merged)
+            .await?;
         log::debug!("Chain '{}' wallets updated successfully", self.chain_name);
         Ok(())
     }
@@ -116,12 +101,7 @@ impl ChainStateOps {
     ///
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn contracts(&self) -> Result<ChainContracts> {
-        let key = paths::chain_contracts_path(&self.chain_name);
-        log::debug!("Reading chain '{}' contracts from {}", self.chain_name, key);
-        let content = self.backend.read(&key).await?;
-        let contracts: ChainContracts = deserialize_yaml(&content, &PathBuf::from(&key))?;
-        log::debug!("Loaded chain '{}' contracts successfully", self.chain_name);
-        Ok(contracts)
+        self.backend.read_chain_contracts(&self.chain_name).await
     }
 
     /// Check if contracts file exists.
@@ -132,7 +112,11 @@ impl ChainStateOps {
     pub async fn contracts_exist(&self) -> Result<bool> {
         let key = paths::chain_contracts_path(&self.chain_name);
         let exists = self.backend.exists(&key).await?;
-        log::debug!("Chain '{}' contracts file exists: {}", self.chain_name, exists);
+        log::debug!(
+            "Chain '{}' contracts file exists: {}",
+            self.chain_name,
+            exists
+        );
         Ok(exists)
     }
 
@@ -142,10 +126,10 @@ impl ChainStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_contracts(&self, contracts: &ChainContracts) -> Result<()> {
-        let key = paths::chain_contracts_path(&self.chain_name);
         log::debug!("Updating chain '{}' contracts", self.chain_name);
-        let yaml = serialize_yaml(contracts, &PathBuf::from(&key))?;
-        self.backend.write(&key, &yaml).await?;
+        self.backend
+            .write_chain_contracts(&self.chain_name, contracts)
+            .await?;
         log::debug!("Chain '{}' contracts updated successfully", self.chain_name);
         Ok(())
     }
@@ -161,10 +145,61 @@ impl ChainStateOps {
         log::debug!("Chain '{}' exists: {}", self.chain_name, exists);
         Ok(exists)
     }
+
+    // ========== CREATE OPERATIONS ==========
+
+    /// Create chain metadata (chains/{name}/ZkStack.yaml).
+    ///
+    /// # Arguments
+    ///
+    /// * `metadata` - The chain metadata to create.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if file already exists or creation fails.
+    pub async fn create_metadata(&self, metadata: &ChainMetadata) -> Result<()> {
+        log::debug!("Creating chain '{}' metadata", self.chain_name);
+        self.backend
+            .create_chain_metadata(&self.chain_name, metadata)
+            .await?;
+        log::debug!("Chain '{}' metadata created successfully", self.chain_name);
+        Ok(())
+    }
+
+    /// Create chain wallets (chains/{name}/configs/wallets.yaml).
+    ///
+    /// # Errors
+    ///
+    /// Returns error if file already exists or creation fails.
+    pub async fn create_wallets(&self, wallets: &Wallets) -> Result<()> {
+        log::debug!("Creating chain '{}' wallets", self.chain_name);
+        self.backend
+            .create_chain_wallets(&self.chain_name, wallets)
+            .await?;
+        log::debug!("Chain '{}' wallets created successfully", self.chain_name);
+        Ok(())
+    }
+
+    /// Create chain contracts (chains/{name}/configs/contracts.yaml).
+    ///
+    /// # Errors
+    ///
+    /// Returns error if file already exists or creation fails.
+    pub async fn create_contracts(&self, contracts: &ChainContracts) -> Result<()> {
+        log::debug!("Creating chain '{}' contracts", self.chain_name);
+        self.backend
+            .create_chain_contracts(&self.chain_name, contracts)
+            .await?;
+        log::debug!("Chain '{}' contracts created successfully", self.chain_name);
+        Ok(())
+    }
 }
 
 /// Merge partial chain metadata into current metadata.
-fn merge_chain_metadata(mut current: ChainMetadata, partial: &PartialChainMetadata) -> ChainMetadata {
+fn merge_chain_metadata(
+    mut current: ChainMetadata,
+    partial: &PartialChainMetadata,
+) -> ChainMetadata {
     if let Some(id) = partial.id {
         current.id = id;
     }
@@ -217,7 +252,9 @@ fn merge_chain_metadata(mut current: ChainMetadata, partial: &PartialChainMetada
         current.contracts_path.clone_from(contracts_path);
     }
     if let Some(ref default_configs_path) = partial.default_configs_path {
-        current.default_configs_path.clone_from(default_configs_path);
+        current
+            .default_configs_path
+            .clone_from(default_configs_path);
     }
     current
 }
@@ -225,7 +262,9 @@ fn merge_chain_metadata(mut current: ChainMetadata, partial: &PartialChainMetada
 #[cfg(test)]
 mod tests {
     use super::*;
-    use adi_types::{BaseToken, BatchCommitDataMode, L1Network, ProverMode, VmOption, WalletCreation};
+    use adi_types::{
+        BaseToken, BatchCommitDataMode, L1Network, ProverMode, VmOption, WalletCreation,
+    };
 
     #[test]
     fn test_merge_chain_metadata_partial() {

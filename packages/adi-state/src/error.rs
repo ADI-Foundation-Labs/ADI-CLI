@@ -57,6 +57,20 @@ pub enum StateError {
     #[error("State file not found: {}", .0.display())]
     NotFound(PathBuf),
 
+    /// State file already exists (cannot create).
+    #[error("State file already exists: {}", .0.display())]
+    AlreadyExists(PathBuf),
+
+    /// Failed to delete state file.
+    #[error("Failed to delete state file '{}': {source}", .path.display())]
+    DeleteFailed {
+        /// Path that failed to delete.
+        path: PathBuf,
+        /// Underlying error.
+        #[source]
+        source: std::io::Error,
+    },
+
     /// Chain not found in ecosystem.
     #[error("Chain '{name}' not found in ecosystem")]
     ChainNotFound {

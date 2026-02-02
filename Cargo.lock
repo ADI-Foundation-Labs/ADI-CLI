@@ -7,6 +7,7 @@ name = "adi-cli"
 version = "0.1.0"
 dependencies = [
  "adi-ecosystem",
+ "adi-state",
  "adi-toolkit",
  "built",
  "chrono",
@@ -19,6 +20,7 @@ dependencies = [
  "log",
  "serde",
  "serde_yaml",
+ "tempfile",
  "tokio",
 ]
 

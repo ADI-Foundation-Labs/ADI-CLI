@@ -123,6 +123,10 @@ colored = { workspace = true }
 # SDK packages
 adi-toolkit = { workspace = true }
 adi-ecosystem = { workspace = true }
+adi-state = { workspace = true }
+
+# Utils
+tempfile = { workspace = true }
 
 [build-dependencies]
 built = { workspace = true }
