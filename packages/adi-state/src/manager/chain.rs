@@ -38,8 +38,15 @@ impl ChainStateOps {
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn metadata(&self) -> Result<ChainMetadata> {
         let key = paths::chain_metadata_path(&self.chain_name);
+        log::debug!("Reading chain '{}' metadata from {}", self.chain_name, key);
         let content = self.backend.read(&key).await?;
-        deserialize_yaml(&content, &PathBuf::from(&key))
+        let metadata: ChainMetadata = deserialize_yaml(&content, &PathBuf::from(&key))?;
+        log::debug!(
+            "Loaded chain metadata: name={}, chain_id={}",
+            metadata.name,
+            metadata.chain_id
+        );
+        Ok(metadata)
     }
 
     /// Update chain metadata with partial values.
@@ -50,11 +57,14 @@ impl ChainStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_metadata(&self, partial: &PartialChainMetadata) -> Result<()> {
+        log::debug!("Updating chain '{}' metadata with partial values", self.chain_name);
         let current = self.metadata().await?;
         let merged = merge_chain_metadata(current, partial);
         let key = paths::chain_metadata_path(&self.chain_name);
         let yaml = serialize_yaml(&merged, &PathBuf::from(&key))?;
-        self.backend.write(&key, &yaml).await
+        self.backend.write(&key, &yaml).await?;
+        log::debug!("Chain '{}' metadata updated successfully", self.chain_name);
+        Ok(())
     }
 
     // ========== WALLETS ==========
@@ -66,8 +76,16 @@ impl ChainStateOps {
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn wallets(&self) -> Result<Wallets> {
         let key = paths::chain_wallets_path(&self.chain_name);
+        log::debug!("Reading chain '{}' wallets from {}", self.chain_name, key);
         let content = self.backend.read(&key).await?;
-        deserialize_yaml(&content, &PathBuf::from(&key))
+        let wallets: Wallets = deserialize_yaml(&content, &PathBuf::from(&key))?;
+        log::debug!(
+            "Loaded chain '{}' wallets: deployer={}, governor={}",
+            self.chain_name,
+            wallets.deployer.is_some(),
+            wallets.governor.is_some()
+        );
+        Ok(wallets)
     }
 
     /// Update chain wallets.
@@ -78,11 +96,14 @@ impl ChainStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_wallets(&self, partial: &Wallets) -> Result<()> {
+        log::debug!("Updating chain '{}' wallets", self.chain_name);
         let current = self.wallets().await?;
         let merged = merge_wallets(current, partial);
         let key = paths::chain_wallets_path(&self.chain_name);
         let yaml = serialize_yaml(&merged, &PathBuf::from(&key))?;
-        self.backend.write(&key, &yaml).await
+        self.backend.write(&key, &yaml).await?;
+        log::debug!("Chain '{}' wallets updated successfully", self.chain_name);
+        Ok(())
     }
 
     // ========== CONTRACTS ==========
@@ -96,8 +117,11 @@ impl ChainStateOps {
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn contracts(&self) -> Result<ChainContracts> {
         let key = paths::chain_contracts_path(&self.chain_name);
+        log::debug!("Reading chain '{}' contracts from {}", self.chain_name, key);
         let content = self.backend.read(&key).await?;
-        deserialize_yaml(&content, &PathBuf::from(&key))
+        let contracts: ChainContracts = deserialize_yaml(&content, &PathBuf::from(&key))?;
+        log::debug!("Loaded chain '{}' contracts successfully", self.chain_name);
+        Ok(contracts)
     }
 
     /// Check if contracts file exists.
@@ -106,9 +130,10 @@ impl ChainStateOps {
     ///
     /// Returns error if checking existence fails.
     pub async fn contracts_exist(&self) -> Result<bool> {
-        self.backend
-            .exists(&paths::chain_contracts_path(&self.chain_name))
-            .await
+        let key = paths::chain_contracts_path(&self.chain_name);
+        let exists = self.backend.exists(&key).await?;
+        log::debug!("Chain '{}' contracts file exists: {}", self.chain_name, exists);
+        Ok(exists)
     }
 
     /// Update chain contracts.
@@ -118,8 +143,11 @@ impl ChainStateOps {
     /// Returns error if file doesn't exist.
     pub async fn update_contracts(&self, contracts: &ChainContracts) -> Result<()> {
         let key = paths::chain_contracts_path(&self.chain_name);
+        log::debug!("Updating chain '{}' contracts", self.chain_name);
         let yaml = serialize_yaml(contracts, &PathBuf::from(&key))?;
-        self.backend.write(&key, &yaml).await
+        self.backend.write(&key, &yaml).await?;
+        log::debug!("Chain '{}' contracts updated successfully", self.chain_name);
+        Ok(())
     }
 
     /// Check if this chain exists (has metadata file).
@@ -128,9 +156,10 @@ impl ChainStateOps {
     ///
     /// Returns error if checking existence fails.
     pub async fn exists(&self) -> Result<bool> {
-        self.backend
-            .exists(&paths::chain_metadata_path(&self.chain_name))
-            .await
+        let key = paths::chain_metadata_path(&self.chain_name);
+        let exists = self.backend.exists(&key).await?;
+        log::debug!("Chain '{}' exists: {}", self.chain_name, exists);
+        Ok(exists)
     }
 }
 

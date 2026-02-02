@@ -32,8 +32,16 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn metadata(&self) -> Result<EcosystemMetadata> {
+        log::debug!("Reading ecosystem metadata from {}", paths::ECOSYSTEM_METADATA);
         let content = self.backend.read(paths::ECOSYSTEM_METADATA).await?;
-        deserialize_yaml(&content, &PathBuf::from(paths::ECOSYSTEM_METADATA))
+        let metadata: EcosystemMetadata =
+            deserialize_yaml(&content, &PathBuf::from(paths::ECOSYSTEM_METADATA))?;
+        log::debug!(
+            "Loaded ecosystem metadata: name={}, l1_network={:?}",
+            metadata.name,
+            metadata.l1_network
+        );
+        Ok(metadata)
     }
 
     /// Update ecosystem metadata with partial values.
@@ -45,10 +53,13 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_metadata(&self, partial: &PartialEcosystemMetadata) -> Result<()> {
+        log::debug!("Updating ecosystem metadata with partial values");
         let current = self.metadata().await?;
         let merged = merge_ecosystem_metadata(current, partial);
         let yaml = serialize_yaml(&merged, &PathBuf::from(paths::ECOSYSTEM_METADATA))?;
-        self.backend.write(paths::ECOSYSTEM_METADATA, &yaml).await
+        self.backend.write(paths::ECOSYSTEM_METADATA, &yaml).await?;
+        log::debug!("Ecosystem metadata updated successfully");
+        Ok(())
     }
 
     // ========== WALLETS ==========
@@ -60,8 +71,15 @@ impl EcosystemStateOps {
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn wallets(&self) -> Result<Wallets> {
         let key = paths::ecosystem_wallets_path();
+        log::debug!("Reading ecosystem wallets from {}", key);
         let content = self.backend.read(&key).await?;
-        deserialize_yaml(&content, &PathBuf::from(&key))
+        let wallets: Wallets = deserialize_yaml(&content, &PathBuf::from(&key))?;
+        log::debug!(
+            "Loaded ecosystem wallets: deployer={}, governor={}",
+            wallets.deployer.is_some(),
+            wallets.governor.is_some()
+        );
+        Ok(wallets)
     }
 
     /// Update ecosystem wallets.
@@ -72,11 +90,14 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_wallets(&self, partial: &Wallets) -> Result<()> {
+        let key = paths::ecosystem_wallets_path();
+        log::debug!("Updating ecosystem wallets");
         let current = self.wallets().await?;
         let merged = merge_wallets(current, partial);
-        let key = paths::ecosystem_wallets_path();
         let yaml = serialize_yaml(&merged, &PathBuf::from(&key))?;
-        self.backend.write(&key, &yaml).await
+        self.backend.write(&key, &yaml).await?;
+        log::debug!("Ecosystem wallets updated successfully");
+        Ok(())
     }
 
     // ========== CONTRACTS ==========
@@ -90,8 +111,11 @@ impl EcosystemStateOps {
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn contracts(&self) -> Result<EcosystemContracts> {
         let key = paths::ecosystem_contracts_path();
+        log::debug!("Reading ecosystem contracts from {}", key);
         let content = self.backend.read(&key).await?;
-        deserialize_yaml(&content, &PathBuf::from(&key))
+        let contracts: EcosystemContracts = deserialize_yaml(&content, &PathBuf::from(&key))?;
+        log::debug!("Loaded ecosystem contracts successfully");
+        Ok(contracts)
     }
 
     /// Check if contracts file exists.
@@ -100,7 +124,10 @@ impl EcosystemStateOps {
     ///
     /// Returns error if checking existence fails.
     pub async fn contracts_exist(&self) -> Result<bool> {
-        self.backend.exists(&paths::ecosystem_contracts_path()).await
+        let key = paths::ecosystem_contracts_path();
+        let exists = self.backend.exists(&key).await?;
+        log::debug!("Ecosystem contracts file exists: {}", exists);
+        Ok(exists)
     }
 
     /// Update ecosystem contracts.
@@ -110,8 +137,11 @@ impl EcosystemStateOps {
     /// Returns error if file doesn't exist.
     pub async fn update_contracts(&self, contracts: &EcosystemContracts) -> Result<()> {
         let key = paths::ecosystem_contracts_path();
+        log::debug!("Updating ecosystem contracts");
         let yaml = serialize_yaml(contracts, &PathBuf::from(&key))?;
-        self.backend.write(&key, &yaml).await
+        self.backend.write(&key, &yaml).await?;
+        log::debug!("Ecosystem contracts updated successfully");
+        Ok(())
     }
 
     // ========== INITIAL DEPLOYMENTS ==========
@@ -123,8 +153,11 @@ impl EcosystemStateOps {
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn initial_deployments(&self) -> Result<InitialDeployments> {
         let key = paths::initial_deployments_path();
+        log::debug!("Reading initial deployments from {}", key);
         let content = self.backend.read(&key).await?;
-        deserialize_yaml(&content, &PathBuf::from(&key))
+        let deployments: InitialDeployments = deserialize_yaml(&content, &PathBuf::from(&key))?;
+        log::debug!("Loaded initial deployments successfully");
+        Ok(deployments)
     }
 
     /// Update initial deployments.
@@ -134,8 +167,11 @@ impl EcosystemStateOps {
     /// Returns error if file doesn't exist.
     pub async fn update_initial_deployments(&self, deployments: &InitialDeployments) -> Result<()> {
         let key = paths::initial_deployments_path();
+        log::debug!("Updating initial deployments");
         let yaml = serialize_yaml(deployments, &PathBuf::from(&key))?;
-        self.backend.write(&key, &yaml).await
+        self.backend.write(&key, &yaml).await?;
+        log::debug!("Initial deployments updated successfully");
+        Ok(())
     }
 
     // ========== ERC20 DEPLOYMENTS ==========
@@ -147,8 +183,11 @@ impl EcosystemStateOps {
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn erc20_deployments(&self) -> Result<Erc20Deployments> {
         let key = paths::erc20_deployments_path();
+        log::debug!("Reading ERC20 deployments from {}", key);
         let content = self.backend.read(&key).await?;
-        deserialize_yaml(&content, &PathBuf::from(&key))
+        let deployments: Erc20Deployments = deserialize_yaml(&content, &PathBuf::from(&key))?;
+        log::debug!("Loaded ERC20 deployments successfully");
+        Ok(deployments)
     }
 
     /// Update ERC20 deployments.
@@ -158,8 +197,11 @@ impl EcosystemStateOps {
     /// Returns error if file doesn't exist.
     pub async fn update_erc20_deployments(&self, deployments: &Erc20Deployments) -> Result<()> {
         let key = paths::erc20_deployments_path();
+        log::debug!("Updating ERC20 deployments");
         let yaml = serialize_yaml(deployments, &PathBuf::from(&key))?;
-        self.backend.write(&key, &yaml).await
+        self.backend.write(&key, &yaml).await?;
+        log::debug!("ERC20 deployments updated successfully");
+        Ok(())
     }
 
     // ========== APPS ==========
@@ -171,8 +213,11 @@ impl EcosystemStateOps {
     /// Returns error if file doesn't exist or parsing fails.
     pub async fn apps(&self) -> Result<Apps> {
         let key = paths::apps_path();
+        log::debug!("Reading apps config from {}", key);
         let content = self.backend.read(&key).await?;
-        deserialize_yaml(&content, &PathBuf::from(&key))
+        let apps: Apps = deserialize_yaml(&content, &PathBuf::from(&key))?;
+        log::debug!("Loaded apps config successfully");
+        Ok(apps)
     }
 
     /// Update apps config.
@@ -182,8 +227,11 @@ impl EcosystemStateOps {
     /// Returns error if file doesn't exist.
     pub async fn update_apps(&self, apps: &Apps) -> Result<()> {
         let key = paths::apps_path();
+        log::debug!("Updating apps config");
         let yaml = serialize_yaml(apps, &PathBuf::from(&key))?;
-        self.backend.write(&key, &yaml).await
+        self.backend.write(&key, &yaml).await?;
+        log::debug!("Apps config updated successfully");
+        Ok(())
     }
 }
 

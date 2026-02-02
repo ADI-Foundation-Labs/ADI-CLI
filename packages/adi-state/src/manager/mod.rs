@@ -49,6 +49,10 @@ impl StateManager {
     /// * `ecosystem_path` - Path to the ecosystem directory.
     #[must_use]
     pub fn new(ecosystem_path: &Path) -> Self {
+        log::debug!(
+            "Creating StateManager with filesystem backend at {}",
+            ecosystem_path.display()
+        );
         let backend = create_backend(BackendType::Filesystem, ecosystem_path);
         Self {
             backend: Arc::from(backend),
@@ -83,6 +87,7 @@ impl StateManager {
     /// * `chain_name` - Name of the chain.
     #[must_use]
     pub fn chain(&self, chain_name: &str) -> ChainStateOps {
+        log::debug!("Getting chain state operations for '{}'", chain_name);
         ChainStateOps::new(Arc::clone(&self.backend), chain_name.to_string())
     }
 
@@ -100,6 +105,7 @@ impl StateManager {
     ///
     /// Returns error if reading the chains directory fails.
     pub async fn list_chains(&self) -> Result<Vec<String>> {
+        log::debug!("Listing chains in ecosystem");
         let entries = self.backend.list(paths::CHAINS_DIR).await?;
 
         let mut chains = Vec::new();
@@ -110,6 +116,7 @@ impl StateManager {
             }
         }
 
+        log::debug!("Found {} chains: {:?}", chains.len(), chains);
         Ok(chains)
     }
 }
