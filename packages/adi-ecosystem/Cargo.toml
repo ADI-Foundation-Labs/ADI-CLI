@@ -1,0 +1,20 @@
+[package]
+name = "adi-ecosystem"
+version.workspace = true
+edition.workspace = true
+description = "Domain logic for ZkSync ecosystem management (no Docker dependency)"
+
+[lints]
+workspace = true
+
+[lib]
+name = "adi_ecosystem"
+path = "src/lib.rs"
+
+[dependencies]
+eyre = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+log = { workspace = true }
+strum = { workspace = true }
+clap = { workspace = true }

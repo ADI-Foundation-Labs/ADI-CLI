@@ -11,10 +11,80 @@ tasks:
       - curl https://sh.rustup.rs -sSf | sh
 
   build:
+    desc: Build the CLI in development mode
     deps:
       - _install_rust
     cmds:
       - cargo build
+
+  build:release:
+    desc: Build the CLI in release mode
+    deps:
+      - _install_rust
+    cmds:
+      - cargo build --release
+
+  # ====================
+  # Testing
+  # ====================
+
+  test:
+    desc: Run all tests
+    deps:
+      - _install_rust
+    cmds:
+      - cargo test --workspace
+
+  test:unit:
+    desc: Run unit tests only (library crates)
+    deps:
+      - _install_rust
+    cmds:
+      - cargo test --workspace --lib
+
+  test:integration:
+    desc: Run integration tests only
+    deps:
+      - _install_rust
+    preconditions:
+      - sh: 'find . -path ./target -prune -o -type f -path "*/tests/*.rs" -print -quit | grep -q .'
+        msg: "No integration tests found (no */tests/*.rs files)"
+    cmds:
+      - cargo test --workspace --test '*'
+
+  lint:
+    desc: Run clippy linter with strict rules
+    deps:
+      - _install_rust
+    cmds:
+      - cargo clippy --workspace -- -D warnings
+
+  fmt:
+    desc: Format code with rustfmt
+    deps:
+      - _install_rust
+    cmds:
+      - cargo fmt
+
+  fmt:check:
+    desc: Check code formatting
+    deps:
+      - _install_rust
+    cmds:
+      - cargo fmt -- --check
+
+  check:
+    desc: Run all checks (fmt, lint, test)
+    deps:
+      - _install_rust
+    cmds:
+      - task: fmt:check
+      - task: lint
+      - task: test
+
+  # ====================
+  # Docker / Toolkit
+  # ====================
 
   build:docker:
     desc: Build Docker images using Docker Bake
@@ -26,7 +96,6 @@ tasks:
     generates:
       - .task/build_docker_{{.TARGETS}}
     preconditions:
-      # Check if docker is running and have required commands
       - docker ps
       - docker buildx version
       - docker buildx bake --help
@@ -34,9 +103,45 @@ tasks:
       - docker buildx bake -f docker/docker-bake.hcl {{.TARGETS}}
       - mkdir -p .task && touch .task/build_docker_{{.TARGETS}}
 
+  build:toolkit:
+    desc: Build toolkit image (v30.0.2)
+    cmds:
+      - task: build:docker
+        vars:
+          TARGETS: default
+
+  build:toolkit:v30.0.2:
+    desc: Build toolkit image for protocol v30.0.2
+    cmds:
+      - task: build:docker
+        vars:
+          TARGETS: toolkit-v30-0-2
+
+  build:toolkit:local:
+    desc: Build toolkit image for local testing (current platform, faster)
+    preconditions:
+      - docker ps
+      - docker buildx version
+    cmds:
+      - docker buildx bake -f docker/docker-bake.hcl toolkit-v30-0-2 --set '*.platform=linux/arm64' --load
+
   push:docker:
     desc: Build and push Docker images using Docker Bake
     vars:
       TARGETS: '{{default "default" .TARGETS}}'
     cmds:
       - docker buildx bake -f docker/docker-bake.hcl --push {{.TARGETS}}
+
+  push:toolkit:
+    desc: Build and push toolkit image
+    cmds:
+      - task: push:docker
+        vars:
+          TARGETS: default
+
+  push:toolkit:v30.0.2:
+    desc: Build and push toolkit v30.0.2 image
+    cmds:
+      - task: push:docker
+        vars:
+          TARGETS: toolkit-v30-0-2

@@ -1,56 +1,31 @@
+//! Context for command execution.
+//!
+//! The Context struct carries configuration through command execution.
+
+use crate::config::Config;
 use crate::error::{Result, WrapErr};
 
-use crate::{config::Config, log::Logger};
-
+/// Execution context for CLI commands.
+///
+/// Provides access to configuration and shared resources.
 #[derive(Clone)]
 pub struct Context {
     cfg: Config,
-    log: Logger,
 }
 
 impl Context {
+    /// Create a new context from CLI options.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if configuration loading fails.
     pub fn new_from_options(options: &super::Opts) -> Result<Self> {
-        let cfg = Config::new().wrap_err("Failed to load config")?;
-
-        Ok(Self {
-            cfg,
-            log: Logger::new(false), // TODO: Debug?
-        })
+        let cfg = Config::new(options.config.as_deref()).wrap_err("Failed to load config")?;
+        Ok(Self { cfg })
     }
 
+    /// Get a reference to the configuration.
     pub fn config(&self) -> &Config {
         &self.cfg
-    }
-
-    #[allow(dead_code)]
-    pub fn error(&self, msg: &str) {
-        self.log.error(msg);
-    }
-
-    #[allow(dead_code)]
-    pub fn error_fmt(&self, msg: &str) {
-        self.log.error_fmt(msg);
-    }
-
-    pub fn info(&self, msg: &str) {
-        self.log.info(msg);
-    }
-
-    pub fn success(&self, msg: &str) {
-        self.log.success(msg);
-    }
-
-    pub fn success_fmt(&self, msg: &str) {
-        self.log.success_fmt(msg);
-    }
-
-    #[allow(dead_code)]
-    pub fn warning(&self, msg: &str) {
-        self.log.warning(msg);
-    }
-
-    #[allow(dead_code)]
-    pub fn debug(&self, msg: &str) {
-        self.log.debug(msg);
     }
 }

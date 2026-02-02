@@ -3,6 +3,17 @@ name = "adi-cli"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "adi"
+path = "src/main.rs"
+
+[workspace]
+resolver = "2"
+members = ["packages/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
 
 [profile.release]
 opt-level = "z"
@@ -15,26 +26,10 @@ panic = "abort"
 incremental = false
 overflow-checks = false
 
-
-[dependencies]
-clap = { version = "4", features = ["derive"] }
-config = { version = "0.15", default-features = false, features = ["yaml"] }
-tokio = { version = "1", default-features = false, features = ["full"] }
-
-colored = "3"
-eyre = "0.6"
-built = { version = "0.7", features = ["git2"] }
-serde = { version = "1", features = ["derive"] }
-chrono = { version = "0.4", features = ["serde"] }
-dirs = "6.0"
-
-[build-dependencies]
-built = { version = "0.7", features = ["git2"] }
-
-[lints.rust]
+[workspace.lints.rust]
 unused_must_use = "deny"
 
-[lints.clippy]
+[workspace.lints.clippy]
 panic = "deny"
 unwrap_used = "deny"
 expect_used = "deny"
@@ -57,3 +52,67 @@ iter_nth_zero = "deny"
 bind_instead_of_map = "deny"
 manual_filter_map = "deny"
 double_ended_iterator_last = "allow"
+
+[workspace.dependencies]
+# CLI
+clap = { version = "4", default-features = false, features = ["derive", "std", "color", "help", "usage", "error-context"] }
+config = { version = "0.15", default-features = false, features = ["yaml"] }
+
+# Async
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "macros", "time", "io-util"] }
+
+# Error handling
+eyre = { version = "0.6", default-features = false, features = ["auto-install"] }
+thiserror = { version = "2", default-features = false }
+
+# Serialization
+serde = { version = "1", default-features = false, features = ["derive"] }
+serde_yaml = { version = "0.9", default-features = false }
+
+# Logging
+log = { version = "0.4", default-features = false }
+env_logger = { version = "0.11", default-features = false, features = ["auto-color"] }
+
+# Docker
+bollard = { version = "0.18" }
+futures-util = { version = "0.3", default-features = false, features = ["std", "async-await"] }
+
+# Version handling
+semver = { version = "1", default-features = false, features = ["serde"] }
+strum = { version = "0.26", default-features = false, features = ["derive"] }
+
+# Utilities
+dirs = { version = "6.0", default-features = false }
+chrono = { version = "0.4", default-features = false, features = ["serde", "std", "clock"] }
+colored = { version = "3", default-features = false }
+
+# Build
+built = { version = "0.7", default-features = false, features = ["git2"] }
+
+# Internal packages
+adi-docker = { path = "packages/adi-docker" }
+adi-toolkit = { path = "packages/adi-toolkit" }
+adi-ecosystem = { path = "packages/adi-ecosystem" }
+
+[lints]
+workspace = true
+
+[dependencies]
+clap = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+eyre = { workspace = true }
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+config = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+dirs = { workspace = true }
+chrono = { workspace = true }
+colored = { workspace = true }
+
+# SDK packages
+adi-toolkit = { workspace = true }
+adi-ecosystem = { workspace = true }
+
+[build-dependencies]
+built = { workspace = true }
