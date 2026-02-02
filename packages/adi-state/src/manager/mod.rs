@@ -139,4 +139,55 @@ impl StateManager {
         log::debug!("Found {} chains: {:?}", chains.len(), chains);
         Ok(chains)
     }
+
+    /// Check if ecosystem state exists.
+    ///
+    /// Returns true if the ecosystem metadata file (ZkStack.yaml) exists.
+    pub async fn exists(&self) -> Result<bool> {
+        self.backend.exists(paths::ECOSYSTEM_METADATA).await
+    }
+
+    /// Delete all ecosystem state.
+    ///
+    /// Removes the entire ecosystem directory and all its contents.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the directory doesn't exist or deletion fails.
+    pub async fn delete_all(&self) -> Result<()> {
+        log::info!("Deleting ecosystem state at {}", self.base_path.display());
+        tokio::fs::remove_dir_all(&self.base_path)
+            .await
+            .map_err(|e| crate::error::StateError::DeleteFailed {
+                path: self.base_path.clone(),
+                source: e,
+            })
+    }
+
+    /// List all files in the ecosystem state directory for display.
+    ///
+    /// Returns a list of relative file paths that exist in the state directory.
+    /// Useful for showing the user what will be deleted.
+    pub fn list_state_files(&self) -> Vec<String> {
+        let mut files = Vec::new();
+        if self.base_path.exists() {
+            collect_files_recursive(&self.base_path, &self.base_path, &mut files);
+        }
+        files.sort();
+        files
+    }
+}
+
+/// Recursively collect file paths relative to base.
+fn collect_files_recursive(base: &Path, current: &Path, files: &mut Vec<String>) {
+    if let Ok(entries) = std::fs::read_dir(current) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_files_recursive(base, &path, files);
+            } else if let Ok(relative) = path.strip_prefix(base) {
+                files.push(relative.display().to_string());
+            }
+        }
+    }
 }

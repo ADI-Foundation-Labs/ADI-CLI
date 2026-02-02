@@ -128,11 +128,10 @@ pub async fn export_chain_state(
 
 /// Write a value as YAML to a file.
 async fn write_yaml<T: Serialize>(path: &Path, data: &T) -> Result<()> {
-    let yaml =
-        serde_yaml::to_string(data).map_err(|e| StateError::YamlSerializeFailed {
-            path: path.to_path_buf(),
-            source: e,
-        })?;
+    let yaml = serde_yaml::to_string(data).map_err(|e| StateError::YamlSerializeFailed {
+        path: path.to_path_buf(),
+        source: e,
+    })?;
 
     // Create parent directories if needed
     if let Some(parent) = path.parent() {

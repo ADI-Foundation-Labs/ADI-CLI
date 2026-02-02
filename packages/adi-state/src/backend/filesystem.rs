@@ -170,6 +170,19 @@ impl StateBackend for FilesystemBackend {
             .map_err(|e| StateError::DeleteFailed { path, source: e })
     }
 
+    async fn delete_dir(&self, key: &str) -> Result<()> {
+        let path = self.full_path(key);
+        log::debug!("Deleting state directory: {}", path.display());
+
+        if !path.exists() {
+            return Err(StateError::NotFound(path));
+        }
+
+        fs::remove_dir_all(&path)
+            .await
+            .map_err(|e| StateError::DeleteFailed { path, source: e })
+    }
+
     // ========== ECOSYSTEM METADATA ==========
 
     async fn read_ecosystem_metadata(&self) -> Result<EcosystemMetadata> {

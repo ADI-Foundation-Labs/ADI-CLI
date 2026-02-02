@@ -3,6 +3,9 @@
 use crate::error::{DockerError, Result};
 use bollard::container::LogsOptions;
 use bollard::Docker;
+use crossterm::cursor::{RestorePosition, SavePosition};
+use crossterm::terminal::{Clear, ClearType};
+use crossterm::ExecutableCommand;
 use futures_util::StreamExt;
 use std::collections::VecDeque;
 use std::io::{self, Write};
@@ -126,10 +129,9 @@ impl OutputStreamer {
     {
         let mut window = SlidingWindow::new(DEFAULT_WINDOW_SIZE);
 
-        // Save cursor position using DEC sequence (more compatible than CSI s)
-        print!("\x1b7");
+        // Save cursor position
         stdout
-            .flush()
+            .execute(SavePosition)
             .map_err(|e| DockerError::StreamError(e.to_string()))?;
 
         while let Some(result) = stream.next().await {
@@ -140,8 +142,12 @@ impl OutputStreamer {
                     window.push(&text);
 
                     // Restore cursor position and clear from cursor to end of screen
-                    // \x1b8 = DEC restore cursor, \x1b[J = clear from cursor to end
-                    print!("\x1b8\x1b[J");
+                    stdout
+                        .execute(RestorePosition)
+                        .map_err(|e| DockerError::StreamError(e.to_string()))?;
+                    stdout
+                        .execute(Clear(ClearType::FromCursorDown))
+                        .map_err(|e| DockerError::StreamError(e.to_string()))?;
 
                     // Print lines
                     for line in window.lines() {

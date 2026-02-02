@@ -1,6 +1,7 @@
 use std::io::Write;
 use std::path::PathBuf;
 
+use chrono::Local;
 use clap::{
     builder::styling::{AnsiColor as Ansi, Styles},
     Parser,
@@ -50,20 +51,16 @@ fn init_logger(debug: bool) {
             let level_style = match record.level() {
                 ::log::Level::Error => Style::new().fg_color(Some(AnsiColor::Red.into())).bold(),
                 ::log::Level::Warn => Style::new().fg_color(Some(AnsiColor::Yellow.into())).bold(),
-                ::log::Level::Info => Style::new().fg_color(Some(AnsiColor::Cyan.into())).bold(),
-                ::log::Level::Debug => Style::new().fg_color(Some(AnsiColor::Blue.into())).bold(),
-                ::log::Level::Trace => Style::new()
-                    .fg_color(Some(AnsiColor::Magenta.into()))
-                    .bold(),
+                ::log::Level::Info => Style::new().fg_color(Some(AnsiColor::Cyan.into())),
+                ::log::Level::Debug => Style::new().fg_color(Some(AnsiColor::BrightBlack.into())),
+                ::log::Level::Trace => Style::new().fg_color(Some(AnsiColor::Magenta.into())),
             };
-            let reset = Style::new();
-            let prefix = Style::new().fg_color(Some(AnsiColor::Yellow.into())).bold();
+            let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
 
             writeln!(
                 buf,
-                "{prefix}[adi-cli]:{reset} {style}[{level}]:{reset} {args}",
-                prefix = prefix,
-                reset = reset,
+                "[{timestamp}] [adi-cli]: {style}[{level}]\x1b[0m: {args}",
+                timestamp = timestamp,
                 style = level_style,
                 level = record.level(),
                 args = record.args()

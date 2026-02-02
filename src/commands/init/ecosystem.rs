@@ -3,6 +3,7 @@
 use adi_ecosystem::{build_ecosystem_create_args, verify_ecosystem_created, EcosystemConfig};
 use adi_state::{import_ecosystem_state, StateManager};
 use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
+use dialoguer::Input;
 use tempfile::TempDir;
 
 use super::EcosystemArgs;
@@ -14,13 +15,14 @@ use crate::error::{Result, WrapErr};
 /// This command:
 /// 1. Validates the protocol version
 /// 2. Merges CLI args with config defaults
-/// 3. Creates a temporary directory for zkstack output
-/// 4. Copies genesis.json to temp directory
-/// 5. Runs zkstack ecosystem create pointing to temp dir
-/// 6. Verifies ecosystem was created in temp dir
-/// 7. Imports state from temp dir through StateManager to configured backend
-/// 8. Validates imported state
-/// 9. TempDir is automatically cleaned up on drop
+/// 3. Checks if ecosystem already exists (prompts for confirmation to reinitialize)
+/// 4. Creates a temporary directory for zkstack output
+/// 5. Copies genesis.json to temp directory
+/// 6. Runs zkstack ecosystem create pointing to temp dir
+/// 7. Verifies ecosystem was created in temp dir
+/// 8. Imports state from temp dir through StateManager to configured backend
+/// 9. Validates imported state
+/// 10. TempDir is automatically cleaned up on drop
 pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
     log::debug!("Starting ecosystem initialization");
 
@@ -39,11 +41,56 @@ pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
     log::info!("  Prover mode: {}", config.prover_mode);
     log::debug!("Full ecosystem config: {:?}", config);
 
-    // 3. Build zkstack command arguments (domain logic - no Docker knowledge)
+    // 3. Check if ecosystem state already exists
+    let state_dir = &context.config().state_dir;
+    let ecosystem_path = state_dir.join(&config.name);
+    let state_manager =
+        StateManager::with_backend_type(context.config().state_backend.clone(), &ecosystem_path);
+
+    if state_manager.exists().await? {
+        // Show files that will be deleted
+        let files = state_manager.list_state_files();
+        log::warn!(
+            "Ecosystem '{}' already exists at {}",
+            config.name,
+            ecosystem_path.display()
+        );
+        log::warn!("The following files will be deleted:");
+        for file in &files {
+            log::warn!("  - {}", file);
+        }
+
+        // Require typing ecosystem name to confirm deletion
+        let prompt = format!(
+            "Type '{}' to confirm deletion and reinitialize",
+            config.name
+        );
+        let input: String = Input::new()
+            .with_prompt(prompt)
+            .interact_text()
+            .wrap_err("Failed to read user input")?;
+
+        if input != config.name {
+            return Err(eyre::eyre!(
+                "Confirmation failed: expected '{}', got '{}'",
+                config.name,
+                input
+            ));
+        }
+
+        log::info!("Deleting existing ecosystem state...");
+        state_manager
+            .delete_all()
+            .await
+            .wrap_err("Failed to delete existing ecosystem state")?;
+        log::info!("Existing state deleted");
+    }
+
+    // 4. Build zkstack command arguments (domain logic - no Docker knowledge)
     let zkstack_args = build_ecosystem_create_args(&config);
     log::debug!("zkstack args: {:?}", zkstack_args);
 
-    // 4. Create temp directory for zkstack output
+    // 5. Create temp directory for zkstack output
     let temp_dir = TempDir::new().wrap_err("Failed to create temporary directory")?;
     let temp_path = temp_dir
         .path()
@@ -51,8 +98,7 @@ pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
         .wrap_err("Failed to resolve temp directory to absolute path")?;
     log::debug!("Using temp directory: {}", temp_path.display());
 
-    // 5. Check genesis.json exists in state directory and copy to temp
-    let state_dir = &context.config().state_dir;
+    // 6. Check genesis.json exists in state directory and copy to temp
     std::fs::create_dir_all(state_dir).wrap_err("Failed to create state directory")?;
 
     let genesis_src = state_dir.join(GENESIS_FILENAME);
@@ -70,7 +116,7 @@ pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
         .wrap_err("Failed to copy genesis.json to temp dir")?;
     log::info!("Genesis file copied to temp directory");
 
-    // 6. Create toolkit runner and execute pointing to temp dir
+    // 7. Create toolkit runner and execute pointing to temp dir
     log::info!("Connecting to Docker...");
     let runner = ToolkitRunner::new()
         .await
@@ -91,21 +137,12 @@ pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
         ));
     }
 
-    // 7. Verify ecosystem was created in temp dir
+    // 8. Verify ecosystem was created in temp dir
     log::info!("Verifying ecosystem files...");
     verify_ecosystem_created(&temp_path, &config).wrap_err("Ecosystem verification failed")?;
 
-    // 8. Create state directory and StateManager with configured backend
-    let state_dir = state_dir
-        .canonicalize()
-        .wrap_err("Failed to resolve state directory to absolute path")?;
-    log::info!("State directory: {}", state_dir.display());
-
-    let ecosystem_path = state_dir.join(&config.name);
-    let state_manager =
-        StateManager::with_backend_type(context.config().state_backend.clone(), &ecosystem_path);
-
     // 9. Import state from temp dir through StateManager
+    log::info!("State directory: {}", state_dir.display());
     log::info!("Importing ecosystem state through backend...");
     import_ecosystem_state(&state_manager, &temp_path, &config.name, &config.chain_name)
         .await

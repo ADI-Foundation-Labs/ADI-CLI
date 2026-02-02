@@ -118,6 +118,18 @@ pub trait StateBackend: Send + Sync {
     /// Returns `StateError::DeleteFailed` for I/O errors.
     async fn delete(&self, key: &str) -> Result<()>;
 
+    /// Delete a directory and all its contents recursively.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - Relative path to directory within state directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::NotFound` if the directory does not exist.
+    /// Returns `StateError::DeleteFailed` for I/O errors.
+    async fn delete_dir(&self, key: &str) -> Result<()>;
+
     // ========== ECOSYSTEM METADATA ==========
 
     /// Read ecosystem metadata (ZkStack.yaml).
