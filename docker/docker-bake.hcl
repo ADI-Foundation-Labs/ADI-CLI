@@ -7,13 +7,34 @@ variable "PLATFORMS" {
   default = ["linux/amd64", "linux/arm64"]
 }
 
+variable "CI_COMMIT_REF_SLUG" {
+  default = "main"
+}
+
+variable "CACHE_FROM" {
+  default = [
+    "type=registry,ref=${REGISTRY}/adi-toolkit:cache-${CI_COMMIT_REF_SLUG}",
+    "type=registry,ref=${REGISTRY}/adi-toolkit:cache-main"
+  ]
+}
+
+variable "CACHE_TO_REF" {
+  default = ""
+}
+
+target "common" {
+  dockerfile = "docker/worker/Dockerfile"
+  platforms = PLATFORMS
+  cache-from = CACHE_FROM
+  cache-to = notequal("", CACHE_TO_REF) ? ["type=registry,ref=${CACHE_TO_REF},mode=max"] : []
+}
+
 group "default" {
   targets = ["toolkit-v29", "toolkit-v30"]
 }
 
 target "toolkit-v29" {
-  dockerfile = "docker/worker/Dockerfile"
-  platforms = PLATFORMS
+  inherits = ["common"]
   tags = ["${REGISTRY}/adi-toolkit:v29"]
   args = {
     ZKSYNC_ERA_COMMIT = "7c4c428b1ea3fd75d9884f3e842fb12d847705c1"
@@ -24,8 +45,7 @@ target "toolkit-v29" {
 }
 
 target "toolkit-v30" {
-  dockerfile = "docker/worker/Dockerfile"
-  platforms = PLATFORMS
+  inherits = ["common"]
   tags = ["${REGISTRY}/adi-toolkit:v30"]
   args = {
     ZKSYNC_ERA_COMMIT = "a48fd5f99a3fad0542b514fc9c508094230b35f4"

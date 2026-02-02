@@ -16,7 +16,7 @@ variables:
   DOCKER_TLS_CERTDIR: ""
   DOCKER_BUILDKIT: "1"
   BUILDKIT_PROGRESS: plain
-  RUNNER_SCRIPT_TIMEOUT: 2h
+  RUNNER_SCRIPT_TIMEOUT: 4h
 
 build-docker:
   stage: build
@@ -48,4 +48,4 @@ build-docker:
     - docker buildx inspect --bootstrap
 
   script:
-    - task push:docker TARGETS=$[[inputs.build_target]] 
+    - CACHE_TO_REF=harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:cache-${CI_COMMIT_REF_SLUG} task push:docker TARGETS=$[[inputs.build_target]]

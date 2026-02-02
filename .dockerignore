@@ -1,0 +1,6 @@
+.git
+.task
+target
+node_modules
+dist
+build

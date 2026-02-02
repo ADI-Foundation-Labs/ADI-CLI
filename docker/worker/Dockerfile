@@ -20,7 +20,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies for upgrade scripts
-RUN pip3 install eth-abi "eth-hash[pycryptodome]" --break-system-packages
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+  pip3 install eth-abi "eth-hash[pycryptodome]" --break-system-packages
 
 # Install yarn globally (needed for era-contracts build)
 RUN npm install -g yarn
@@ -68,7 +69,8 @@ RUN git clone https://github.com/matter-labs/era-contracts.git .
 RUN git checkout ${ERA_CONTRACTS_TAG}
 RUN git submodule update --init --recursive
 # Pre-install dependencies for faster runtime
-RUN yarn install
+RUN --mount=type=cache,target=/root/.cache/yarn,sharing=locked \
+  yarn install --cache-folder /root/.cache/yarn
 
 WORKDIR /workspace
 ENTRYPOINT ["/bin/bash"]
