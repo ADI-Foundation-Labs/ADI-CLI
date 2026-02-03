@@ -1,0 +1,23 @@
+[package]
+name = "adi-state"
+version.workspace = true
+edition.workspace = true
+description = "State management SDK with abstract backend support"
+
+[lints]
+workspace = true
+
+[lib]
+name = "adi_state"
+
+[dependencies]
+tokio = { workspace = true, features = ["fs"] }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+log = { workspace = true }
+adi-types = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

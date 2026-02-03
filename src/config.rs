@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{Result, WrapErr};
 use adi_ecosystem::EcosystemConfig;
+use adi_state::BackendType;
 use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_CONFIG_FILE_NAME: &str = ".adi.yml";
@@ -25,6 +26,11 @@ pub struct Config {
     /// These can be overridden by CLI flags.
     #[serde(default)]
     pub ecosystem: EcosystemConfig,
+
+    /// State backend type for persistence.
+    /// Default: `filesystem`
+    #[serde(default)]
+    pub state_backend: BackendType,
 }
 
 impl Config {
