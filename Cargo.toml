@@ -93,8 +93,19 @@ crossterm = { version = "0.28", default-features = false }
 built = { version = "0.7", default-features = false, features = ["git2"] }
 
 # EVM types
-alloy-primitives = { version = "0.8", default-features = false, features = ["serde"] }
+alloy-primitives = { version = "1.5", default-features = false, features = ["serde"] }
 secrecy = { version = "0.10", default-features = false, features = ["serde"] }
+
+# Alloy EVM stack
+alloy-provider = { version = "1.5", default-features = false, features = ["reqwest"] }
+alloy-signer = { version = "1.5", default-features = false }
+alloy-signer-local = { version = "1.5", default-features = false }
+alloy-network = { version = "1.5", default-features = false }
+alloy-rpc-types = { version = "1.5", default-features = false, features = ["eth"] }
+alloy-contract = { version = "1.5", default-features = false }
+alloy-sol-types = { version = "1.5", default-features = false }
+alloy-transport-http = { version = "1.5", default-features = false }
+hex = { version = "0.4", default-features = false, features = ["std"] }
 
 # Testing
 tempfile = { version = "3", default-features = false }
@@ -105,6 +116,7 @@ adi-toolkit = { path = "packages/adi-toolkit" }
 adi-ecosystem = { path = "packages/adi-ecosystem" }
 adi-types = { path = "packages/adi-types" }
 adi-state = { path = "packages/adi-state" }
+adi-funding = { path = "packages/adi-funding" }
 
 [lints]
 workspace = true

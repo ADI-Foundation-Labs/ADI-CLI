@@ -1,0 +1,46 @@
+[package]
+name = "adi-funding"
+version.workspace = true
+edition.workspace = true
+description = "Wallet funding SDK for ecosystem and chain operations"
+
+[lints]
+workspace = true
+
+[lib]
+name = "adi_funding"
+path = "src/lib.rs"
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Error handling
+eyre = { workspace = true }
+thiserror = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+
+# Logging
+log = { workspace = true }
+
+# Domain types
+adi-types = { workspace = true }
+
+# Alloy EVM stack
+alloy-primitives = { workspace = true }
+alloy-provider = { workspace = true }
+alloy-signer = { workspace = true }
+alloy-signer-local = { workspace = true }
+alloy-network = { workspace = true }
+alloy-rpc-types = { workspace = true }
+alloy-contract = { workspace = true }
+alloy-sol-types = { workspace = true }
+alloy-transport-http = { workspace = true }
+secrecy = { workspace = true }
+hex = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
