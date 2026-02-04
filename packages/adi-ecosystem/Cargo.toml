@@ -19,3 +19,4 @@ log = { workspace = true }
 strum = { workspace = true }
 clap = { workspace = true }
 adi-types = { workspace = true }
+alloy-primitives = { workspace = true }

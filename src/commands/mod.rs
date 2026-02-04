@@ -3,21 +3,27 @@ use serde::{Deserialize, Serialize};
 
 use crate::{context::Context, error::Result};
 
+mod deploy;
 mod init;
 mod show;
 
 #[derive(Clone, Subcommand, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Commands {
-    /// Show various information (version, config)
+    /// Display CLI version, current configuration, or system state
     Show {
         #[command(subcommand)]
         command: show::ShowCommand,
     },
-    /// Initialize ecosystem or chain
+    /// Initialize ecosystem or chain configuration (run before deploy)
     Init {
         #[command(subcommand)]
         command: init::InitCommand,
+    },
+    /// Deploy smart contracts to the settlement layer (L1)
+    Deploy {
+        #[command(subcommand)]
+        command: deploy::DeployCommand,
     },
 }
 
@@ -26,6 +32,7 @@ impl Commands {
         match self {
             Commands::Show { command } => command.run(context).await,
             Commands::Init { command } => command.run(context).await,
+            Commands::Deploy { command } => command.run(context).await,
         }
     }
 }

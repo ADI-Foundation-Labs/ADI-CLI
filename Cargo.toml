@@ -55,7 +55,7 @@ double_ended_iterator_last = "allow"
 
 [workspace.dependencies]
 # CLI
-clap = { version = "4", default-features = false, features = ["derive", "std", "color", "help", "usage", "error-context"] }
+clap = { version = "4", default-features = false, features = ["derive", "std", "color", "help", "usage", "error-context", "env"] }
 config = { version = "0.15", default-features = false, features = ["yaml"] }
 
 # Async
@@ -93,11 +93,25 @@ crossterm = { version = "0.28", default-features = false }
 built = { version = "0.7", default-features = false, features = ["git2"] }
 
 # EVM types
-alloy-primitives = { version = "0.8", default-features = false, features = ["serde"] }
+alloy-primitives = { version = "1.5", default-features = false, features = ["serde"] }
 secrecy = { version = "0.10", default-features = false, features = ["serde"] }
+
+# Alloy EVM stack
+alloy-provider = { version = "1.5", default-features = false, features = ["reqwest"] }
+alloy-signer = { version = "1.5", default-features = false }
+alloy-signer-local = { version = "1.5", default-features = false }
+alloy-network = { version = "1.5", default-features = false }
+alloy-rpc-types = { version = "1.5", default-features = false, features = ["eth"] }
+alloy-contract = { version = "1.5", default-features = false }
+alloy-sol-types = { version = "1.5", default-features = false }
+alloy-transport-http = { version = "1.5", default-features = false, features = ["reqwest", "reqwest-rustls-tls"] }
+hex = { version = "0.4", default-features = false, features = ["std"] }
 
 # Testing
 tempfile = { version = "3", default-features = false }
+
+# URL handling
+url = { version = "2", default-features = false, features = ["serde"] }
 
 # Internal packages
 adi-docker = { path = "packages/adi-docker" }
@@ -105,6 +119,7 @@ adi-toolkit = { path = "packages/adi-toolkit" }
 adi-ecosystem = { path = "packages/adi-ecosystem" }
 adi-types = { path = "packages/adi-types" }
 adi-state = { path = "packages/adi-state" }
+adi-funding = { path = "packages/adi-funding" }
 
 [lints]
 workspace = true
@@ -126,6 +141,13 @@ colored = { workspace = true }
 adi-toolkit = { workspace = true }
 adi-ecosystem = { workspace = true }
 adi-state = { workspace = true }
+adi-funding = { workspace = true }
+adi-types = { workspace = true }
+
+# EVM types
+alloy-primitives = { workspace = true }
+secrecy = { workspace = true }
+url = { workspace = true }
 
 # Utils
 tempfile = { workspace = true }
