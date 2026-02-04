@@ -1,13 +1,17 @@
 //! Ecosystem deployment command implementation.
 //!
-//! This command funds ecosystem and chain wallets before deployment.
-//! Actual contract deployment will be added in a future implementation.
+//! This command:
+//! 1. Funds ecosystem and chain wallets
+//! 2. Deploys ecosystem contracts via zkstack
+//! 3. Configures validator roles for operators
 
+use adi_ecosystem::{add_validator_roles, DeployedContracts};
 use adi_funding::{
     get_wallet_balance, DefaultAmounts, FundingConfig, FundingError, FundingExecutor,
     FundingPlanBuilder, LoggingEventHandler,
 };
 use adi_state::StateManager;
+use adi_toolkit::{ProtocolVersion, ToolkitRunner};
 use adi_types::Wallets;
 use alloy_primitives::{Address, U256};
 use clap::Args;
@@ -28,23 +32,40 @@ use crate::error::{Result, WrapErr};
 #[derive(Clone, Args, Debug, Serialize, Deserialize)]
 pub struct EcosystemDeployArgs {
     /// Ecosystem name (falls back to config file if not provided)
-    #[arg(long, help = "Ecosystem name (falls back to config file if not provided)")]
+    #[arg(
+        long,
+        help = "Ecosystem name (falls back to config file if not provided)"
+    )]
     pub ecosystem_name: Option<String>,
 
     /// Chain name for wallet funding (falls back to config file if not provided)
-    #[arg(long, help = "Chain name for wallet funding (falls back to config file if not provided)")]
+    #[arg(
+        long,
+        help = "Chain name for wallet funding (falls back to config file if not provided)"
+    )]
     pub chain_name: Option<String>,
 
     /// Settlement layer JSON-RPC URL (e.g., http://localhost:8545 or https://sepolia.infura.io/v3/KEY)
-    #[arg(long, env = "ADI_RPC_URL", help = "Settlement layer JSON-RPC URL (e.g., http://localhost:8545)")]
+    #[arg(
+        long,
+        env = "ADI_RPC_URL",
+        help = "Settlement layer JSON-RPC URL (e.g., http://localhost:8545)"
+    )]
     pub rpc_url: Option<Url>,
 
     /// Funder wallet private key (hex). Prefer config file or env var for security
-    #[arg(long, env = "ADI_FUNDER_KEY", help = "Funder wallet private key (hex). Prefer config file or env var for security")]
+    #[arg(
+        long,
+        env = "ADI_FUNDER_KEY",
+        help = "Funder wallet private key (hex). Prefer config file or env var for security"
+    )]
     pub funder_key: Option<String>,
 
     /// Gas price multiplier percentage (default: 120 = 20% buffer over estimated gas)
-    #[arg(long, help = "Gas price multiplier percentage (default: 120 = 20% buffer over estimated gas)")]
+    #[arg(
+        long,
+        help = "Gas price multiplier percentage (default: 120 = 20% buffer over estimated gas)"
+    )]
     pub gas_multiplier: Option<u64>,
 
     /// Deployer wallet ETH amount in ether (default: 1.0)
@@ -56,7 +77,10 @@ pub struct EcosystemDeployArgs {
     pub governor_eth: Option<f64>,
 
     /// Governor custom gas token (CGT) amount. Only for chains with custom base token (default: 5.0)
-    #[arg(long, help = "Governor custom gas token (CGT) amount. Only for chains with custom base token (default: 5.0)")]
+    #[arg(
+        long,
+        help = "Governor custom gas token (CGT) amount. Only for chains with custom base token (default: 5.0)"
+    )]
     pub governor_cgt_units: Option<f64>,
 
     /// Operator wallet ETH amount in ether (default: 5.0)
@@ -64,15 +88,24 @@ pub struct EcosystemDeployArgs {
     pub operator_eth: Option<f64>,
 
     /// Prove operator wallet ETH (submits validity proofs to L1, default: 5.0)
-    #[arg(long, help = "Prove operator wallet ETH (submits validity proofs to L1, default: 5.0)")]
+    #[arg(
+        long,
+        help = "Prove operator wallet ETH (submits validity proofs to L1, default: 5.0)"
+    )]
     pub prove_operator_eth: Option<f64>,
 
     /// Execute operator wallet ETH (executes batches on L1, default: 5.0)
-    #[arg(long, help = "Execute operator wallet ETH (executes batches on L1, default: 5.0)")]
+    #[arg(
+        long,
+        help = "Execute operator wallet ETH (executes batches on L1, default: 5.0)"
+    )]
     pub execute_operator_eth: Option<f64>,
 
     /// Skip wallet funding step (use if wallets are already funded)
-    #[arg(long, help = "Skip wallet funding step (use if wallets are already funded)")]
+    #[arg(
+        long,
+        help = "Skip wallet funding step (use if wallets are already funded)"
+    )]
     pub skip_funding: bool,
 
     /// Preview funding plan without executing transactions
@@ -80,8 +113,24 @@ pub struct EcosystemDeployArgs {
     pub dry_run: bool,
 
     /// Skip confirmation prompt (for automation/scripting)
-    #[arg(long, short = 'y', help = "Skip confirmation prompt (for automation/scripting)")]
+    #[arg(
+        long,
+        short = 'y',
+        help = "Skip confirmation prompt (for automation/scripting)"
+    )]
     pub yes: bool,
+
+    /// Custom gas price in wei (for non-local networks). If not set, gas price is estimated
+    #[arg(long, help = "Custom gas price in wei (for non-local networks)")]
+    pub gas_price_wei: Option<u128>,
+
+    /// Skip contract deployment step (only fund wallets)
+    #[arg(long, help = "Skip contract deployment step (only fund wallets)")]
+    pub skip_deployment: bool,
+
+    /// Protocol version for toolkit image (e.g., v30.0.2). Required for deployment
+    #[arg(long, help = "Protocol version for toolkit image (e.g., v30.0.2)")]
+    pub protocol_version: Option<String>,
 }
 
 /// Execute the ecosystem deploy command.
@@ -286,7 +335,124 @@ pub async fn run(args: EcosystemDeployArgs, context: &Context) -> Result<()> {
 
     log::info!("");
     log::info!("Ecosystem wallets funded successfully!");
-    log::info!("Note: Contract deployment not yet implemented");
+
+    // 17. Skip deployment if requested
+    if args.skip_deployment {
+        log::info!("Skipping contract deployment (--skip-deployment)");
+        return Ok(());
+    }
+
+    // 18. Validate protocol version is provided for deployment
+    let protocol_version_str = args.protocol_version.as_ref().ok_or_else(|| {
+        eyre::eyre!(
+            "Protocol version required for deployment. Use --protocol-version (e.g., v30.0.2)"
+        )
+    })?;
+    let protocol_version = ProtocolVersion::parse(protocol_version_str)
+        .map_err(|e| eyre::eyre!("Invalid protocol version '{}': {}", protocol_version_str, e))?;
+    log::info!("Protocol version: {}", protocol_version.to_string().green());
+
+    // 19. Run zkstack ecosystem init with foundry.toml fix
+    log::info!("");
+    log::info!("============================================================");
+    log::info!("Deploying Ecosystem Contracts");
+    log::info!("============================================================");
+
+    let runner = ToolkitRunner::new()
+        .await
+        .wrap_err("Failed to create toolkit runner")?;
+
+    let ecosystem_path = context.config().state_dir.join(&ecosystem_name);
+    log::info!("Running zkstack ecosystem init...");
+
+    let exit_code = runner
+        .run_zkstack_ecosystem_init(
+            &ecosystem_path,
+            rpc_url.as_str(),
+            args.gas_price_wei,
+            &protocol_version.to_semver(),
+        )
+        .await
+        .wrap_err("Failed to run zkstack ecosystem init")?;
+
+    if exit_code != 0 {
+        return Err(eyre::eyre!(
+            "zkstack ecosystem init failed with exit code {}",
+            exit_code
+        ));
+    }
+
+    log::info!("Ecosystem contracts deployed successfully!");
+
+    // 20. Re-read chain contracts from state (now populated after deployment)
+    let chain_contracts = state_manager
+        .chain(&chain_name)
+        .contracts()
+        .await
+        .wrap_err("Failed to load chain contracts after deployment")?;
+
+    let deployed = DeployedContracts::try_from_chain_contracts(&chain_contracts)
+        .wrap_err("Missing required contract addresses after deployment")?;
+
+    log::info!("");
+    log::info!("Deployed contract addresses:");
+    log::info!(
+        "  Diamond proxy: {}",
+        deployed.diamond_proxy.to_string().green()
+    );
+    log::info!(
+        "  Validator timelock: {}",
+        deployed.validator_timelock.to_string().green()
+    );
+    log::info!(
+        "  Chain admin: {}",
+        deployed.chain_admin.to_string().green()
+    );
+
+    // 21. Get chain governor private key for signing validator role txs
+    let governor_key = chain_wallets
+        .governor
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("Chain governor wallet required for validator role setup"))?
+        .private_key
+        .clone();
+
+    // 22. Add validator roles
+    log::info!("");
+    log::info!("============================================================");
+    log::info!("Configuring Validator Roles");
+    log::info!("============================================================");
+
+    let tx_hashes = add_validator_roles(
+        rpc_url.as_str(),
+        &deployed,
+        &chain_wallets,
+        &governor_key,
+        args.gas_price_wei,
+    )
+    .await
+    .wrap_err("Failed to add validator roles")?;
+
+    log::info!("");
+    log::info!(
+        "Validator roles configured: {} transactions confirmed",
+        tx_hashes.len().to_string().green()
+    );
+
+    // 23. Final success message
+    log::info!("");
+    log::info!("============================================================");
+    log::info!("Ecosystem Deployment Complete!");
+    log::info!("============================================================");
+    log::info!("  Ecosystem: {}", ecosystem_name.green());
+    log::info!("  Chain: {}", chain_name.green());
+    log::info!(
+        "  Diamond proxy: {}",
+        deployed.diamond_proxy.to_string().green()
+    );
+    log::info!("============================================================");
+    log::info!("");
+    log::info!("You can now start containers and operate the rollup.");
 
     Ok(())
 }

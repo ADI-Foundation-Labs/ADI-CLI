@@ -48,13 +48,21 @@ name = "adi-ecosystem"
 version = "0.1.0"
 dependencies = [
  "adi-types",
+ "alloy-network",
  "alloy-primitives",
+ "alloy-provider",
+ "alloy-rpc-types",
+ "alloy-signer-local",
+ "alloy-sol-types",
  "clap",
  "eyre",
+ "hex",
  "log",
+ "secrecy",
  "serde",
  "strum 0.26.3",
  "thiserror 2.0.18",
+ "url",
 ]
 
 [[package]]

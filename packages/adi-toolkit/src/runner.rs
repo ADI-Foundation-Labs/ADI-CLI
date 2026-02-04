@@ -247,4 +247,90 @@ impl ToolkitRunner {
         self.run_command(&command, &temp_dir, protocol_version, &[])
             .await
     }
+
+    /// Execute `zkstack ecosystem init` with foundry.toml permission fix.
+    ///
+    /// This method:
+    /// 1. Copies genesis.json to the required container location
+    /// 2. Fixes foundry.toml to allow read-write access to script-out directory
+    /// 3. Runs `zkstack ecosystem init` with deployment flags
+    ///
+    /// # Arguments
+    ///
+    /// * `ecosystem_dir` - Host directory containing ecosystem state (e.g., ~/.adi_cli/state/adi_ecosystem).
+    /// * `l1_rpc_url` - L1 RPC endpoint URL.
+    /// * `gas_price_wei` - Optional gas price in wei (for non-local networks).
+    /// * `protocol_version` - Protocol version for toolkit image selection.
+    ///
+    /// # Returns
+    ///
+    /// Container exit code (0 = success).
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use adi_toolkit::ToolkitRunner;
+    /// # use semver::Version;
+    /// # use std::path::Path;
+    /// # async fn example() -> adi_toolkit::Result<()> {
+    /// # let runner = ToolkitRunner::new().await?;
+    /// let version = Version::new(30, 0, 2);
+    /// let ecosystem_dir = Path::new("/home/user/.adi_cli/state/adi_ecosystem");
+    ///
+    /// let exit_code = runner.run_zkstack_ecosystem_init(
+    ///     ecosystem_dir,
+    ///     "http://localhost:8545",
+    ///     None,
+    ///     &version,
+    /// ).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn run_zkstack_ecosystem_init(
+        &self,
+        ecosystem_dir: &Path,
+        l1_rpc_url: &str,
+        gas_price_wei: Option<u128>,
+        protocol_version: &Version,
+    ) -> Result<i64> {
+        log::debug!(
+            "Running zkstack ecosystem init (ecosystem_dir: {}, rpc: {})",
+            ecosystem_dir.display(),
+            l1_rpc_url
+        );
+
+        // Build foundry.toml fix command (change read to read-write for script-out)
+        let foundry_fix = r#"sed -i.bak 's/{ access = "read", path = "\.\.\/l1-contracts\/script-out\/" }/{ access = "read-write", path = "..\/l1-contracts\/script-out\/" }/' /deps/zksync-era/contracts/l1-contracts/foundry.toml"#;
+
+        // Build zkstack command arguments
+        let mut zkstack_args = String::from(
+            "zkstack ecosystem init \
+             --ignore-prerequisites \
+             --observability false \
+             --deploy-ecosystem true \
+             --deploy-erc20 false \
+             --deploy-paymaster false",
+        );
+
+        // Add gas price if provided
+        if let Some(gas_price) = gas_price_wei {
+            zkstack_args.push_str(&format!(" -a --with-gas-price -a {}", gas_price));
+        }
+
+        // Add L1 RPC URL
+        zkstack_args.push_str(&format!(" --l1-rpc-url {}", l1_rpc_url));
+
+        // Build complete shell command: copy genesis + fix foundry + run zkstack
+        let shell_cmd = format!(
+            "cp /workspace/{} {} && {} && {}",
+            GENESIS_FILENAME, GENESIS_CONTAINER_PATH, foundry_fix, zkstack_args
+        );
+
+        log::info!("Fixing foundry.toml permissions and deploying ecosystem contracts");
+
+        let command = vec!["sh", "-c", &shell_cmd];
+
+        self.run_command(&command, ecosystem_dir, protocol_version, &[])
+            .await
+    }
 }
