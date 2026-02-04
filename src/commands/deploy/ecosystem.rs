@@ -22,62 +22,65 @@ use crate::context::Context;
 use crate::error::{Result, WrapErr};
 
 /// Arguments for `deploy ecosystem` command.
+///
+/// Funds ecosystem wallets and deploys core infrastructure contracts.
+/// Requires initialized ecosystem (run `adi init ecosystem` first).
 #[derive(Clone, Args, Debug, Serialize, Deserialize)]
 pub struct EcosystemDeployArgs {
-    /// Ecosystem name (from config if not provided).
-    #[arg(long)]
+    /// Ecosystem name (falls back to config file if not provided)
+    #[arg(long, help = "Ecosystem name (falls back to config file if not provided)")]
     pub ecosystem_name: Option<String>,
 
-    /// Chain name to fund (from config if not provided).
-    #[arg(long)]
+    /// Chain name for wallet funding (falls back to config file if not provided)
+    #[arg(long, help = "Chain name for wallet funding (falls back to config file if not provided)")]
     pub chain_name: Option<String>,
 
-    /// RPC URL for the settlement layer.
-    #[arg(long, env = "ADI_RPC_URL")]
+    /// Settlement layer JSON-RPC URL (e.g., http://localhost:8545 or https://sepolia.infura.io/v3/KEY)
+    #[arg(long, env = "ADI_RPC_URL", help = "Settlement layer JSON-RPC URL (e.g., http://localhost:8545)")]
     pub rpc_url: Option<Url>,
 
-    /// Funder wallet private key.
-    #[arg(long, env = "ADI_FUNDER_KEY")]
+    /// Funder wallet private key (hex). Prefer config file or env var for security
+    #[arg(long, env = "ADI_FUNDER_KEY", help = "Funder wallet private key (hex). Prefer config file or env var for security")]
     pub funder_key: Option<String>,
 
-    /// Gas price multiplier percentage (default: 120 = 20% buffer).
-    #[arg(long)]
+    /// Gas price multiplier percentage (default: 120 = 20% buffer over estimated gas)
+    #[arg(long, help = "Gas price multiplier percentage (default: 120 = 20% buffer over estimated gas)")]
     pub gas_multiplier: Option<u64>,
 
-    /// Deployer ETH amount (overrides config default of 1.0).
-    #[arg(long)]
+    /// Deployer wallet ETH amount in ether (default: 1.0)
+    #[arg(long, help = "Deployer wallet ETH amount in ether (default: 1.0)")]
     pub deployer_eth: Option<f64>,
 
-    /// Governor ETH amount (overrides config default of 1.0).
-    #[arg(long)]
+    /// Governor wallet ETH amount in ether (default: 1.0)
+    #[arg(long, help = "Governor wallet ETH amount in ether (default: 1.0)")]
     pub governor_eth: Option<f64>,
 
-    /// Governor custom gas token amount (overrides config default of 5.0).
-    #[arg(long)]
+    /// Governor custom gas token (CGT) amount. Only for chains with custom base token (default: 5.0)
+    #[arg(long, help = "Governor custom gas token (CGT) amount. Only for chains with custom base token (default: 5.0)")]
     pub governor_cgt_units: Option<f64>,
 
-    /// Operator ETH amount (overrides config default of 5.0).
-    #[arg(long)]
+    /// Operator wallet ETH amount in ether (default: 5.0)
+    #[arg(long, help = "Operator wallet ETH amount in ether (default: 5.0)")]
     pub operator_eth: Option<f64>,
 
-    /// Prove operator ETH amount (overrides config default of 5.0).
-    #[arg(long)]
+    /// Prove operator wallet ETH (submits validity proofs to L1, default: 5.0)
+    #[arg(long, help = "Prove operator wallet ETH (submits validity proofs to L1, default: 5.0)")]
     pub prove_operator_eth: Option<f64>,
 
-    /// Execute operator ETH amount (overrides config default of 5.0).
-    #[arg(long)]
+    /// Execute operator wallet ETH (executes batches on L1, default: 5.0)
+    #[arg(long, help = "Execute operator wallet ETH (executes batches on L1, default: 5.0)")]
     pub execute_operator_eth: Option<f64>,
 
-    /// Skip wallet funding step.
-    #[arg(long)]
+    /// Skip wallet funding step (use if wallets are already funded)
+    #[arg(long, help = "Skip wallet funding step (use if wallets are already funded)")]
     pub skip_funding: bool,
 
-    /// Dry-run: show funding plan without executing.
-    #[arg(long)]
+    /// Preview funding plan without executing transactions
+    #[arg(long, help = "Preview funding plan without executing transactions")]
     pub dry_run: bool,
 
-    /// Skip confirmation prompt.
-    #[arg(long, short = 'y')]
+    /// Skip confirmation prompt (for automation/scripting)
+    #[arg(long, short = 'y', help = "Skip confirmation prompt (for automation/scripting)")]
     pub yes: bool,
 }
 

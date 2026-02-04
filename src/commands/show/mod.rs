@@ -9,9 +9,9 @@ use crate::{context::Context, error::Result};
 #[derive(Clone, Subcommand, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ShowCommand {
-    /// Show version information
+    /// Display CLI version and build information
     Version,
-    /// Show current configuration
+    /// Display current configuration (merged from file, env vars, and defaults)
     Config,
 }
 

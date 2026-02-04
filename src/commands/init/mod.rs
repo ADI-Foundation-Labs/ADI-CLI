@@ -14,7 +14,10 @@ use crate::error::Result;
 #[derive(Clone, Subcommand, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum InitCommand {
-    /// Initialize a new ecosystem configuration
+    /// Create ecosystem configuration with an initial chain.
+    ///
+    /// Generates ZkStack.yaml, wallet keys, and chain config in the state directory.
+    /// Requires genesis.json in state dir (download from protocol version URL).
     Ecosystem(EcosystemArgs),
 }
 
@@ -24,44 +27,45 @@ pub enum InitCommand {
 /// to values from the config file (.adi.yml) if not provided.
 #[derive(Clone, Args, Debug, Serialize, Deserialize)]
 pub struct EcosystemArgs {
-    /// Protocol version for the toolkit image (e.g., v29.0.11)
+    /// Protocol version for the toolkit Docker image (e.g., v29.0.11).
+    /// Determines which era-contracts and zkstack version to use.
     #[arg(long, short = 'p')]
     pub protocol_version: String,
 
-    /// Ecosystem name
-    #[arg(long)]
+    /// Ecosystem name (used for directory name and identification)
+    #[arg(long, help = "Ecosystem name (used for directory name and identification)")]
     pub ecosystem_name: Option<String>,
 
-    /// L1 network (localhost, sepolia, mainnet)
-    #[arg(long, value_enum)]
+    /// Settlement layer network: localhost (Anvil), sepolia (testnet), or mainnet
+    #[arg(long, value_enum, help = "Settlement layer network: localhost (Anvil), sepolia (testnet), or mainnet")]
     pub l1_network: Option<L1Network>,
 
-    /// Initial chain name
-    #[arg(long)]
+    /// Name for the initial chain within this ecosystem
+    #[arg(long, help = "Name for the initial chain within this ecosystem")]
     pub chain_name: Option<String>,
 
-    /// Initial chain ID
-    #[arg(long)]
+    /// Unique numeric chain ID (must not conflict with existing chains)
+    #[arg(long, help = "Unique numeric chain ID (must not conflict with existing chains)")]
     pub chain_id: Option<u64>,
 
-    /// Prover mode (no-proofs, gpu)
-    #[arg(long, value_enum)]
+    /// Prover mode: no-proofs (testing) or gpu (production with ZK proofs)
+    #[arg(long, value_enum, help = "Prover mode: no-proofs (testing) or gpu (production with ZK proofs)")]
     pub prover_mode: Option<ProverMode>,
 
-    /// Base token address (from config, or ETH if not specified)
-    #[arg(long)]
+    /// Custom base token contract address. Use ETH address (0x0...01) for native ETH
+    #[arg(long, help = "Custom base token contract address. Use ETH address (0x0...01) for native ETH")]
     pub base_token_address: Option<Address>,
 
-    /// Base token price nominator
-    #[arg(long)]
+    /// Price ratio numerator (with denominator, sets ETH/token rate, e.g., 1:100 = 1 ETH per 100 tokens)
+    #[arg(long, help = "Price ratio numerator (with denominator, sets ETH/token rate, e.g., 1:100 = 1 ETH per 100 tokens)")]
     pub base_token_price_nominator: Option<u64>,
 
-    /// Base token price denominator
-    #[arg(long)]
+    /// Price ratio denominator (with nominator, sets ETH/token rate, e.g., 1:100 = 1 ETH per 100 tokens)
+    #[arg(long, help = "Price ratio denominator (with nominator, sets ETH/token rate, e.g., 1:100 = 1 ETH per 100 tokens)")]
     pub base_token_price_denominator: Option<u64>,
 
-    /// Enable EVM emulator
-    #[arg(long)]
+    /// Enable EVM bytecode emulator for running unmodified Ethereum contracts
+    #[arg(long, help = "Enable EVM bytecode emulator for running unmodified Ethereum contracts")]
     pub evm_emulator: Option<bool>,
 }
 

@@ -10,17 +10,17 @@ mod show;
 #[derive(Clone, Subcommand, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Commands {
-    /// Show various information (version, config)
+    /// Display CLI version, current configuration, or system state
     Show {
         #[command(subcommand)]
         command: show::ShowCommand,
     },
-    /// Initialize ecosystem or chain
+    /// Initialize ecosystem or chain configuration (run before deploy)
     Init {
         #[command(subcommand)]
         command: init::InitCommand,
     },
-    /// Deploy ecosystem or chain contracts
+    /// Deploy smart contracts to the settlement layer (L1)
     Deploy {
         #[command(subcommand)]
         command: deploy::DeployCommand,
