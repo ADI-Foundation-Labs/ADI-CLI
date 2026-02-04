@@ -3,6 +3,7 @@
 use crate::config::WalletRole;
 use crate::transfer::Transfer;
 use alloy_primitives::{Address, B256, U256};
+use colored::Colorize;
 
 /// Events emitted during funding operations.
 #[derive(Clone, Debug)]
@@ -153,7 +154,11 @@ impl FundingEventHandler for LoggingEventHandler {
                 log::info!("[{}/{}] {}", index + 1, total, transfer.description());
             }
             FundingEvent::TransferSubmitted { index, tx_hash } => {
-                log::debug!("Transfer {} submitted: {}", index + 1, tx_hash);
+                log::debug!(
+                    "Transfer {} submitted: {}",
+                    index + 1,
+                    tx_hash.to_string().green()
+                );
             }
             FundingEvent::TransferConfirmed {
                 index,
@@ -163,7 +168,7 @@ impl FundingEventHandler for LoggingEventHandler {
                 log::info!(
                     "Transfer {} confirmed: {} (gas: {})",
                     index + 1,
-                    tx_hash,
+                    tx_hash.to_string().green(),
                     gas_used
                 );
             }

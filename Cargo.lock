@@ -72,6 +72,7 @@ dependencies = [
  "alloy-sol-types",
  "alloy-transport-http",
  "async-trait",
+ "colored",
  "eyre",
  "hex",
  "log",

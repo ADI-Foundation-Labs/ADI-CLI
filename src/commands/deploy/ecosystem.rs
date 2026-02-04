@@ -11,6 +11,7 @@ use adi_state::StateManager;
 use adi_types::Wallets;
 use alloy_primitives::{Address, U256};
 use clap::Args;
+use colored::Colorize;
 use dialoguer::Confirm;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
@@ -212,31 +213,24 @@ pub async fn run(args: EcosystemDeployArgs, context: &Context) -> Result<()> {
     log::info!("============================================================");
     log::info!("  Transfers needed: {}", plan.transfer_count());
     log::info!(
-        "  Total ETH to transfer: {} ETH",
-        format_eth(plan.total_eth_transfers())
+        "  Total ETH to transfer: {}",
+        green_eth(plan.total_eth_transfers())
     );
     if !plan.total_token_required.is_zero() {
         let symbol = funding_config.token_symbol.as_deref().unwrap_or("tokens");
         log::info!(
-            "  Total {} to transfer: {} {}",
-            symbol,
-            format_token(plan.total_token_required),
-            symbol
+            "  Total {} to transfer: {}",
+            symbol.green(),
+            green_token(plan.total_token_required, symbol)
         );
     }
+    log::info!("  Estimated gas cost: {}", green_eth(plan.total_gas_cost));
     log::info!(
-        "  Estimated gas cost: {} ETH",
-        format_eth(plan.total_gas_cost)
-    );
-    log::info!(
-        "  Total ETH required: {} ETH",
-        format_eth(plan.total_eth_required)
+        "  Total ETH required: {}",
+        green_eth(plan.total_eth_required)
     );
     log::info!("");
-    log::info!(
-        "  Funder balance: {} ETH",
-        format_eth(plan.funder_eth_balance)
-    );
+    log::info!("  Funder balance: {}", green_eth(plan.funder_eth_balance));
 
     if !plan.is_valid() {
         let needed = plan.total_eth_required;
@@ -464,8 +458,8 @@ async fn build_funding_config(
         config = config.with_token(address, symbol.clone());
         log::info!(
             "Custom gas token: {} ({})",
-            address,
-            symbol.as_deref().unwrap_or("unknown")
+            green_address(address),
+            symbol.as_deref().unwrap_or("unknown").green()
         );
     }
 
@@ -673,18 +667,19 @@ async fn display_wallet_balance(
         .await
         .wrap_err_with(|| format!("Failed to get balance for {}", role))?;
 
-    let eth_str = format_eth(balance.eth_balance);
+    let eth_str = format_eth(balance.eth_balance).green();
     let symbol = token_symbol.unwrap_or("tokens");
     let token_str = balance
         .token_balance
-        .map(|t| format!(" + {} {}", format_token(t), symbol))
+        .map(|t| format!(" + {} {}", format_token(t).green(), symbol.green()))
         .unwrap_or_default();
 
     log::info!(
-        "  {:24} ({}): {} ETH{}",
+        "  {:24} ({}): {} {}{}",
         role,
-        w.address,
+        green_address(w.address),
         eth_str,
+        "ETH".green(),
         token_str
     );
 
@@ -697,16 +692,14 @@ fn display_plan_details(plan: &adi_funding::FundingPlan) {
     log::info!("Planned Transfers:");
     for (i, transfer) in plan.transfers.iter().enumerate() {
         let amount_str = match &transfer.transfer_type {
-            adi_funding::TransferType::Eth { amount } => format!("{} ETH", format_eth(*amount)),
-            adi_funding::TransferType::Token { amount, symbol, .. } => {
-                format!("{} {}", format_token(*amount), symbol)
-            }
+            adi_funding::TransferType::Eth { amount } => green_eth(*amount),
+            adi_funding::TransferType::Token { amount, symbol, .. } => green_token(*amount, symbol),
         };
         log::info!(
             "  [{}] {:24} -> {}  ({})",
             i + 1,
             transfer.role,
-            transfer.to,
+            green_address(transfer.to),
             amount_str
         );
     }
@@ -737,6 +730,21 @@ fn format_eth(wei: U256) -> String {
 /// Format U256 as token amount (assuming 18 decimals).
 fn format_token(amount: U256) -> String {
     format_eth(amount) // Same format for now
+}
+
+/// Format ETH amount with green color.
+fn green_eth(wei: U256) -> String {
+    format!("{} {}", format_eth(wei).green(), "ETH".green())
+}
+
+/// Format token amount with green color.
+fn green_token(amount: U256, symbol: &str) -> String {
+    format!("{} {}", format_token(amount).green(), symbol.green())
+}
+
+/// Format address with green color.
+fn green_address(address: Address) -> String {
+    address.to_string().green().to_string()
 }
 
 /// Convert ETH amount (f64) to wei (U256).
