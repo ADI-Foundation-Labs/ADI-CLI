@@ -207,13 +207,14 @@ impl FundingExecutor {
         };
 
         // Send transaction
-        let pending = provider
-            .send_transaction(tx)
-            .await
-            .map_err(|e| FundingError::TransactionFailed {
-                to: transfer.to,
-                reason: e.to_string(),
-            })?;
+        let pending =
+            provider
+                .send_transaction(tx)
+                .await
+                .map_err(|e| FundingError::TransactionFailed {
+                    to: transfer.to,
+                    reason: e.to_string(),
+                })?;
 
         let tx_hash = *pending.tx_hash();
 

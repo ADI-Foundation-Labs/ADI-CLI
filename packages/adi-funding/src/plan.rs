@@ -197,8 +197,7 @@ impl<'a> FundingPlanBuilder<'a> {
         }
 
         let gas_price = self.provider.get_gas_price().await?;
-        let adjusted_gas_price =
-            (gas_price * u128::from(self.config.gas_price_multiplier)) / 100;
+        let adjusted_gas_price = (gas_price * u128::from(self.config.gas_price_multiplier)) / 100;
 
         // Get funder balances
         let funder_eth = self.provider.get_eth_balance(self.funder).await?;
@@ -241,14 +240,19 @@ impl<'a> FundingPlanBuilder<'a> {
         // Calculate required transfers for each target
         for target in &self.targets {
             let current_balance =
-                get_wallet_balance(self.provider, target.address, self.config.token_address).await?;
+                get_wallet_balance(self.provider, target.address, self.config.token_address)
+                    .await?;
 
             // ETH funding needed?
             if current_balance.eth_balance < target.eth_amount {
                 let eth_needed = target.eth_amount - current_balance.eth_balance;
-                let gas_estimate =
-                    estimate_eth_transfer_gas(self.provider, self.funder, target.address, eth_needed)
-                        .await?;
+                let gas_estimate = estimate_eth_transfer_gas(
+                    self.provider,
+                    self.funder,
+                    target.address,
+                    eth_needed,
+                )
+                .await?;
 
                 transfers.push(Transfer::eth(
                     target.role,

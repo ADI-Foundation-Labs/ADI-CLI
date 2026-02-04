@@ -93,7 +93,10 @@ mod signer;
 mod transfer;
 
 // Public re-exports
-pub use balance::{get_eth_balance, get_token_balance, get_token_decimals, get_token_symbol, get_wallet_balance, WalletBalance};
+pub use balance::{
+    get_eth_balance, get_token_balance, get_token_decimals, get_token_symbol, get_wallet_balance,
+    WalletBalance,
+};
 pub use config::{DefaultAmounts, FundingConfig, FundingTarget, WalletRole};
 pub use error::{FundingError, Result};
 pub use events::{FundingEvent, FundingEventHandler, LoggingEventHandler, NoOpEventHandler};

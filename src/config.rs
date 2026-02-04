@@ -3,12 +3,76 @@ use std::path::{Path, PathBuf};
 use crate::error::{Result, WrapErr};
 use adi_ecosystem::EcosystemConfig;
 use adi_state::BackendType;
+use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 pub const DEFAULT_CONFIG_FILE_NAME: &str = ".adi.yml";
 pub const DEFAULT_STATE_DIR: &str = ".adi_cli/state";
 /// Environment variable for specifying config file path.
 pub const CONFIG_ENV_VAR: &str = "ADI_CONFIG";
+
+/// Default funding configuration values.
+///
+/// These can be overridden by CLI flags or environment variables.
+/// Note: Token address is read from ecosystem metadata, not configured here.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct FundingDefaults {
+    /// RPC URL for settlement layer.
+    /// Can be overridden with --rpc-url or ADI_RPC_URL env var.
+    #[serde(default)]
+    pub rpc_url: Option<Url>,
+
+    /// Funder wallet private key.
+    /// Prefer ADI_FUNDER_KEY env var for security.
+    /// Note: This field is never serialized (skipped) for security.
+    #[serde(default, skip_serializing)]
+    pub funder_key: Option<SecretString>,
+
+    /// Gas price multiplier percentage (default: 120 = 20% buffer).
+    #[serde(default = "default_gas_multiplier")]
+    pub gas_multiplier: u64,
+
+    /// Deployer ETH amount (default: 1.0 ETH).
+    #[serde(default)]
+    pub deployer_eth: Option<f64>,
+
+    /// Governor ETH amount (default: 1.0 ETH).
+    #[serde(default)]
+    pub governor_eth: Option<f64>,
+
+    /// Governor custom gas token units (default: 5 units).
+    #[serde(default)]
+    pub governor_cgt_units: Option<u64>,
+
+    /// Operator ETH amount (default: 5.0 ETH).
+    #[serde(default)]
+    pub operator_eth: Option<f64>,
+
+    /// Blob operator ETH amount (default: 5.0 ETH).
+    #[serde(default)]
+    pub blob_operator_eth: Option<f64>,
+
+    /// Prove operator ETH amount (default: 5.0 ETH).
+    #[serde(default)]
+    pub prove_operator_eth: Option<f64>,
+
+    /// Execute operator ETH amount (default: 5.0 ETH).
+    #[serde(default)]
+    pub execute_operator_eth: Option<f64>,
+
+    /// Fee account ETH amount (default: 0 ETH).
+    #[serde(default)]
+    pub fee_account_eth: Option<f64>,
+
+    /// Token multiplier setter ETH amount (default: 0.1 ETH).
+    #[serde(default)]
+    pub token_multiplier_setter_eth: Option<f64>,
+}
+
+fn default_gas_multiplier() -> u64 {
+    120
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
@@ -31,6 +95,11 @@ pub struct Config {
     /// Default: `filesystem`
     #[serde(default)]
     pub state_backend: BackendType,
+
+    /// Default funding configuration values.
+    /// These can be overridden by CLI flags.
+    #[serde(default)]
+    pub funding: FundingDefaults,
 }
 
 impl Config {

@@ -55,7 +55,7 @@ pub fn build_ecosystem_create_args(config: &EcosystemConfig) -> Vec<String> {
         "--l1-batch-commit-data-generator-mode".to_string(),
         "rollup".to_string(),
         "--base-token-address".to_string(),
-        config.base_token_address.clone(),
+        config.base_token_address.to_string(),
         "--base-token-price-nominator".to_string(),
         config.base_token_price_nominator.to_string(),
         "--base-token-price-denominator".to_string(),
@@ -71,6 +71,7 @@ pub fn build_ecosystem_create_args(config: &EcosystemConfig) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::types::{L1Network, ProverMode};
+    use adi_types::ETH_TOKEN_ADDRESS;
 
     #[test]
     fn test_build_ecosystem_create_args() {
@@ -80,7 +81,7 @@ mod tests {
             chain_name: "test_chain".to_string(),
             chain_id: 123,
             prover_mode: ProverMode::NoProofs,
-            base_token_address: "0x123".to_string(),
+            base_token_address: ETH_TOKEN_ADDRESS,
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
             evm_emulator: false,

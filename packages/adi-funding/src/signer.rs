@@ -25,11 +25,12 @@ pub fn create_signer(private_key: &SecretString) -> Result<PrivateKeySigner> {
     let key_hex = key_str.strip_prefix("0x").unwrap_or(key_str);
 
     // Parse hex to bytes
-    let key_bytes =
-        hex::decode(key_hex).map_err(|e| FundingError::InvalidPrivateKey(format!("Invalid hex: {e}")))?;
+    let key_bytes = hex::decode(key_hex)
+        .map_err(|e| FundingError::InvalidPrivateKey(format!("Invalid hex: {e}")))?;
 
     // Create signer
-    PrivateKeySigner::from_slice(&key_bytes).map_err(|e| FundingError::InvalidPrivateKey(e.to_string()))
+    PrivateKeySigner::from_slice(&key_bytes)
+        .map_err(|e| FundingError::InvalidPrivateKey(e.to_string()))
 }
 
 /// Get the address for a signer.

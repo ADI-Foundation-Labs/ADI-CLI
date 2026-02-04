@@ -66,7 +66,11 @@ pub async fn get_token_balance(
         .balanceOf(wallet_address)
         .call()
         .await
-        .map_err(|e| FundingError::RpcError(format!("ERC20 balanceOf failed: {e}")))?;
+        .map_err(|e| FundingError::RpcError {
+            url: provider.url().to_string(),
+            operation: "ERC20.balanceOf",
+            reason: e.to_string(),
+        })?;
 
     Ok(balance)
 }
@@ -88,7 +92,11 @@ pub async fn get_token_decimals(provider: &FundingProvider, token_address: Addre
         .decimals()
         .call()
         .await
-        .map_err(|e| FundingError::RpcError(format!("ERC20 decimals failed: {e}")))?;
+        .map_err(|e| FundingError::RpcError {
+            url: provider.url().to_string(),
+            operation: "ERC20.decimals",
+            reason: e.to_string(),
+        })?;
 
     Ok(decimals)
 }
@@ -103,14 +111,21 @@ pub async fn get_token_decimals(provider: &FundingProvider, token_address: Addre
 /// # Errors
 ///
 /// Returns error if the RPC request fails.
-pub async fn get_token_symbol(provider: &FundingProvider, token_address: Address) -> Result<String> {
+pub async fn get_token_symbol(
+    provider: &FundingProvider,
+    token_address: Address,
+) -> Result<String> {
     let contract = IERC20::new(token_address, provider.inner());
 
     let symbol = contract
         .symbol()
         .call()
         .await
-        .map_err(|e| FundingError::RpcError(format!("ERC20 symbol failed: {e}")))?;
+        .map_err(|e| FundingError::RpcError {
+            url: provider.url().to_string(),
+            operation: "ERC20.symbol",
+            reason: e.to_string(),
+        })?;
 
     Ok(symbol)
 }

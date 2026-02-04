@@ -27,7 +27,9 @@ pub enum FundingError {
     InvalidAddress(String),
 
     /// Funder has insufficient ETH balance.
-    #[error("Insufficient ETH balance: have {have}, need {need} (includes {gas_estimate} for gas)")]
+    #[error(
+        "Insufficient ETH balance: have {have}, need {need} (includes {gas_estimate} for gas)"
+    )]
     InsufficientEthBalance {
         /// Current balance.
         have: U256,
@@ -56,8 +58,15 @@ pub enum FundingError {
     },
 
     /// RPC request failed.
-    #[error("RPC request failed: {0}")]
-    RpcError(String),
+    #[error("RPC request failed for '{url}' ({operation}): {reason}")]
+    RpcError {
+        /// RPC URL that was called.
+        url: String,
+        /// Operation being performed (e.g., "get_balance", "get_gas_price").
+        operation: &'static str,
+        /// Failure reason.
+        reason: String,
+    },
 
     /// Transaction failed to execute.
     #[error("Transaction failed for {to}: {reason}")]

@@ -207,8 +207,7 @@ fn build_ecosystem_config(args: &EcosystemArgs, defaults: &EcosystemConfig) -> E
             .unwrap_or_else(|| defaults.prover_mode.clone()),
         base_token_address: args
             .base_token_address
-            .clone()
-            .unwrap_or_else(|| defaults.base_token_address.clone()),
+            .unwrap_or(defaults.base_token_address),
         base_token_price_nominator: args
             .base_token_price_nominator
             .unwrap_or(defaults.base_token_price_nominator),

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{context::Context, error::Result};
 
+mod deploy;
 mod init;
 mod show;
 
@@ -19,6 +20,11 @@ pub enum Commands {
         #[command(subcommand)]
         command: init::InitCommand,
     },
+    /// Deploy ecosystem or chain contracts
+    Deploy {
+        #[command(subcommand)]
+        command: deploy::DeployCommand,
+    },
 }
 
 impl Commands {
@@ -26,6 +32,7 @@ impl Commands {
         match self {
             Commands::Show { command } => command.run(context).await,
             Commands::Init { command } => command.run(context).await,
+            Commands::Deploy { command } => command.run(context).await,
         }
     }
 }

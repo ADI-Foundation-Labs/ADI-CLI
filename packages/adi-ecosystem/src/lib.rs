@@ -50,7 +50,7 @@ mod verify;
 
 // Public re-exports
 pub use commands::{build_ecosystem_create_args, ERA_CONTRACTS_PATH};
-pub use config::{EcosystemConfig, EcosystemConfigBuilder, ETH_ADDRESS};
+pub use config::{EcosystemConfig, EcosystemConfigBuilder};
 pub use error::{EcosystemError, Result};
 pub use types::{L1Network, ProverMode};
 pub use verify::verify_ecosystem_created;

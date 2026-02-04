@@ -1,10 +1,10 @@
 //! Ecosystem configuration types.
 
-use crate::types::{L1Network, ProverMode};
+use adi_types::ETH_TOKEN_ADDRESS;
+use alloy_primitives::Address;
 use serde::{Deserialize, Serialize};
 
-/// Default ETH address (native token).
-pub const ETH_ADDRESS: &str = "0x0000000000000000000000000000000000000001";
+use crate::types::{L1Network, ProverMode};
 
 /// Configuration for ecosystem creation.
 ///
@@ -28,7 +28,7 @@ pub struct EcosystemConfig {
     pub prover_mode: ProverMode,
 
     /// Base token address.
-    pub base_token_address: String,
+    pub base_token_address: Address,
 
     /// Base token price nominator.
     pub base_token_price_nominator: u64,
@@ -48,7 +48,7 @@ impl Default for EcosystemConfig {
             chain_name: "adi".to_string(),
             chain_id: 270,
             prover_mode: ProverMode::default(),
-            base_token_address: ETH_ADDRESS.to_string(),
+            base_token_address: ETH_TOKEN_ADDRESS,
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
             evm_emulator: false,
@@ -106,8 +106,8 @@ impl EcosystemConfigBuilder {
 
     /// Set base token address.
     #[must_use]
-    pub fn base_token_address(mut self, address: impl Into<String>) -> Self {
-        self.config.base_token_address = address.into();
+    pub fn base_token_address(mut self, address: Address) -> Self {
+        self.config.base_token_address = address;
         self
     }
 
@@ -159,7 +159,7 @@ mod tests {
         assert_eq!(config.chain_name, "adi");
         assert_eq!(config.chain_id, 270);
         assert_eq!(config.prover_mode, ProverMode::NoProofs);
-        assert_eq!(config.base_token_address, ETH_ADDRESS);
+        assert_eq!(config.base_token_address, ETH_TOKEN_ADDRESS);
         assert!(!config.evm_emulator);
     }
 

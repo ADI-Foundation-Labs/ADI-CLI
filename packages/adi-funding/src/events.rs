@@ -117,7 +117,13 @@ impl FundingEventHandler for LoggingEventHandler {
                 token_balance,
             } => {
                 if let Some(tok) = token_balance {
-                    log::debug!("{}: {} has {} wei ETH, {} token", role, address, eth_balance, tok);
+                    log::debug!(
+                        "{}: {} has {} wei ETH, {} token",
+                        role,
+                        address,
+                        eth_balance,
+                        tok
+                    );
                 } else {
                     log::debug!("{}: {} has {} wei ETH", role, address, eth_balance);
                 }

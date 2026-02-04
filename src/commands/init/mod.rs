@@ -2,7 +2,8 @@
 
 mod ecosystem;
 
-use adi_ecosystem::{L1Network, ProverMode, ETH_ADDRESS};
+use adi_ecosystem::{L1Network, ProverMode};
+use alloy_primitives::Address;
 use clap::{Args, Subcommand};
 use serde::{Deserialize, Serialize};
 
@@ -47,9 +48,9 @@ pub struct EcosystemArgs {
     #[arg(long, value_enum)]
     pub prover_mode: Option<ProverMode>,
 
-    /// Base token address (default: ETH)
-    #[arg(long, default_value = ETH_ADDRESS)]
-    pub base_token_address: Option<String>,
+    /// Base token address (from config, or ETH if not specified)
+    #[arg(long)]
+    pub base_token_address: Option<Address>,
 
     /// Base token price nominator
     #[arg(long)]

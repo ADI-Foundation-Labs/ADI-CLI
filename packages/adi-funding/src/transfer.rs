@@ -53,7 +53,13 @@ pub enum TransferType {
 
 impl Transfer {
     /// Create an ETH transfer.
-    pub fn eth(role: WalletRole, from: Address, to: Address, amount: U256, gas_estimate: u64) -> Self {
+    pub fn eth(
+        role: WalletRole,
+        from: Address,
+        to: Address,
+        amount: U256,
+        gas_estimate: u64,
+    ) -> Self {
         Self {
             role,
             from,
@@ -106,7 +112,13 @@ impl Transfer {
                 format!("{} ETH to {} ({})", format_eth(*amount), self.to, self.role)
             }
             TransferType::Token { amount, symbol, .. } => {
-                format!("{} {} to {} ({})", format_token(*amount), symbol, self.to, self.role)
+                format!(
+                    "{} {} to {} ({})",
+                    format_token(*amount),
+                    symbol,
+                    self.to,
+                    self.role
+                )
             }
         }
     }
@@ -130,7 +142,10 @@ pub async fn estimate_eth_transfer_gas(
     to: Address,
     amount: U256,
 ) -> Result<u64> {
-    let tx = TransactionRequest::default().from(from).to(to).value(amount);
+    let tx = TransactionRequest::default()
+        .from(from)
+        .to(to)
+        .value(amount);
 
     provider.estimate_gas(&tx).await
 }
