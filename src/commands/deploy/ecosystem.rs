@@ -52,17 +52,13 @@ pub struct EcosystemDeployArgs {
     #[arg(long)]
     pub governor_eth: Option<f64>,
 
-    /// Governor custom gas token units (overrides config default of 5).
+    /// Governor custom gas token amount (overrides config default of 5.0).
     #[arg(long)]
-    pub governor_cgt_units: Option<u64>,
+    pub governor_cgt_units: Option<f64>,
 
     /// Operator ETH amount (overrides config default of 5.0).
     #[arg(long)]
     pub operator_eth: Option<f64>,
-
-    /// Blob operator ETH amount (overrides config default of 5.0).
-    #[arg(long)]
-    pub blob_operator_eth: Option<f64>,
 
     /// Prove operator ETH amount (overrides config default of 5.0).
     #[arg(long)]
@@ -71,14 +67,6 @@ pub struct EcosystemDeployArgs {
     /// Execute operator ETH amount (overrides config default of 5.0).
     #[arg(long)]
     pub execute_operator_eth: Option<f64>,
-
-    /// Fee account ETH amount (overrides config default of 0).
-    #[arg(long)]
-    pub fee_account_eth: Option<f64>,
-
-    /// Token multiplier setter ETH amount (overrides config default of 0.1).
-    #[arg(long)]
-    pub token_multiplier_setter_eth: Option<f64>,
 
     /// Skip wallet funding step.
     #[arg(long)]
@@ -109,11 +97,11 @@ pub async fn run(args: EcosystemDeployArgs, context: &Context) -> Result<()> {
 
     // 1. Resolve ecosystem name
     let ecosystem_name = resolve_ecosystem_name(&args, context)?;
-    log::info!("Deploying ecosystem: {}", ecosystem_name);
+    log::info!("Deploying ecosystem: {}", ecosystem_name.green());
 
     // 2. Resolve chain name
     let chain_name = resolve_chain_name(&args, context)?;
-    log::info!("Chain: {}", chain_name);
+    log::info!("Chain: {}", chain_name.green());
 
     // 3. Create state manager and validate ecosystem exists
     let state_manager = create_state_manager(&ecosystem_name, context)?;
@@ -132,7 +120,7 @@ pub async fn run(args: EcosystemDeployArgs, context: &Context) -> Result<()> {
 
     // 6. Resolve RPC URL (args > config)
     let rpc_url = resolve_rpc_url(&args, context)?;
-    log::info!("Settlement layer RPC: {}", rpc_url);
+    log::info!("Settlement layer RPC: {}", rpc_url.to_string().green());
 
     // 7. Get funder key (args > config)
     let funder_key = resolve_funder_key(&args, context)?;
@@ -163,7 +151,7 @@ pub async fn run(args: EcosystemDeployArgs, context: &Context) -> Result<()> {
         .with_event_handler(Arc::new(LoggingEventHandler));
 
     let funder_address = executor.funder_address();
-    log::info!("Funder address: {}", funder_address);
+    log::info!("Funder address: {}", green_address(funder_address));
 
     // 10. Build funding config (reads base_token from chain metadata)
     let funding_config = build_funding_config(
@@ -190,8 +178,8 @@ pub async fn run(args: EcosystemDeployArgs, context: &Context) -> Result<()> {
     // 12. Build funding plan
     log::info!("Building funding plan...");
     let plan_result = FundingPlanBuilder::new(executor.provider(), &funding_config, funder_address)
-        .with_wallets(&ecosystem_wallets)
-        .with_wallets(&chain_wallets)
+        .with_ecosystem_wallets(&ecosystem_wallets)
+        .with_chain_wallets(&chain_wallets)
         .build()
         .await;
 
@@ -220,7 +208,7 @@ pub async fn run(args: EcosystemDeployArgs, context: &Context) -> Result<()> {
         let symbol = funding_config.token_symbol.as_deref().unwrap_or("tokens");
         log::info!(
             "  Total {} to transfer: {}",
-            symbol.green(),
+            symbol,
             green_token(plan.total_token_required, symbol)
         );
     }
@@ -231,6 +219,14 @@ pub async fn run(args: EcosystemDeployArgs, context: &Context) -> Result<()> {
     );
     log::info!("");
     log::info!("  Funder balance: {}", green_eth(plan.funder_eth_balance));
+    if let Some(token_balance) = plan.funder_token_balance {
+        let symbol = funding_config.token_symbol.as_deref().unwrap_or("tokens");
+        log::info!(
+            "  Funder {} balance: {}",
+            symbol,
+            green_token(token_balance, symbol)
+        );
+    }
 
     if !plan.is_valid() {
         let needed = plan.total_eth_required;
@@ -495,11 +491,8 @@ fn build_default_amounts(
             .map(eth_to_wei)
             .or_else(|| config.operator_eth.map(eth_to_wei))
             .unwrap_or(defaults.operator_eth),
-        blob_operator_eth: args
-            .blob_operator_eth
-            .map(eth_to_wei)
-            .or_else(|| config.blob_operator_eth.map(eth_to_wei))
-            .unwrap_or(defaults.blob_operator_eth),
+        // Not configurable - use library defaults
+        blob_operator_eth: defaults.blob_operator_eth,
         prove_operator_eth: args
             .prove_operator_eth
             .map(eth_to_wei)
@@ -510,16 +503,9 @@ fn build_default_amounts(
             .map(eth_to_wei)
             .or_else(|| config.execute_operator_eth.map(eth_to_wei))
             .unwrap_or(defaults.execute_operator_eth),
-        fee_account_eth: args
-            .fee_account_eth
-            .map(eth_to_wei)
-            .or_else(|| config.fee_account_eth.map(eth_to_wei))
-            .unwrap_or(defaults.fee_account_eth),
-        token_multiplier_setter_eth: args
-            .token_multiplier_setter_eth
-            .map(eth_to_wei)
-            .or_else(|| config.token_multiplier_setter_eth.map(eth_to_wei))
-            .unwrap_or(defaults.token_multiplier_setter_eth),
+        // Not configurable - use library defaults
+        fee_account_eth: defaults.fee_account_eth,
+        token_multiplier_setter_eth: defaults.token_multiplier_setter_eth,
     }
 }
 
@@ -586,7 +572,7 @@ async fn display_wallet_balances(
     )
     .await?;
 
-    // Chain wallets
+    // Chain wallets (only those that will be funded)
     log::info!("");
     log::info!("Chain Wallets ({}):", chain_name);
     display_wallet_balance(
@@ -607,14 +593,6 @@ async fn display_wallet_balances(
     .await?;
     display_wallet_balance(
         provider,
-        "blob_operator",
-        chain_wallets.blob_operator.as_ref(),
-        token_address,
-        token_symbol,
-    )
-    .await?;
-    display_wallet_balance(
-        provider,
         "prove_operator",
         chain_wallets.prove_operator.as_ref(),
         token_address,
@@ -625,22 +603,6 @@ async fn display_wallet_balances(
         provider,
         "execute_operator",
         chain_wallets.execute_operator.as_ref(),
-        token_address,
-        token_symbol,
-    )
-    .await?;
-    display_wallet_balance(
-        provider,
-        "fee_account",
-        chain_wallets.fee_account.as_ref(),
-        token_address,
-        token_symbol,
-    )
-    .await?;
-    display_wallet_balance(
-        provider,
-        "token_multiplier_setter",
-        chain_wallets.token_multiplier_setter.as_ref(),
         token_address,
         token_symbol,
     )

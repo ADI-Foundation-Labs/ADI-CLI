@@ -23,10 +23,10 @@ pub struct DefaultAmounts {
     pub deployer_eth: U256,
     /// Governor: 1 ETH.
     pub governor_eth: U256,
-    /// Governor custom gas token amount in whole token units (not smallest units).
+    /// Governor custom gas token amount in token units (supports fractional amounts).
     /// Only used when custom base token is configured.
     /// Converted to actual amount at runtime using token decimals.
-    pub governor_cgt_units: u64,
+    pub governor_cgt_units: f64,
     /// Operator: 5 ETH.
     pub operator_eth: U256,
     /// Blob operator: 5 ETH.
@@ -43,8 +43,21 @@ pub struct DefaultAmounts {
 
 impl DefaultAmounts {
     /// Convert governor CGT units to smallest token units using token decimals.
+    ///
+    /// Uses precise multiplication to avoid floating-point errors:
+    /// 1. Multiply f64 by 10^decimals
+    /// 2. Round to nearest integer
+    /// 3. Clamp to prevent overflow
     pub fn governor_cgt_amount(&self, token_decimals: u8) -> U256 {
-        U256::from(self.governor_cgt_units) * U256::from(10).pow(U256::from(token_decimals))
+        if self.governor_cgt_units <= 0.0 {
+            return U256::ZERO;
+        }
+        let multiplier = 10_f64.powi(i32::from(token_decimals));
+        let smallest_units = self.governor_cgt_units * multiplier;
+        let clamped = smallest_units.min(u128::MAX as f64);
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let amount_u128 = clamped.round() as u128;
+        U256::from(amount_u128)
     }
 }
 
@@ -53,7 +66,7 @@ impl Default for DefaultAmounts {
         Self {
             deployer_eth: eth(1),
             governor_eth: eth(1),
-            governor_cgt_units: 5, // 5 tokens (converted using actual decimals at runtime)
+            governor_cgt_units: 5.0, // 5 tokens (converted using actual decimals at runtime)
             operator_eth: eth(5),
             blob_operator_eth: eth(5),
             prove_operator_eth: eth(5),

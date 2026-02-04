@@ -164,6 +164,83 @@ impl<'a> FundingPlanBuilder<'a> {
         self
     }
 
+    /// Add funding targets for ecosystem wallets only.
+    ///
+    /// Ecosystem deployment requires funding only:
+    /// - `deployer` - for contract deployment (ETH)
+    /// - `governor` - for governance operations (ETH + CGT)
+    ///
+    /// Other wallet roles in the Wallets struct are ignored.
+    pub fn with_ecosystem_wallets(mut self, wallets: &Wallets) -> Self {
+        let amounts = &self.config.default_amounts;
+
+        if let Some(w) = &wallets.deployer {
+            self.targets.push(FundingTarget::new(
+                WalletRole::Deployer,
+                w.address,
+                amounts.deployer_eth,
+            ));
+        }
+
+        if let Some(w) = &wallets.governor {
+            self.targets.push(FundingTarget::new(
+                WalletRole::Governor,
+                w.address,
+                amounts.governor_eth,
+            ));
+        }
+
+        self
+    }
+
+    /// Add funding targets for chain wallets only.
+    ///
+    /// Chain deployment requires funding only:
+    /// - `governor` - for chain governance (ETH + CGT)
+    /// - `operator` - for chain operations (ETH)
+    /// - `prove_operator` - for proof submission (ETH)
+    /// - `execute_operator` - for transaction execution (ETH)
+    ///
+    /// Other wallet roles (deployer, blob_operator, fee_account,
+    /// token_multiplier_setter) are NOT funded.
+    pub fn with_chain_wallets(mut self, wallets: &Wallets) -> Self {
+        let amounts = &self.config.default_amounts;
+
+        if let Some(w) = &wallets.governor {
+            self.targets.push(FundingTarget::new(
+                WalletRole::Governor,
+                w.address,
+                amounts.governor_eth,
+            ));
+        }
+
+        if let Some(w) = &wallets.operator {
+            self.targets.push(FundingTarget::new(
+                WalletRole::Operator,
+                w.address,
+                amounts.operator_eth,
+            ));
+        }
+
+        if let Some(w) = &wallets.prove_operator {
+            self.targets.push(FundingTarget::new(
+                WalletRole::ProveOperator,
+                w.address,
+                amounts.prove_operator_eth,
+            ));
+        }
+
+        if let Some(w) = &wallets.execute_operator {
+            self.targets.push(FundingTarget::new(
+                WalletRole::ExecuteOperator,
+                w.address,
+                amounts.execute_operator_eth,
+            ));
+        }
+
+        self
+    }
+
     /// Add a custom funding target.
     pub fn with_target(mut self, target: FundingTarget) -> Self {
         self.targets.push(target);

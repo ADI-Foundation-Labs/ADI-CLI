@@ -3,6 +3,7 @@
 use adi_ecosystem::{build_ecosystem_create_args, verify_ecosystem_created, EcosystemConfig};
 use adi_state::{import_ecosystem_state, StateManager};
 use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
+use colored::Colorize;
 use dialoguer::Input;
 use tempfile::TempDir;
 
@@ -29,16 +30,20 @@ pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
     // 1. Parse and validate protocol version
     let version =
         ProtocolVersion::parse(&args.protocol_version).wrap_err("Invalid protocol version")?;
-    log::info!("Protocol version: {}", version);
+    log::info!("Protocol version: {}", version.to_string().green());
 
     // 2. Merge CLI args with config defaults (CLI > Config)
     let config_defaults = &context.config().ecosystem;
     let config = build_ecosystem_config(args, config_defaults);
 
-    log::info!("Ecosystem: {}", config.name);
-    log::info!("  L1 network: {}", config.l1_network);
-    log::info!("  Chain: {} (ID: {})", config.chain_name, config.chain_id);
-    log::info!("  Prover mode: {}", config.prover_mode);
+    log::info!("Ecosystem: {}", config.name.green());
+    log::info!("  L1 network: {}", config.l1_network.to_string().green());
+    log::info!(
+        "  Chain: {} (ID: {})",
+        config.chain_name.green(),
+        config.chain_id.to_string().green()
+    );
+    log::info!("  Prover mode: {}", config.prover_mode.to_string().green());
     log::debug!("Full ecosystem config: {:?}", config);
 
     // 3. Check if ecosystem state already exists
@@ -143,7 +148,7 @@ pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
     verify_ecosystem_created(&temp_path, &config).wrap_err("Ecosystem verification failed")?;
 
     // 9. Import state from temp dir through StateManager
-    log::info!("State directory: {}", state_dir.display());
+    log::info!("State directory: {}", state_dir.display().to_string().green());
     log::info!("Importing ecosystem state through backend...");
     import_ecosystem_state(&state_manager, &temp_path, &config.name, &config.chain_name)
         .await
@@ -178,7 +183,7 @@ pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
 
     log::info!("State validated: {} chain(s) found", chains.len());
     log::info!("Ecosystem '{}' initialized successfully!", config.name);
-    log::info!("Location: {}", ecosystem_path.display());
+    log::info!("Location: {}", ecosystem_path.display().to_string().green());
 
     // TempDir is automatically cleaned up when dropped
     Ok(())

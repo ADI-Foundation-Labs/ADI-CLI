@@ -41,17 +41,13 @@ pub struct FundingDefaults {
     #[serde(default)]
     pub governor_eth: Option<f64>,
 
-    /// Governor custom gas token units (default: 5 units).
+    /// Governor custom gas token amount (default: 5.0 tokens).
     #[serde(default)]
-    pub governor_cgt_units: Option<u64>,
+    pub governor_cgt_units: Option<f64>,
 
     /// Operator ETH amount (default: 5.0 ETH).
     #[serde(default)]
     pub operator_eth: Option<f64>,
-
-    /// Blob operator ETH amount (default: 5.0 ETH).
-    #[serde(default)]
-    pub blob_operator_eth: Option<f64>,
 
     /// Prove operator ETH amount (default: 5.0 ETH).
     #[serde(default)]
@@ -60,14 +56,6 @@ pub struct FundingDefaults {
     /// Execute operator ETH amount (default: 5.0 ETH).
     #[serde(default)]
     pub execute_operator_eth: Option<f64>,
-
-    /// Fee account ETH amount (default: 0 ETH).
-    #[serde(default)]
-    pub fee_account_eth: Option<f64>,
-
-    /// Token multiplier setter ETH amount (default: 0.1 ETH).
-    #[serde(default)]
-    pub token_multiplier_setter_eth: Option<f64>,
 }
 
 fn default_gas_multiplier() -> u64 {
