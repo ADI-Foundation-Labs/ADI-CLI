@@ -68,7 +68,13 @@ async fn import_ecosystem_metadata(
     let path = ecosystem_dir.join("ZkStack.yaml");
     log::debug!("Importing ecosystem metadata from {}", path.display());
 
-    let metadata: EcosystemMetadata = read_yaml_file(&path).await?;
+    let mut metadata: EcosystemMetadata = read_yaml_file(&path).await?;
+
+    // Transform paths from /workspace/<ecosystem_name>/... to /workspace/...
+    // Container mounts ecosystem dir directly to /workspace during deployment
+    metadata.chains = "/workspace/chains".to_string();
+    metadata.config = "/workspace/configs/".to_string();
+
     state_manager.ecosystem().create_metadata(&metadata).await
 }
 
@@ -98,7 +104,14 @@ async fn import_chain_metadata(
         path.display()
     );
 
-    let metadata: ChainMetadata = read_yaml_file(&path).await?;
+    let mut metadata: ChainMetadata = read_yaml_file(&path).await?;
+
+    // Transform paths from /workspace/<ecosystem_name>/chains/... to /workspace/chains/...
+    // Container mounts ecosystem dir directly to /workspace during deployment
+    metadata.configs = format!("/workspace/chains/{}/configs/", chain_name);
+    metadata.rocks_db_path = format!("/workspace/chains/{}/db/", chain_name);
+    metadata.artifacts_path = format!("/workspace/chains/{}/artifacts/", chain_name);
+
     state_manager
         .chain(chain_name)
         .create_metadata(&metadata)

@@ -54,9 +54,11 @@ mod container;
 mod error;
 mod image;
 mod stream;
+mod url;
 
 // Public re-exports
 pub use client::DockerClient;
 pub use config::{ContainerConfig, DEFAULT_TIMEOUT_SECONDS};
 pub use container::ContainerManager;
 pub use error::{DockerError, Result};
+pub use url::transform_url_for_container;

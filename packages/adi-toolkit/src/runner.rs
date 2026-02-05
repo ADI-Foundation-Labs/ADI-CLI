@@ -2,7 +2,7 @@
 
 use crate::config::ToolkitConfig;
 use crate::error::Result;
-use adi_docker::{ContainerConfig, ContainerManager, DockerClient};
+use adi_docker::{transform_url_for_container, ContainerConfig, ContainerManager, DockerClient};
 use semver::Version;
 use std::path::Path;
 
@@ -135,6 +135,21 @@ impl ToolkitRunner {
         let exit_code = manager.run(&image_uri, &container_config).await?;
 
         log::debug!("Command completed with exit code: {}", exit_code);
+
+        // Check for crash reports on failure
+        if exit_code != 0 {
+            let tmp_dir = state_dir.join(".tmp");
+            if let Ok(entries) = std::fs::read_dir(&tmp_dir) {
+                for entry in entries.flatten() {
+                    let filename = entry.file_name();
+                    let filename_str = filename.to_string_lossy();
+                    if filename_str.starts_with("report-") && filename_str.ends_with(".toml") {
+                        log::error!("Crash report available at: {}", entry.path().display());
+                    }
+                }
+            }
+        }
+
         Ok(exit_code)
     }
 
@@ -303,8 +318,13 @@ impl ToolkitRunner {
         let foundry_fix = r#"sed -i.bak 's/{ access = "read", path = "\.\.\/l1-contracts\/script-out\/" }/{ access = "read-write", path = "..\/l1-contracts\/script-out\/" }/' /deps/zksync-era/contracts/l1-contracts/foundry.toml"#;
 
         // Build zkstack command arguments
+        // --dev bypasses interactive prompts (explicit flags override dev defaults)
+        // --zksync-os selects VM option to avoid VM selection prompt
         let mut zkstack_args = String::from(
             "zkstack ecosystem init \
+             --verbose \
+             --dev \
+             --zksync-os \
              --ignore-prerequisites \
              --observability false \
              --deploy-ecosystem true \
@@ -317,20 +337,41 @@ impl ToolkitRunner {
             zkstack_args.push_str(&format!(" -a --with-gas-price -a {}", gas_price));
         }
 
+        // Transform localhost URLs to host.docker.internal for macOS Docker containers
+        let container_rpc_url = transform_url_for_container(l1_rpc_url);
+
         // Add L1 RPC URL
-        zkstack_args.push_str(&format!(" --l1-rpc-url {}", l1_rpc_url));
+        zkstack_args.push_str(&format!(" --l1-rpc-url {}", container_rpc_url));
 
         // Build complete shell command: copy genesis + fix foundry + run zkstack
+        // Use expect to auto-confirm interactive prompts (cliclack reads from terminal, not stdin)
+        // Pattern matches only prompts like (Y/n), letting regular output flow through
         let shell_cmd = format!(
-            "cp /workspace/{} {} && {} && {}",
-            GENESIS_FILENAME, GENESIS_CONTAINER_PATH, foundry_fix, zkstack_args
+            r#"cp /workspace/{genesis} {genesis_path} && {foundry_fix} && \
+expect -c 'set timeout 3600
+log_user 1
+spawn {zkstack}
+while 1 {{
+    expect {{
+        eof {{ break }}
+        timeout {{ break }}
+        -re "\\(.*\\)\\s*$" {{ send "\r" }}
+    }}
+}}
+catch wait result
+exit [lindex $result 3]'"#,
+            genesis = GENESIS_FILENAME,
+            genesis_path = GENESIS_CONTAINER_PATH,
+            foundry_fix = foundry_fix,
+            zkstack = zkstack_args
         );
 
         log::info!("Fixing foundry.toml permissions and deploying ecosystem contracts");
 
         let command = vec!["sh", "-c", &shell_cmd];
 
-        self.run_command(&command, ecosystem_dir, protocol_version, &[])
+        // CI=true skips forge telemetry prompt (detected as non-interactive)
+        self.run_command(&command, ecosystem_dir, protocol_version, &[("CI", "true")])
             .await
     }
 }

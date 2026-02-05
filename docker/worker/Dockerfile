@@ -19,6 +19,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   python3-pip \
   docker.io \
   docker-compose \
+  expect \
   && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies for upgrade scripts

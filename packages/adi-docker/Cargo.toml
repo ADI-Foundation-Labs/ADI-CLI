@@ -19,3 +19,4 @@ log = { workspace = true }
 futures-util = { workspace = true }
 bollard = { workspace = true }
 crossterm = { workspace = true }
+url = { workspace = true }

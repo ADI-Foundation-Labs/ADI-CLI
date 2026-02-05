@@ -64,7 +64,7 @@ fn init_logger(debug: bool) {
             if color_full_message {
                 writeln!(
                     buf,
-                    "[{timestamp}] [adi-cli]: {style}[{level}]: {args}\x1b[0m",
+                    "[{timestamp}] {style}[{level}]: {args}\x1b[0m",
                     timestamp = timestamp,
                     style = level_style,
                     level = record.level(),
@@ -73,7 +73,7 @@ fn init_logger(debug: bool) {
             } else {
                 writeln!(
                     buf,
-                    "[{timestamp}] [adi-cli]: {style}[{level}]\x1b[0m: {args}",
+                    "[{timestamp}] {style}[{level}]\x1b[0m: {args}",
                     timestamp = timestamp,
                     style = level_style,
                     level = record.level(),
