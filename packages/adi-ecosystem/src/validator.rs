@@ -174,12 +174,8 @@ mod tests {
         let operator = Address::ZERO;
         let roles = ValidatorRoles::commit_operator();
 
-        let calldata = build_add_validator_roles_calldata(
-            validator_timelock,
-            diamond_proxy,
-            operator,
-            roles,
-        );
+        let calldata =
+            build_add_validator_roles_calldata(validator_timelock, diamond_proxy, operator, roles);
 
         // Calldata should not be empty
         assert!(!calldata.is_empty());

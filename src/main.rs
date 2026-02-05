@@ -58,10 +58,8 @@ fn init_logger(debug: bool) {
             let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
 
             // Apply color to entire message for Warn/Error, only to tag for others
-            let color_full_message = matches!(
-                record.level(),
-                ::log::Level::Error | ::log::Level::Warn
-            );
+            let color_full_message =
+                matches!(record.level(), ::log::Level::Error | ::log::Level::Warn);
 
             if color_full_message {
                 writeln!(

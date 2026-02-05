@@ -148,7 +148,10 @@ pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
     verify_ecosystem_created(&temp_path, &config).wrap_err("Ecosystem verification failed")?;
 
     // 9. Import state from temp dir through StateManager
-    log::info!("State directory: {}", state_dir.display().to_string().green());
+    log::info!(
+        "State directory: {}",
+        state_dir.display().to_string().green()
+    );
     log::info!("Importing ecosystem state through backend...");
     import_ecosystem_state(&state_manager, &temp_path, &config.name, &config.chain_name)
         .await

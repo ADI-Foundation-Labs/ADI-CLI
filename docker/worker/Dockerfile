@@ -37,6 +37,7 @@ WORKDIR /deps
 RUN git clone https://github.com/matter-labs/zksync-era.git zksync-era
 WORKDIR /deps/zksync-era
 RUN git checkout ${ZKSYNC_ERA_COMMIT}
+RUN git submodule update --init --recursive
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
   cargo install --path zkstack_cli/crates/zkstack --force --locked
 

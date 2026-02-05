@@ -33,11 +33,18 @@ pub struct EcosystemArgs {
     pub protocol_version: String,
 
     /// Ecosystem name (used for directory name and identification)
-    #[arg(long, help = "Ecosystem name (used for directory name and identification)")]
+    #[arg(
+        long,
+        help = "Ecosystem name (used for directory name and identification)"
+    )]
     pub ecosystem_name: Option<String>,
 
     /// Settlement layer network: localhost (Anvil), sepolia (testnet), or mainnet
-    #[arg(long, value_enum, help = "Settlement layer network: localhost (Anvil), sepolia (testnet), or mainnet")]
+    #[arg(
+        long,
+        value_enum,
+        help = "Settlement layer network: localhost (Anvil), sepolia (testnet), or mainnet"
+    )]
     pub l1_network: Option<L1Network>,
 
     /// Name for the initial chain within this ecosystem
@@ -45,27 +52,46 @@ pub struct EcosystemArgs {
     pub chain_name: Option<String>,
 
     /// Unique numeric chain ID (must not conflict with existing chains)
-    #[arg(long, help = "Unique numeric chain ID (must not conflict with existing chains)")]
+    #[arg(
+        long,
+        help = "Unique numeric chain ID (must not conflict with existing chains)"
+    )]
     pub chain_id: Option<u64>,
 
     /// Prover mode: no-proofs (testing) or gpu (production with ZK proofs)
-    #[arg(long, value_enum, help = "Prover mode: no-proofs (testing) or gpu (production with ZK proofs)")]
+    #[arg(
+        long,
+        value_enum,
+        help = "Prover mode: no-proofs (testing) or gpu (production with ZK proofs)"
+    )]
     pub prover_mode: Option<ProverMode>,
 
     /// Custom base token contract address. Use ETH address (0x0...01) for native ETH
-    #[arg(long, help = "Custom base token contract address. Use ETH address (0x0...01) for native ETH")]
+    #[arg(
+        long,
+        help = "Custom base token contract address. Use ETH address (0x0...01) for native ETH"
+    )]
     pub base_token_address: Option<Address>,
 
     /// Price ratio numerator (with denominator, sets ETH/token rate, e.g., 1:100 = 1 ETH per 100 tokens)
-    #[arg(long, help = "Price ratio numerator (with denominator, sets ETH/token rate, e.g., 1:100 = 1 ETH per 100 tokens)")]
+    #[arg(
+        long,
+        help = "Price ratio numerator (with denominator, sets ETH/token rate, e.g., 1:100 = 1 ETH per 100 tokens)"
+    )]
     pub base_token_price_nominator: Option<u64>,
 
     /// Price ratio denominator (with nominator, sets ETH/token rate, e.g., 1:100 = 1 ETH per 100 tokens)
-    #[arg(long, help = "Price ratio denominator (with nominator, sets ETH/token rate, e.g., 1:100 = 1 ETH per 100 tokens)")]
+    #[arg(
+        long,
+        help = "Price ratio denominator (with nominator, sets ETH/token rate, e.g., 1:100 = 1 ETH per 100 tokens)"
+    )]
     pub base_token_price_denominator: Option<u64>,
 
     /// Enable EVM bytecode emulator for running unmodified Ethereum contracts
-    #[arg(long, help = "Enable EVM bytecode emulator for running unmodified Ethereum contracts")]
+    #[arg(
+        long,
+        help = "Enable EVM bytecode emulator for running unmodified Ethereum contracts"
+    )]
     pub evm_emulator: Option<bool>,
 }
 

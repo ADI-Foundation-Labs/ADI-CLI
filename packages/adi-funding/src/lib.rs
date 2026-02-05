@@ -82,6 +82,7 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 
+mod anvil;
 mod balance;
 mod config;
 mod error;
@@ -93,6 +94,9 @@ mod signer;
 mod transfer;
 
 // Public re-exports
+pub use anvil::{
+    is_localhost_rpc, AnvilFunder, AnvilFundingResult, AnvilFundingTarget, ANVIL_DEFAULT_KEY,
+};
 pub use balance::{
     get_eth_balance, get_token_balance, get_token_decimals, get_token_symbol, get_wallet_balance,
     WalletBalance,

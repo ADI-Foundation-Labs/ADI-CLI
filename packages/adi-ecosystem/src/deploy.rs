@@ -37,9 +37,9 @@ impl DeployedContracts {
             .as_ref()
             .ok_or_else(|| EcosystemError::MissingContract("l1".to_string()))?;
 
-        let validator_timelock = l1
-            .validator_timelock_addr
-            .ok_or_else(|| EcosystemError::MissingContract("validator_timelock_addr".to_string()))?;
+        let validator_timelock = l1.validator_timelock_addr.ok_or_else(|| {
+            EcosystemError::MissingContract("validator_timelock_addr".to_string())
+        })?;
 
         let chain_admin = l1
             .chain_admin_addr
@@ -96,7 +96,10 @@ pub async fn add_validator_roles(
     governor_key: &SecretString,
     gas_price_wei: Option<u128>,
 ) -> Result<Vec<B256>> {
-    log::debug!("Adding validator roles via chain_admin: {}", contracts.chain_admin);
+    log::debug!(
+        "Adding validator roles via chain_admin: {}",
+        contracts.chain_admin
+    );
 
     // Create signer from governor key
     let signer = create_signer(governor_key)?;
@@ -111,12 +114,13 @@ pub async fn add_validator_roles(
     let provider = ProviderBuilder::new().wallet(wallet).connect_http(url);
 
     // Get chain ID and nonce
-    let chain_id = provider
-        .get_chain_id()
-        .await
-        .map_err(|e| EcosystemError::TransactionFailed {
-            reason: format!("Failed to get chain ID: {}", e),
-        })?;
+    let chain_id =
+        provider
+            .get_chain_id()
+            .await
+            .map_err(|e| EcosystemError::TransactionFailed {
+                reason: format!("Failed to get chain ID: {}", e),
+            })?;
 
     let mut nonce = provider
         .get_transaction_count(governor_address)
@@ -128,11 +132,12 @@ pub async fn add_validator_roles(
     // Get gas price if not provided
     let gas_price = match gas_price_wei {
         Some(price) => price,
-        None => provider.get_gas_price().await.map_err(|e| {
-            EcosystemError::TransactionFailed {
+        None => provider
+            .get_gas_price()
+            .await
+            .map_err(|e| EcosystemError::TransactionFailed {
                 reason: format!("Failed to get gas price: {}", e),
-            }
-        })?,
+            })?,
     };
     log::debug!("Using gas price: {} wei", gas_price);
 
@@ -196,34 +201,35 @@ pub async fn add_validator_roles(
             .with_chain_id(chain_id);
 
         // Send transaction
-        let pending = provider.send_transaction(tx).await.map_err(|e| {
-            EcosystemError::TransactionFailed {
-                reason: format!(
-                    "Failed to send {} validator role tx: {}",
-                    assignment.name, e
-                ),
-            }
-        })?;
+        let pending =
+            provider
+                .send_transaction(tx)
+                .await
+                .map_err(|e| EcosystemError::TransactionFailed {
+                    reason: format!(
+                        "Failed to send {} validator role tx: {}",
+                        assignment.name, e
+                    ),
+                })?;
 
         let tx_hash = *pending.tx_hash();
         log::info!("  Transaction submitted: {}", tx_hash);
 
         // Wait for confirmation
-        let receipt = pending.get_receipt().await.map_err(|e| {
-            EcosystemError::TransactionFailed {
-                reason: format!(
-                    "Failed to confirm {} validator role tx: {}",
-                    assignment.name, e
-                ),
-            }
-        })?;
+        let receipt =
+            pending
+                .get_receipt()
+                .await
+                .map_err(|e| EcosystemError::TransactionFailed {
+                    reason: format!(
+                        "Failed to confirm {} validator role tx: {}",
+                        assignment.name, e
+                    ),
+                })?;
 
         if !receipt.status() {
             return Err(EcosystemError::TransactionFailed {
-                reason: format!(
-                    "Transaction {} reverted for {}",
-                    tx_hash, assignment.name
-                ),
+                reason: format!("Transaction {} reverted for {}", tx_hash, assignment.name),
             });
         }
 

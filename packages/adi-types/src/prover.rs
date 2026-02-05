@@ -9,7 +9,7 @@ use strum::{Display, EnumString};
 /// Maps to the `prover_version` field in ZkStack.yaml files.
 ///
 /// # Serde Behavior
-/// - Serializes to kebab-case: `"no-proofs"`, `"gpu"`
+/// - Serializes to PascalCase: `"NoProofs"`, `"Gpu"` (zkstack format)
 /// - Deserializes case-insensitively: accepts `"NoProofs"`, `"no-proofs"`, `"noproofs"`
 #[derive(Clone, Debug, Default, Display, EnumString, PartialEq, Eq, ValueEnum)]
 #[strum(serialize_all = "kebab-case")]
@@ -27,8 +27,8 @@ impl Serialize for ProverMode {
         S: Serializer,
     {
         serializer.serialize_str(match self {
-            Self::NoProofs => "no-proofs",
-            Self::Gpu => "gpu",
+            Self::NoProofs => "NoProofs",
+            Self::Gpu => "Gpu",
         })
     }
 }

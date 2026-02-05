@@ -28,6 +28,7 @@ pub struct EcosystemConfig {
     pub prover_mode: ProverMode,
 
     /// Base token address.
+    #[serde(default = "default_base_token_address")]
     pub base_token_address: Address,
 
     /// Base token price nominator.
@@ -38,6 +39,10 @@ pub struct EcosystemConfig {
 
     /// Enable EVM emulator.
     pub evm_emulator: bool,
+}
+
+fn default_base_token_address() -> Address {
+    ETH_TOKEN_ADDRESS
 }
 
 impl Default for EcosystemConfig {
