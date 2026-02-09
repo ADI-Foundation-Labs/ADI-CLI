@@ -1,6 +1,6 @@
 variable "REGISTRY" {
   // default = "ghcr.io/adi"
-  default = "harbor.sde.adifoundation.ai/adi-chain/cli"
+  default = "harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli"
 }
 
 variable "PLATFORMS" {

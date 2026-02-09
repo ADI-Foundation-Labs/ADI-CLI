@@ -28,7 +28,7 @@ build-docker:
       alias: docker
   before_script:
     - set -euo pipefail
-    - echo "$HARBOR_PASSWORD" | docker login harbor.sde.adifoundation.ai -u "$HARBOR_USERNAME" --password-stdin
+    - echo "$HARBOR_PASSWORD" | docker login harbor-v2.dev.internal.adifoundation.ai -u "$HARBOR_USERNAME" --password-stdin
     - |
       for i in $(seq 1 60); do
         if docker info >/dev/null 2>&1; then
@@ -48,4 +48,4 @@ build-docker:
     - docker buildx inspect --bootstrap
 
   script:
-    - CACHE_TO_REF=harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:cache-${CI_COMMIT_REF_SLUG} task push:docker TARGETS=$[[inputs.build_target]]
+    - CACHE_TO_REF=harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli/adi-toolkit:cache-${CI_COMMIT_REF_SLUG} task push:docker TARGETS=$[[inputs.build_target]]
