@@ -1,13 +1,18 @@
 //! Ecosystem deployment command implementation.
 //!
-//! This command funds ecosystem and chain wallets before deployment.
-//! Actual contract deployment will be added in a future implementation.
+//! This command:
+//! 1. Funds ecosystem and chain wallets
+//! 2. Deploys ecosystem contracts via zkstack
+//! 3. Configures validator roles for operators
 
+use adi_ecosystem::{add_validator_roles, DeployedContracts};
 use adi_funding::{
-    get_wallet_balance, DefaultAmounts, FundingConfig, FundingError, FundingExecutor,
-    FundingPlanBuilder, LoggingEventHandler,
+    get_wallet_balance, is_localhost_rpc, normalize_rpc_url, AnvilFunder, AnvilFundingTarget,
+    DefaultAmounts, FundingConfig, FundingError, FundingExecutor, FundingPlanBuilder,
+    LoggingEventHandler,
 };
 use adi_state::StateManager;
+use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
 use adi_types::Wallets;
 use alloy_primitives::{Address, U256};
 use clap::Args;
@@ -15,8 +20,10 @@ use colored::Colorize;
 use dialoguer::Confirm;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use std::sync::Arc;
 use url::Url;
+use walkdir::WalkDir;
 
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
@@ -28,23 +35,40 @@ use crate::error::{Result, WrapErr};
 #[derive(Clone, Args, Debug, Serialize, Deserialize)]
 pub struct EcosystemDeployArgs {
     /// Ecosystem name (falls back to config file if not provided)
-    #[arg(long, help = "Ecosystem name (falls back to config file if not provided)")]
+    #[arg(
+        long,
+        help = "Ecosystem name (falls back to config file if not provided)"
+    )]
     pub ecosystem_name: Option<String>,
 
     /// Chain name for wallet funding (falls back to config file if not provided)
-    #[arg(long, help = "Chain name for wallet funding (falls back to config file if not provided)")]
+    #[arg(
+        long,
+        help = "Chain name for wallet funding (falls back to config file if not provided)"
+    )]
     pub chain_name: Option<String>,
 
     /// Settlement layer JSON-RPC URL (e.g., http://localhost:8545 or https://sepolia.infura.io/v3/KEY)
-    #[arg(long, env = "ADI_RPC_URL", help = "Settlement layer JSON-RPC URL (e.g., http://localhost:8545)")]
+    #[arg(
+        long,
+        env = "ADI_RPC_URL",
+        help = "Settlement layer JSON-RPC URL (e.g., http://localhost:8545)"
+    )]
     pub rpc_url: Option<Url>,
 
     /// Funder wallet private key (hex). Prefer config file or env var for security
-    #[arg(long, env = "ADI_FUNDER_KEY", help = "Funder wallet private key (hex). Prefer config file or env var for security")]
+    #[arg(
+        long,
+        env = "ADI_FUNDER_KEY",
+        help = "Funder wallet private key (hex). Prefer config file or env var for security"
+    )]
     pub funder_key: Option<String>,
 
     /// Gas price multiplier percentage (default: 120 = 20% buffer over estimated gas)
-    #[arg(long, help = "Gas price multiplier percentage (default: 120 = 20% buffer over estimated gas)")]
+    #[arg(
+        long,
+        help = "Gas price multiplier percentage (default: 120 = 20% buffer over estimated gas)"
+    )]
     pub gas_multiplier: Option<u64>,
 
     /// Deployer wallet ETH amount in ether (default: 1.0)
@@ -56,7 +80,10 @@ pub struct EcosystemDeployArgs {
     pub governor_eth: Option<f64>,
 
     /// Governor custom gas token (CGT) amount. Only for chains with custom base token (default: 5.0)
-    #[arg(long, help = "Governor custom gas token (CGT) amount. Only for chains with custom base token (default: 5.0)")]
+    #[arg(
+        long,
+        help = "Governor custom gas token (CGT) amount. Only for chains with custom base token (default: 5.0)"
+    )]
     pub governor_cgt_units: Option<f64>,
 
     /// Operator wallet ETH amount in ether (default: 5.0)
@@ -64,15 +91,24 @@ pub struct EcosystemDeployArgs {
     pub operator_eth: Option<f64>,
 
     /// Prove operator wallet ETH (submits validity proofs to L1, default: 5.0)
-    #[arg(long, help = "Prove operator wallet ETH (submits validity proofs to L1, default: 5.0)")]
+    #[arg(
+        long,
+        help = "Prove operator wallet ETH (submits validity proofs to L1, default: 5.0)"
+    )]
     pub prove_operator_eth: Option<f64>,
 
     /// Execute operator wallet ETH (executes batches on L1, default: 5.0)
-    #[arg(long, help = "Execute operator wallet ETH (executes batches on L1, default: 5.0)")]
+    #[arg(
+        long,
+        help = "Execute operator wallet ETH (executes batches on L1, default: 5.0)"
+    )]
     pub execute_operator_eth: Option<f64>,
 
     /// Skip wallet funding step (use if wallets are already funded)
-    #[arg(long, help = "Skip wallet funding step (use if wallets are already funded)")]
+    #[arg(
+        long,
+        help = "Skip wallet funding step (use if wallets are already funded)"
+    )]
     pub skip_funding: bool,
 
     /// Preview funding plan without executing transactions
@@ -80,8 +116,28 @@ pub struct EcosystemDeployArgs {
     pub dry_run: bool,
 
     /// Skip confirmation prompt (for automation/scripting)
-    #[arg(long, short = 'y', help = "Skip confirmation prompt (for automation/scripting)")]
+    #[arg(
+        long,
+        short = 'y',
+        help = "Skip confirmation prompt (for automation/scripting)"
+    )]
     pub yes: bool,
+
+    /// Custom gas price in wei (for non-local networks). If not set, gas price is estimated
+    #[arg(long, help = "Custom gas price in wei (for non-local networks)")]
+    pub gas_price_wei: Option<u128>,
+
+    /// Skip contract deployment step (only fund wallets)
+    #[arg(long, help = "Skip contract deployment step (only fund wallets)")]
+    pub skip_deployment: bool,
+
+    /// Protocol version for toolkit image (e.g., v30.0.2). Required for deployment
+    #[arg(
+        long,
+        short = 'p',
+        help = "Protocol version for toolkit image (e.g., v30.0.2)"
+    )]
+    pub protocol_version: Option<String>,
 }
 
 /// Execute the ecosystem deploy command.
@@ -125,7 +181,21 @@ pub async fn run(args: EcosystemDeployArgs, context: &Context) -> Result<()> {
     let rpc_url = resolve_rpc_url(&args, context)?;
     log::info!("Settlement layer RPC: {}", rpc_url.to_string().green());
 
-    // 7. Get funder key (args > config)
+    // 7. Check for Anvil mode (localhost RPC + no custom funder key)
+    let is_anvil = is_localhost_rpc(rpc_url.as_str()) && args.funder_key.is_none();
+    if is_anvil {
+        return run_anvil_funding(
+            &args,
+            context,
+            &state_manager,
+            &ecosystem_name,
+            &chain_name,
+            &rpc_url,
+        )
+        .await;
+    }
+
+    // 8. Get funder key (args > config) - required for production mode
     let funder_key = resolve_funder_key(&args, context)?;
     log::debug!("Funder key resolved");
 
@@ -286,7 +356,335 @@ pub async fn run(args: EcosystemDeployArgs, context: &Context) -> Result<()> {
 
     log::info!("");
     log::info!("Ecosystem wallets funded successfully!");
-    log::info!("Note: Contract deployment not yet implemented");
+
+    // 17. Skip deployment if requested
+    if args.skip_deployment {
+        log::info!("Skipping contract deployment (--skip-deployment)");
+        return Ok(());
+    }
+
+    // 18. Continue to deployment
+    run_ecosystem_deployment(
+        &args,
+        context,
+        &state_manager,
+        &ecosystem_name,
+        &chain_name,
+        &rpc_url,
+        &chain_wallets,
+    )
+    .await
+}
+
+/// Run Anvil-specific funding flow.
+///
+/// Uses the well-known Anvil default account (first account) to fund
+/// wallets. Checks current balances and only funds wallets that need more ETH.
+async fn run_anvil_funding(
+    args: &EcosystemDeployArgs,
+    context: &Context,
+    state_manager: &StateManager,
+    ecosystem_name: &str,
+    chain_name: &str,
+    rpc_url: &Url,
+) -> Result<()> {
+    log::info!(
+        "Using {} funding mode (localhost detected)",
+        "Anvil".green()
+    );
+
+    // Load wallets from state
+    let ecosystem_wallets = state_manager
+        .ecosystem()
+        .wallets()
+        .await
+        .wrap_err("Failed to load ecosystem wallets")?;
+
+    let chain_wallets = state_manager
+        .chain(chain_name)
+        .wallets()
+        .await
+        .wrap_err_with(|| format!("Failed to load chain '{}' wallets", chain_name))?;
+
+    log::info!(
+        "Loaded wallets: ecosystem={}, chain={}",
+        count_wallets(&ecosystem_wallets),
+        count_wallets(&chain_wallets)
+    );
+
+    // Build funding amounts from config
+    let funding_defaults = &context.config().funding;
+    let amounts = build_default_amounts(args, funding_defaults);
+
+    // Create funder to check balances (normalize URL for host-side connection)
+    let funder = AnvilFunder::with_rpc(&normalize_rpc_url(rpc_url.as_str()))?
+        .with_amounts(amounts)
+        .with_event_handler(Arc::new(LoggingEventHandler));
+
+    // Get funding targets with current balances
+    let targets = funder
+        .get_funding_targets(&ecosystem_wallets, &chain_wallets)
+        .await
+        .wrap_err("Failed to check wallet balances")?;
+
+    // Display current balances and funding plan
+    display_anvil_funding_plan(&targets);
+
+    let needs_funding = targets.iter().filter(|t| t.needs_funding).count();
+    let already_funded = targets.len() - needs_funding;
+
+    // Dry-run mode
+    if args.dry_run {
+        log::info!("");
+        log::info!("Dry-run mode: funding plan created but not executed");
+        return Ok(());
+    }
+
+    // If all wallets are already funded, skip confirmation and funding
+    if needs_funding == 0 {
+        log::info!("");
+        log::info!("All wallets already funded, skipping funding step.");
+    } else {
+        // Confirmation (default to yes for local dev)
+        if !args.yes {
+            log::info!("");
+            let confirmed = Confirm::new()
+                .with_prompt(format!(
+                    "Proceed with Anvil funding ({} wallets)?",
+                    needs_funding
+                ))
+                .default(true)
+                .interact()
+                .wrap_err("Failed to read confirmation")?;
+
+            if !confirmed {
+                log::info!("Funding cancelled by user");
+                return Ok(());
+            }
+        }
+
+        // Execute Anvil funding
+        log::info!("");
+        log::info!("Funding wallets from Anvil default account...");
+
+        let result = funder
+            .fund_wallets(&ecosystem_wallets, &chain_wallets)
+            .await
+            .wrap_err("Anvil funding failed")?;
+
+        log::info!("");
+        log::info!("============================================================");
+        log::info!("Anvil Funding Complete!");
+        log::info!("============================================================");
+        log::info!("  Wallets funded: {}", result.successful);
+        log::info!("  Wallets skipped (already funded): {}", already_funded);
+        log::info!("  Total gas used: {}", result.total_gas_used);
+        log::info!("============================================================");
+    }
+
+    // Skip deployment if requested
+    if args.skip_deployment {
+        log::info!("Skipping contract deployment (--skip-deployment)");
+        return Ok(());
+    }
+
+    // Continue to deployment
+    run_ecosystem_deployment(
+        args,
+        context,
+        state_manager,
+        ecosystem_name,
+        chain_name,
+        rpc_url,
+        &chain_wallets,
+    )
+    .await
+}
+
+/// Display Anvil funding plan with current balances and status.
+fn display_anvil_funding_plan(targets: &[AnvilFundingTarget]) {
+    log::info!("");
+    log::info!("============================================================");
+    log::info!("Anvil Funding Plan");
+    log::info!("============================================================");
+    log::info!("  Using Anvil default account (account 0)");
+    log::info!("");
+
+    for target in targets {
+        let current = format_eth(target.current_balance);
+        let required = format_eth(target.amount);
+        let status = if target.needs_funding {
+            "→ Will fund".yellow()
+        } else {
+            "✓ Already funded".green()
+        };
+
+        log::info!(
+            "  {:20} {} ETH (current: {} ETH) {}",
+            target.role.to_string(),
+            required,
+            current,
+            status
+        );
+    }
+
+    let needs_funding = targets.iter().filter(|t| t.needs_funding).count();
+    let already_funded = targets.len() - needs_funding;
+
+    log::info!("");
+    log::info!(
+        "  Summary: {} need funding, {} already funded",
+        needs_funding,
+        already_funded
+    );
+    log::info!("============================================================");
+}
+
+/// Run ecosystem contract deployment and validator role configuration.
+///
+/// This is the shared deployment logic used by both Anvil and production funding paths.
+async fn run_ecosystem_deployment(
+    args: &EcosystemDeployArgs,
+    context: &Context,
+    state_manager: &StateManager,
+    ecosystem_name: &str,
+    chain_name: &str,
+    rpc_url: &Url,
+    chain_wallets: &Wallets,
+) -> Result<()> {
+    // Validate protocol version is provided for deployment
+    let protocol_version_str = args.protocol_version.as_ref().ok_or_else(|| {
+        eyre::eyre!(
+            "Protocol version required for deployment. Use --protocol-version (e.g., v30.0.2)"
+        )
+    })?;
+    let protocol_version = ProtocolVersion::parse(protocol_version_str)
+        .map_err(|e| eyre::eyre!("Invalid protocol version '{}': {}", protocol_version_str, e))?;
+    log::info!("Protocol version: {}", protocol_version.to_string().green());
+
+    // Run zkstack ecosystem init
+    log::info!("");
+    log::info!("============================================================");
+    log::info!("Deploying Ecosystem Contracts");
+    log::info!("============================================================");
+
+    let runner = ToolkitRunner::new()
+        .await
+        .wrap_err("Failed to create toolkit runner")?;
+
+    let ecosystem_path = context.config().state_dir.join(ecosystem_name);
+
+    // Copy genesis.json to ecosystem directory if not present
+    let genesis_src = context.config().state_dir.join(GENESIS_FILENAME);
+    let genesis_dst = ecosystem_path.join(GENESIS_FILENAME);
+    if !genesis_dst.exists() {
+        if !genesis_src.exists() {
+            return Err(eyre::eyre!(
+                "genesis.json not found.\n\
+                 Please place the genesis.json file at: {}",
+                genesis_src.display()
+            ));
+        }
+        std::fs::copy(&genesis_src, &genesis_dst)
+            .wrap_err("Failed to copy genesis.json to ecosystem directory")?;
+        log::info!("Copied genesis.json to ecosystem directory");
+    }
+
+    log::info!("Running zkstack ecosystem init...");
+
+    let exit_code = runner
+        .run_zkstack_ecosystem_init(
+            &ecosystem_path,
+            rpc_url.as_str(),
+            args.gas_price_wei,
+            &protocol_version.to_semver(),
+        )
+        .await
+        .wrap_err("Failed to run zkstack ecosystem init")?;
+
+    if exit_code != 0 {
+        return Err(eyre::eyre!(
+            "zkstack ecosystem init failed with exit code {}",
+            exit_code
+        ));
+    }
+
+    log::info!("Ecosystem contracts deployed successfully!");
+
+    // Log all deployment files (with warnings for unhandled ones)
+    log_deployment_files(&ecosystem_path, chain_name);
+
+    // Re-read chain contracts from state (now populated after deployment)
+    let chain_contracts = state_manager
+        .chain(chain_name)
+        .contracts()
+        .await
+        .wrap_err("Failed to load chain contracts after deployment")?;
+
+    let deployed = DeployedContracts::try_from_chain_contracts(&chain_contracts)
+        .wrap_err("Missing required contract addresses after deployment")?;
+
+    log::info!("");
+    log::info!("Deployed contract addresses:");
+    log::info!(
+        "  Diamond proxy: {}",
+        deployed.diamond_proxy.to_string().green()
+    );
+    log::info!(
+        "  Validator timelock: {}",
+        deployed.validator_timelock.to_string().green()
+    );
+    log::info!(
+        "  Chain admin: {}",
+        deployed.chain_admin.to_string().green()
+    );
+
+    // Get chain governor private key for signing validator role txs
+    let governor_key = chain_wallets
+        .governor
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("Chain governor wallet required for validator role setup"))?
+        .private_key
+        .clone();
+
+    // Add validator roles
+    log::info!("");
+    log::info!("============================================================");
+    log::info!("Configuring Validator Roles");
+    log::info!("============================================================");
+
+    // Normalize URL for host-side connection (host.docker.internal -> localhost)
+    let normalized_rpc = normalize_rpc_url(rpc_url.as_str());
+    let tx_hashes = add_validator_roles(
+        &normalized_rpc,
+        &deployed,
+        chain_wallets,
+        &governor_key,
+        args.gas_price_wei,
+    )
+    .await
+    .wrap_err("Failed to add validator roles")?;
+
+    log::info!("");
+    log::info!(
+        "Validator roles configured: {} transactions confirmed",
+        tx_hashes.len().to_string().green()
+    );
+
+    // Final success message
+    log::info!("");
+    log::info!("============================================================");
+    log::info!("Ecosystem Deployment Complete!");
+    log::info!("============================================================");
+    log::info!("  Ecosystem: {}", ecosystem_name.green());
+    log::info!("  Chain: {}", chain_name.green());
+    log::info!(
+        "  Diamond proxy: {}",
+        deployed.diamond_proxy.to_string().green()
+    );
+    log::info!("============================================================");
+    log::info!("");
+    log::info!("You can now start containers and operate the rollup.");
 
     Ok(())
 }
@@ -726,4 +1124,74 @@ fn eth_to_wei(eth: f64) -> U256 {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let wei_u128 = clamped as u128;
     U256::from(wei_u128)
+}
+
+/// Config files that CLI actively parses and uses at ecosystem level.
+const KNOWN_ECOSYSTEM_FILES: &[&str] = &[
+    "ZkStack.yaml",
+    "genesis.json",
+    "configs/contracts.yaml",
+    "configs/wallets.yaml",
+    "configs/initial_deployments.yaml",
+    "configs/apps/portal.config.json",
+];
+
+/// Config files that CLI actively parses and uses at chain level.
+const KNOWN_CHAIN_FILES: &[&str] = &[
+    "ZkStack.yaml",
+    "configs/contracts.yaml",
+    "configs/wallets.yaml",
+    "configs/genesis.yaml",
+    "configs/genesis.json",
+    "configs/general.yaml",
+    "configs/secrets.yaml",
+    "configs/external_node.yaml",
+];
+
+/// Log all deployment files and warn about unhandled ones.
+///
+/// Scans the state directory for config files (yaml, yml, json) and logs:
+/// - ✓ for files that CLI actively parses
+/// - ⚠ for files that are saved but not processed by CLI
+fn log_deployment_files(state_path: &Path, chain_name: &str) {
+    log::info!("");
+    log::info!("Deployment files:");
+
+    for entry in WalkDir::new(state_path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .filter(|e| is_config_file(e.path()))
+    {
+        let Ok(relative) = entry.path().strip_prefix(state_path) else {
+            continue;
+        };
+        let rel_str = relative.to_string_lossy();
+
+        // Check if this is a known file
+        let chain_prefix = format!("chains/{}/", chain_name);
+        let is_known = if let Some(chain_rel) = rel_str.strip_prefix(&chain_prefix) {
+            KNOWN_CHAIN_FILES.contains(&chain_rel)
+        } else {
+            KNOWN_ECOSYSTEM_FILES.contains(&rel_str.as_ref())
+        };
+
+        if is_known {
+            log::info!("  {} {}", "✓".green(), relative.display());
+        } else {
+            log::warn!(
+                "  {} {} (not processed by CLI)",
+                "⚠".yellow(),
+                relative.display()
+            );
+        }
+    }
+}
+
+/// Check if file is a config file (yaml, yml, json).
+fn is_config_file(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|s| s.to_str()),
+        Some("yaml" | "yml" | "json")
+    )
 }

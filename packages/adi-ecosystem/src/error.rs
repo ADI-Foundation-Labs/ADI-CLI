@@ -20,4 +20,15 @@ pub enum EcosystemError {
     /// Ecosystem already exists.
     #[error("Ecosystem '{0}' already exists")]
     AlreadyExists(String),
+
+    /// Required contract address is missing after deployment.
+    #[error("Missing contract address: {0}")]
+    MissingContract(String),
+
+    /// Transaction failed during deployment.
+    #[error("Transaction failed: {reason}")]
+    TransactionFailed {
+        /// Reason for failure.
+        reason: String,
+    },
 }

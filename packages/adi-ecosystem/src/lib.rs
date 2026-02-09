@@ -44,13 +44,17 @@
 
 mod commands;
 mod config;
+mod deploy;
 mod error;
 mod types;
+mod validator;
 mod verify;
 
 // Public re-exports
 pub use commands::{build_ecosystem_create_args, ERA_CONTRACTS_PATH};
 pub use config::{EcosystemConfig, EcosystemConfigBuilder};
+pub use deploy::{add_validator_roles, DeployedContracts};
 pub use error::{EcosystemError, Result};
 pub use types::{L1Network, ProverMode};
+pub use validator::{build_add_validator_roles_calldata, ValidatorRoles};
 pub use verify::verify_ecosystem_created;

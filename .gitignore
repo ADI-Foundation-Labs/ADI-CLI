@@ -17,3 +17,4 @@ target/
 .DS_Store
 .adi.yml
 state
+anvil-zksync.log

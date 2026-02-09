@@ -58,15 +58,13 @@ fn init_logger(debug: bool) {
             let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
 
             // Apply color to entire message for Warn/Error, only to tag for others
-            let color_full_message = matches!(
-                record.level(),
-                ::log::Level::Error | ::log::Level::Warn
-            );
+            let color_full_message =
+                matches!(record.level(), ::log::Level::Error | ::log::Level::Warn);
 
             if color_full_message {
                 writeln!(
                     buf,
-                    "[{timestamp}] [adi-cli]: {style}[{level}]: {args}\x1b[0m",
+                    "[{timestamp}] {style}[{level}]: {args}\x1b[0m",
                     timestamp = timestamp,
                     style = level_style,
                     level = record.level(),
@@ -75,7 +73,7 @@ fn init_logger(debug: bool) {
             } else {
                 writeln!(
                     buf,
-                    "[{timestamp}] [adi-cli]: {style}[{level}]\x1b[0m: {args}",
+                    "[{timestamp}] {style}[{level}]\x1b[0m: {args}",
                     timestamp = timestamp,
                     style = level_style,
                     level = record.level(),

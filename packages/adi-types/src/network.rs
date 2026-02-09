@@ -9,7 +9,7 @@ use strum::{Display, EnumString};
 /// Maps to the `l1_network` field in ZkStack.yaml files.
 ///
 /// # Serde Behavior
-/// - Serializes to lowercase: `"localhost"`, `"sepolia"`, `"mainnet"`
+/// - Serializes to PascalCase: `"Localhost"`, `"Sepolia"`, `"Mainnet"` (zkstack format)
 /// - Deserializes case-insensitively: accepts both `"Sepolia"` and `"sepolia"`
 #[derive(Clone, Debug, Default, Display, EnumString, PartialEq, Eq, ValueEnum)]
 #[strum(serialize_all = "lowercase")]
@@ -29,9 +29,9 @@ impl Serialize for L1Network {
         S: Serializer,
     {
         serializer.serialize_str(match self {
-            Self::Localhost => "localhost",
-            Self::Sepolia => "sepolia",
-            Self::Mainnet => "mainnet",
+            Self::Localhost => "Localhost",
+            Self::Sepolia => "Sepolia",
+            Self::Mainnet => "Mainnet",
         })
     }
 }
@@ -78,7 +78,7 @@ mod tests {
     #[test]
     fn test_l1_network_serialize() {
         let yaml = serde_yaml::to_string(&L1Network::Sepolia).unwrap();
-        assert!(yaml.contains("sepolia"));
+        assert!(yaml.contains("Sepolia"));
     }
 
     #[test]

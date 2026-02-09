@@ -46,16 +46,25 @@ impl ContainerManager {
     }
 
     async fn create(&self, image_uri: &str, config: &ContainerConfig) -> Result<String> {
+        // Docker requires absolute paths for bind mounts
+        let state_dir_absolute = config.state_dir.canonicalize().map_err(|e| {
+            DockerError::ContainerCreateFailed(format!(
+                "Failed to resolve state directory '{}' to absolute path: {}",
+                config.state_dir.display(),
+                e
+            ))
+        })?;
+
         log::debug!(
             "Creating container: image={}, working_dir={}, mount={}:/workspace",
             image_uri,
             config.working_dir,
-            config.state_dir.display()
+            state_dir_absolute.display()
         );
 
         let workspace_mount = Mount {
             target: Some("/workspace".to_string()),
-            source: Some(config.state_dir.to_string_lossy().to_string()),
+            source: Some(state_dir_absolute.to_string_lossy().to_string()),
             typ: Some(MountTypeEnum::BIND),
             read_only: Some(false),
             ..Default::default()
@@ -70,8 +79,26 @@ impl ContainerManager {
             ..Default::default()
         };
 
+        // Mount container /tmp to host state_dir/.tmp for crash reports
+        let tmp_dir = state_dir_absolute.join(".tmp");
+        std::fs::create_dir_all(&tmp_dir).map_err(|e| {
+            DockerError::ContainerCreateFailed(format!(
+                "Failed to create tmp directory '{}': {}",
+                tmp_dir.display(),
+                e
+            ))
+        })?;
+
+        let tmp_mount = Mount {
+            target: Some("/tmp".to_string()),
+            source: Some(tmp_dir.to_string_lossy().to_string()),
+            typ: Some(MountTypeEnum::BIND),
+            read_only: Some(false),
+            ..Default::default()
+        };
+
         let host_config = HostConfig {
-            mounts: Some(vec![workspace_mount, docker_socket_mount]),
+            mounts: Some(vec![workspace_mount, docker_socket_mount, tmp_mount]),
             network_mode: if config.host_network {
                 Some("host".to_string())
             } else {
@@ -96,7 +123,7 @@ impl ContainerManager {
             host_config: Some(host_config),
             attach_stdout: Some(true),
             attach_stderr: Some(true),
-            tty: Some(false),
+            tty: Some(true), // Enable TTY for interactive prompts
             ..Default::default()
         };
 
