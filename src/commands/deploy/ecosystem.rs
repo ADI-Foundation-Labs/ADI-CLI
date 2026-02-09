@@ -648,8 +648,10 @@ async fn run_ecosystem_deployment(
     log::info!("Configuring Validator Roles");
     log::info!("============================================================");
 
+    // Normalize URL for host-side connection (host.docker.internal -> localhost)
+    let normalized_rpc = normalize_rpc_url(rpc_url.as_str());
     let tx_hashes = add_validator_roles(
-        rpc_url.as_str(),
+        &normalized_rpc,
         &deployed,
         chain_wallets,
         &governor_key,

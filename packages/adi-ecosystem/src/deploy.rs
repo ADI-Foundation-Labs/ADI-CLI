@@ -12,6 +12,7 @@ use alloy_primitives::{Address, B256};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
 use alloy_signer_local::PrivateKeySigner;
+use colored::Colorize;
 use secrecy::{ExposeSecret, SecretString};
 
 /// Contract addresses required for validator role configuration.
@@ -98,13 +99,13 @@ pub async fn add_validator_roles(
 ) -> Result<Vec<B256>> {
     log::debug!(
         "Adding validator roles via chain_admin: {}",
-        contracts.chain_admin
+        contracts.chain_admin.to_string().green()
     );
 
     // Create signer from governor key
     let signer = create_signer(governor_key)?;
     let governor_address = signer.address();
-    log::debug!("Governor address: {}", governor_address);
+    log::debug!("Governor address: {}", governor_address.to_string().green());
 
     // Create signing provider
     let wallet = EthereumWallet::from(signer);
@@ -139,7 +140,7 @@ pub async fn add_validator_roles(
                 reason: format!("Failed to get gas price: {}", e),
             })?,
     };
-    log::debug!("Using gas price: {} wei", gas_price);
+    log::debug!("Using gas price: {} wei", gas_price.to_string().green());
 
     // Build list of role assignments
     let mut assignments: Vec<ValidatorRoleAssignment> = Vec::new();
@@ -180,7 +181,7 @@ pub async fn add_validator_roles(
         log::info!(
             "Adding validator roles for {} ({})",
             assignment.name,
-            assignment.operator
+            assignment.operator.to_string().green()
         );
 
         let calldata = build_add_validator_roles_calldata(
@@ -213,7 +214,7 @@ pub async fn add_validator_roles(
                 })?;
 
         let tx_hash = *pending.tx_hash();
-        log::info!("  Transaction submitted: {}", tx_hash);
+        log::info!("  Transaction submitted: {}", tx_hash.to_string().green());
 
         // Wait for confirmation
         let receipt =
@@ -235,8 +236,8 @@ pub async fn add_validator_roles(
 
         log::info!(
             "  Confirmed in block {} (gas used: {})",
-            receipt.block_number.unwrap_or_default(),
-            receipt.gas_used
+            receipt.block_number.unwrap_or_default().to_string().green(),
+            receipt.gas_used.to_string().green()
         );
 
         tx_hashes.push(tx_hash);

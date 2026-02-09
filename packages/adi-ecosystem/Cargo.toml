@@ -28,3 +28,4 @@ alloy-signer-local = { workspace = true }
 secrecy = { workspace = true }
 url = { workspace = true }
 hex = { workspace = true }
+colored = { workspace = true }
