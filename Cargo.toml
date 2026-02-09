@@ -88,6 +88,7 @@ chrono = { version = "0.4", default-features = false, features = ["serde", "std"
 colored = { version = "3", default-features = false }
 dialoguer = { version = "0.11", default-features = false }
 crossterm = { version = "0.28", default-features = false }
+walkdir = { version = "2", default-features = false }
 
 # Build
 built = { version = "0.7", default-features = false, features = ["git2"] }
@@ -152,6 +153,7 @@ url = { workspace = true }
 # Utils
 tempfile = { workspace = true }
 dialoguer = { workspace = true }
+walkdir = { workspace = true }
 
 [build-dependencies]
 built = { workspace = true }

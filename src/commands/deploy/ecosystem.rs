@@ -20,8 +20,10 @@ use colored::Colorize;
 use dialoguer::Confirm;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use std::sync::Arc;
 use url::Url;
+use walkdir::WalkDir;
 
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
@@ -609,6 +611,9 @@ async fn run_ecosystem_deployment(
 
     log::info!("Ecosystem contracts deployed successfully!");
 
+    // Log all deployment files (with warnings for unhandled ones)
+    log_deployment_files(&ecosystem_path, chain_name);
+
     // Re-read chain contracts from state (now populated after deployment)
     let chain_contracts = state_manager
         .chain(chain_name)
@@ -1119,4 +1124,74 @@ fn eth_to_wei(eth: f64) -> U256 {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let wei_u128 = clamped as u128;
     U256::from(wei_u128)
+}
+
+/// Config files that CLI actively parses and uses at ecosystem level.
+const KNOWN_ECOSYSTEM_FILES: &[&str] = &[
+    "ZkStack.yaml",
+    "genesis.json",
+    "configs/contracts.yaml",
+    "configs/wallets.yaml",
+    "configs/initial_deployments.yaml",
+    "configs/apps/portal.config.json",
+];
+
+/// Config files that CLI actively parses and uses at chain level.
+const KNOWN_CHAIN_FILES: &[&str] = &[
+    "ZkStack.yaml",
+    "configs/contracts.yaml",
+    "configs/wallets.yaml",
+    "configs/genesis.yaml",
+    "configs/genesis.json",
+    "configs/general.yaml",
+    "configs/secrets.yaml",
+    "configs/external_node.yaml",
+];
+
+/// Log all deployment files and warn about unhandled ones.
+///
+/// Scans the state directory for config files (yaml, yml, json) and logs:
+/// - ✓ for files that CLI actively parses
+/// - ⚠ for files that are saved but not processed by CLI
+fn log_deployment_files(state_path: &Path, chain_name: &str) {
+    log::info!("");
+    log::info!("Deployment files:");
+
+    for entry in WalkDir::new(state_path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .filter(|e| is_config_file(e.path()))
+    {
+        let Ok(relative) = entry.path().strip_prefix(state_path) else {
+            continue;
+        };
+        let rel_str = relative.to_string_lossy();
+
+        // Check if this is a known file
+        let chain_prefix = format!("chains/{}/", chain_name);
+        let is_known = if let Some(chain_rel) = rel_str.strip_prefix(&chain_prefix) {
+            KNOWN_CHAIN_FILES.contains(&chain_rel)
+        } else {
+            KNOWN_ECOSYSTEM_FILES.contains(&rel_str.as_ref())
+        };
+
+        if is_known {
+            log::info!("  {} {}", "✓".green(), relative.display());
+        } else {
+            log::warn!(
+                "  {} {} (not processed by CLI)",
+                "⚠".yellow(),
+                relative.display()
+            );
+        }
+    }
+}
+
+/// Check if file is a config file (yaml, yml, json).
+fn is_config_file(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|s| s.to_str()),
+        Some("yaml" | "yml" | "json")
+    )
 }
