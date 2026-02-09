@@ -323,7 +323,6 @@ impl ToolkitRunner {
         let mut zkstack_args = String::from(
             "zkstack ecosystem init \
              --verbose \
-             --dev \
              --zksync-os \
              --ignore-prerequisites \
              --observability false \

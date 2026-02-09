@@ -344,6 +344,16 @@ pub fn is_localhost_rpc(rpc_url: &str) -> bool {
         || lower.contains("host.docker.internal")
 }
 
+/// Normalize RPC URL for host-side connections.
+///
+/// Converts `host.docker.internal` to `localhost` since the former
+/// is only resolvable from inside Docker containers.
+pub fn normalize_rpc_url(rpc_url: &str) -> String {
+    rpc_url
+        .replace("host.docker.internal", "localhost")
+        .replace("HOST.DOCKER.INTERNAL", "localhost")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -372,5 +382,29 @@ mod tests {
         assert!(!is_localhost_rpc("https://sepolia.infura.io/v3/key"));
         assert!(!is_localhost_rpc("https://mainnet.infura.io/v3/key"));
         assert!(!is_localhost_rpc("https://rpc.zksync.io"));
+    }
+
+    #[test]
+    fn test_normalize_rpc_url_docker_internal() {
+        assert_eq!(
+            normalize_rpc_url("http://host.docker.internal:8545"),
+            "http://localhost:8545"
+        );
+        assert_eq!(
+            normalize_rpc_url("http://HOST.DOCKER.INTERNAL:8545"),
+            "http://localhost:8545"
+        );
+    }
+
+    #[test]
+    fn test_normalize_rpc_url_passthrough() {
+        assert_eq!(
+            normalize_rpc_url("http://localhost:8545"),
+            "http://localhost:8545"
+        );
+        assert_eq!(
+            normalize_rpc_url("https://sepolia.infura.io/v3/key"),
+            "https://sepolia.infura.io/v3/key"
+        );
     }
 }

@@ -95,7 +95,8 @@ mod transfer;
 
 // Public re-exports
 pub use anvil::{
-    is_localhost_rpc, AnvilFunder, AnvilFundingResult, AnvilFundingTarget, ANVIL_DEFAULT_KEY,
+    is_localhost_rpc, normalize_rpc_url, AnvilFunder, AnvilFundingResult, AnvilFundingTarget,
+    ANVIL_DEFAULT_KEY,
 };
 pub use balance::{
     get_eth_balance, get_token_balance, get_token_decimals, get_token_symbol, get_wallet_balance,
