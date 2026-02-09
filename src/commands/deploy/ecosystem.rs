@@ -7,8 +7,9 @@
 
 use adi_ecosystem::{add_validator_roles, DeployedContracts};
 use adi_funding::{
-    get_wallet_balance, is_localhost_rpc, AnvilFunder, AnvilFundingTarget, DefaultAmounts,
-    FundingConfig, FundingError, FundingExecutor, FundingPlanBuilder, LoggingEventHandler,
+    get_wallet_balance, is_localhost_rpc, normalize_rpc_url, AnvilFunder, AnvilFundingTarget,
+    DefaultAmounts, FundingConfig, FundingError, FundingExecutor, FundingPlanBuilder,
+    LoggingEventHandler,
 };
 use adi_state::StateManager;
 use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
@@ -413,8 +414,8 @@ async fn run_anvil_funding(
     let funding_defaults = &context.config().funding;
     let amounts = build_default_amounts(args, funding_defaults);
 
-    // Create funder to check balances
-    let funder = AnvilFunder::with_rpc(rpc_url.as_str())?
+    // Create funder to check balances (normalize URL for host-side connection)
+    let funder = AnvilFunder::with_rpc(&normalize_rpc_url(rpc_url.as_str()))?
         .with_amounts(amounts)
         .with_event_handler(Arc::new(LoggingEventHandler));
 

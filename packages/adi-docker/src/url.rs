@@ -73,6 +73,7 @@ pub fn transform_url_for_container(url: &str) -> String {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

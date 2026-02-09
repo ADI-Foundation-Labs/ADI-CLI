@@ -339,7 +339,9 @@ impl AnvilFunder {
 /// Check if an RPC URL appears to be a local Anvil instance.
 pub fn is_localhost_rpc(rpc_url: &str) -> bool {
     let lower = rpc_url.to_lowercase();
-    lower.contains("localhost") || lower.contains("127.0.0.1")
+    lower.contains("localhost")
+        || lower.contains("127.0.0.1")
+        || lower.contains("host.docker.internal")
 }
 
 #[cfg(test)]
@@ -357,6 +359,12 @@ mod tests {
     fn test_is_localhost_rpc_127() {
         assert!(is_localhost_rpc("http://127.0.0.1:8545"));
         assert!(is_localhost_rpc("https://127.0.0.1:8545"));
+    }
+
+    #[test]
+    fn test_is_localhost_rpc_docker_internal() {
+        assert!(is_localhost_rpc("http://host.docker.internal:8545"));
+        assert!(is_localhost_rpc("http://HOST.DOCKER.INTERNAL:8545"));
     }
 
     #[test]
