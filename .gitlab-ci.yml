@@ -29,8 +29,8 @@ trigger-build-docker:
 build-docker-amd64:
   stage: build
   image: docker:27.5.1
-  tags: [k8s, azure, dev, amd64]
-  needs: ["trigger-build-docker"]
+  tags: [k8s, azure, dev]
+  when: manual
   services:
     - name: docker:27.5.1-dind
       alias: docker
@@ -75,8 +75,8 @@ build-docker-amd64:
 build-docker-arm64:
   stage: build
   image: docker:27.5.1
-  tags: [k8s, azure, dev, arm64]
-  needs: ["trigger-build-docker"]
+  tags: [k8s, azure-arm, dev]
+  when: manual
   services:
     - name: docker:27.5.1-dind
       alias: docker
