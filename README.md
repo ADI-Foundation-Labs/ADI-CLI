@@ -274,18 +274,24 @@ funding:
   operator_eth: 5.0           # Commits batches
   prove_operator_eth: 5.0     # Submits proofs
   execute_operator_eth: 5.0   # Executes batches
+
+# OPTIONAL: Override Docker toolkit image settings
+# toolkit:
+#   # Use a custom image tag instead of protocol version-derived tag
+#   image_tag: "latest"
 ```
 
 ### Environment Variables
 
 For sensitive data like private keys, use environment variables instead of config files:
 
-| Variable         | Purpose                                                                                                          |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `ADI_FUNDER_KEY` | Private key (hex) of the wallet that funds ecosystem wallets. This is the only wallet you need to fund manually. |
-| `ADI_RPC_URL`    | Settlement layer RPC endpoint. Useful for switching networks without editing config.                             |
-| `ADI_CONFIG`     | Path to an alternative config file.                                                                              |
-| `RUST_LOG`       | Logging verbosity: `error`, `warn`, `info`, `debug`, `trace`                                                     |
+| Variable                   | Purpose                                                                                                          |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `ADI_FUNDER_KEY`           | Private key (hex) of the wallet that funds ecosystem wallets. This is the only wallet you need to fund manually. |
+| `ADI_RPC_URL`              | Settlement layer RPC endpoint. Useful for switching networks without editing config.                             |
+| `ADI_CONFIG`               | Path to an alternative config file.                                                                              |
+| `ADI__TOOLKIT__IMAGE_TAG`  | Override Docker image tag for toolkit containers (e.g., `latest` or `custom-build`).                             |
+| `RUST_LOG`                 | Logging verbosity: `error`, `warn`, `info`, `debug`, `trace`                                                     |
 
 You can also override any config value using the `ADI__` prefix with double underscores as path separators:
 
@@ -560,6 +566,35 @@ When the CLI needs to run a toolkit command:
 5. **Cleanup** — Removes the container (state persists in mounted volume)
 
 This ephemeral approach means containers don't accumulate—each operation starts fresh.
+
+### Overriding the Image Tag
+
+By default, the CLI determines the Docker image tag from the protocol version (e.g., `v30.0.2`). You can override this for testing custom builds or using special tags like `latest`.
+
+**Priority order:** CLI flag > environment variable > config file > protocol version
+
+**CLI flag (highest priority):**
+```bash
+adi --image-tag custom-tag init ecosystem -p v30.0.2
+adi --image-tag latest deploy ecosystem -p v30.0.2
+```
+
+**Environment variable:**
+```bash
+export ADI__TOOLKIT__IMAGE_TAG=custom-tag
+adi deploy ecosystem -p v30.0.2
+```
+
+**Config file (`~/.adi.yml`):**
+```yaml
+toolkit:
+  image_tag: custom-tag
+```
+
+When an override is set, the CLI will use it instead of deriving the tag from the protocol version. This is useful for:
+- Testing pre-release or development builds
+- Using `latest` tag for always-current images
+- Working with private registries that use different tagging schemes
 
 ### Building Custom Images
 
