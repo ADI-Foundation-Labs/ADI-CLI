@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{context::Context, error::Result};
 
+mod accept;
 mod deploy;
 mod init;
 mod show;
@@ -25,6 +26,11 @@ pub enum Commands {
         #[command(subcommand)]
         command: deploy::DeployCommand,
     },
+    /// Accept pending ownership transfers for deployed contracts
+    Accept {
+        #[command(subcommand)]
+        command: accept::AcceptCommand,
+    },
 }
 
 impl Commands {
@@ -33,6 +39,7 @@ impl Commands {
             Commands::Show { command } => command.run(context).await,
             Commands::Init { command } => command.run(context).await,
             Commands::Deploy { command } => command.run(context).await,
+            Commands::Accept { command } => command.run(context).await,
         }
     }
 }

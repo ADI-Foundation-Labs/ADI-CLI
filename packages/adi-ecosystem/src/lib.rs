@@ -46,6 +46,7 @@ mod commands;
 mod config;
 mod deploy;
 mod error;
+mod ownership;
 mod types;
 mod validator;
 mod verify;
@@ -55,6 +56,11 @@ pub use commands::{build_ecosystem_create_args, ERA_CONTRACTS_PATH};
 pub use config::{EcosystemConfig, EcosystemConfigBuilder};
 pub use deploy::{add_validator_roles, DeployedContracts};
 pub use error::{EcosystemError, Result};
+pub use ownership::{
+    accept_all_ownership, build_accept_ownership_calldata,
+    build_accept_ownership_multicall_calldata, OwnershipContract, OwnershipMethod, OwnershipResult,
+    OwnershipSummary,
+};
 pub use types::{L1Network, ProverMode};
 pub use validator::{build_add_validator_roles_calldata, ValidatorRoles};
 pub use verify::verify_ecosystem_created;
