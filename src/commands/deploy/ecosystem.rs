@@ -568,7 +568,7 @@ async fn run_ecosystem_deployment(
     log::info!("Deploying Ecosystem Contracts");
     log::info!("============================================================");
 
-    let runner = ToolkitRunner::new()
+    let runner = ToolkitRunner::with_config(context.toolkit_config())
         .await
         .wrap_err("Failed to create toolkit runner")?;
 

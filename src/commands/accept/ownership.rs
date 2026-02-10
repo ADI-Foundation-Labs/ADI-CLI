@@ -93,13 +93,10 @@ pub async fn run(args: OwnershipAcceptArgs, context: &Context) -> Result<()> {
     // Check ecosystem ownership status
     log::info!("");
     log::info!("{}", "Checking ecosystem ownership status...".cyan());
-    let ecosystem_status = check_ecosystem_ownership_status(
-        rpc_url.as_str(),
-        &ecosystem_contracts,
-        governor_address,
-    )
-    .await
-    .wrap_err("Failed to check ecosystem ownership status")?;
+    let ecosystem_status =
+        check_ecosystem_ownership_status(rpc_url.as_str(), &ecosystem_contracts, governor_address)
+            .await
+            .wrap_err("Failed to check ecosystem ownership status")?;
 
     // Display ecosystem contracts with pending status
     log::info!("");
@@ -118,13 +115,10 @@ pub async fn run(args: OwnershipAcceptArgs, context: &Context) -> Result<()> {
                     "{}",
                     format!("Checking chain '{}' ownership status...", chain_name).cyan()
                 );
-                let status = check_chain_ownership_status(
-                    rpc_url.as_str(),
-                    &contracts,
-                    governor_address,
-                )
-                .await
-                .wrap_err("Failed to check chain ownership status")?;
+                let status =
+                    check_chain_ownership_status(rpc_url.as_str(), &contracts, governor_address)
+                        .await
+                        .wrap_err("Failed to check chain ownership status")?;
 
                 log::info!("");
                 log::info!("{}", format!("Chain '{}' contracts:", chain_name).cyan());
@@ -160,7 +154,11 @@ pub async fn run(args: OwnershipAcceptArgs, context: &Context) -> Result<()> {
 
     log::info!(
         "{}",
-        format!("{} contract(s) have pending ownership transfers.", total_pending).yellow()
+        format!(
+            "{} contract(s) have pending ownership transfers.",
+            total_pending
+        )
+        .yellow()
     );
 
     // Dry-run mode
@@ -228,8 +226,8 @@ pub async fn run(args: OwnershipAcceptArgs, context: &Context) -> Result<()> {
     }
 
     // Return appropriate status
-    let total_successes =
-        ecosystem_summary.successful_count() + chain_summary.as_ref().map_or(0, |s| s.successful_count());
+    let total_successes = ecosystem_summary.successful_count()
+        + chain_summary.as_ref().map_or(0, |s| s.successful_count());
     let total_results =
         ecosystem_summary.results.len() + chain_summary.as_ref().map_or(0, |s| s.results.len());
 
@@ -338,8 +336,7 @@ fn derive_address_from_key(key: &secrecy::SecretString) -> Result<Address> {
         .try_into()
         .map_err(|_| eyre::eyre!("Private key must be 32 bytes"))?;
 
-    let signer = PrivateKeySigner::from_bytes(&key_bytes.into())
-        .wrap_err("Invalid private key")?;
+    let signer = PrivateKeySigner::from_bytes(&key_bytes.into()).wrap_err("Invalid private key")?;
 
     Ok(signer.address())
 }

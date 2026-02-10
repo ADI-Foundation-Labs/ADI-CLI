@@ -12,6 +12,18 @@ pub const DEFAULT_STATE_DIR: &str = ".adi_cli/state";
 /// Environment variable for specifying config file path.
 pub const CONFIG_ENV_VAR: &str = "ADI_CONFIG";
 
+/// Default toolkit configuration values.
+///
+/// These can be overridden by CLI flags or environment variables.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct ToolkitDefaults {
+    /// Custom image tag override.
+    /// When set, this overrides the protocol version-derived tag.
+    /// Can be overridden with --image-tag or ADI__TOOLKIT__IMAGE_TAG env var.
+    #[serde(default)]
+    pub image_tag: Option<String>,
+}
+
 /// Default funding configuration values.
 ///
 /// These can be overridden by CLI flags or environment variables.
@@ -88,6 +100,11 @@ pub struct Config {
     /// These can be overridden by CLI flags.
     #[serde(default)]
     pub funding: FundingDefaults,
+
+    /// Default toolkit configuration values.
+    /// These can be overridden by CLI flags.
+    #[serde(default)]
+    pub toolkit: ToolkitDefaults,
 }
 
 impl Config {

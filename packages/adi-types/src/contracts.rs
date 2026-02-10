@@ -200,8 +200,11 @@ impl EcosystemContracts {
     ///
     /// Checks root level first, then falls back to ZkSync OS CTM.
     pub fn server_notifier_addr(&self) -> Option<Address> {
-        self.server_notifier_proxy_addr
-            .or_else(|| self.zksync_os_ctm.as_ref().and_then(|c| c.server_notifier_proxy_addr))
+        self.server_notifier_proxy_addr.or_else(|| {
+            self.zksync_os_ctm
+                .as_ref()
+                .and_then(|c| c.server_notifier_proxy_addr)
+        })
     }
 
     /// Returns the verifier address if available.
@@ -216,8 +219,11 @@ impl EcosystemContracts {
     ///
     /// Checks root level first, then falls back to ZkSync OS CTM.
     pub fn l1_rollup_da_manager_addr(&self) -> Option<Address> {
-        self.l1_rollup_da_manager
-            .or_else(|| self.zksync_os_ctm.as_ref().and_then(|c| c.l1_rollup_da_manager))
+        self.l1_rollup_da_manager.or_else(|| {
+            self.zksync_os_ctm
+                .as_ref()
+                .and_then(|c| c.l1_rollup_da_manager)
+        })
     }
 }
 

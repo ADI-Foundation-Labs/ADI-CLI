@@ -35,6 +35,11 @@ pub struct Opts {
     #[serde(default)]
     pub debug: bool,
 
+    /// Override toolkit Docker image tag (e.g., "v30.0.2-custom" or "latest")
+    #[arg(global = true, long = "image-tag")]
+    #[serde(default)]
+    pub image_tag: Option<String>,
+
     #[command(subcommand)]
     cmd: commands::Commands,
 }

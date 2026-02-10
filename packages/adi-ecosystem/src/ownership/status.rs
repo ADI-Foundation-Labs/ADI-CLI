@@ -3,8 +3,8 @@
 //! This module provides functions to check the ownership status
 //! of ecosystem and chain contracts.
 
-use super::types::{ownerCall, pendingOwnerCall, OwnershipState, OwnershipStatus};
 use super::types::OwnershipStatusSummary;
+use super::types::{ownerCall, pendingOwnerCall, OwnershipState, OwnershipStatus};
 use crate::error::{EcosystemError, Result};
 use adi_types::{ChainContracts, EcosystemContracts};
 use alloy_primitives::Address;
@@ -147,7 +147,10 @@ pub async fn check_chain_ownership_status(
 }
 
 /// Call pendingOwner() on a contract and return the result.
-pub(crate) async fn call_pending_owner<P>(provider: &P, contract_address: Address) -> Option<Address>
+pub(crate) async fn call_pending_owner<P>(
+    provider: &P,
+    contract_address: Address,
+) -> Option<Address>
 where
     P: Provider + Clone,
 {

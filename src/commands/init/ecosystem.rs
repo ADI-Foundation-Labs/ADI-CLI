@@ -124,7 +124,7 @@ pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
 
     // 7. Create toolkit runner and execute pointing to temp dir
     log::info!("Connecting to Docker...");
-    let runner = ToolkitRunner::new()
+    let runner = ToolkitRunner::with_config(context.toolkit_config())
         .await
         .wrap_err("Failed to create toolkit runner")?;
 

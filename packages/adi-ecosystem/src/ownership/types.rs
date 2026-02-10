@@ -146,12 +146,7 @@ impl OwnershipSummary {
     pub fn skipped_count(&self) -> usize {
         self.results
             .iter()
-            .filter(|r| {
-                !r.success
-                    && r.error
-                        .as_ref()
-                        .is_some_and(|e| e.starts_with("Skipped:"))
-            })
+            .filter(|r| !r.success && r.error.as_ref().is_some_and(|e| e.starts_with("Skipped:")))
             .count()
     }
 
@@ -159,12 +154,7 @@ impl OwnershipSummary {
     pub fn failed_count(&self) -> usize {
         self.results
             .iter()
-            .filter(|r| {
-                !r.success
-                    && r.error
-                        .as_ref()
-                        .is_none_or(|e| !e.starts_with("Skipped:"))
-            })
+            .filter(|r| !r.success && r.error.as_ref().is_none_or(|e| !e.starts_with("Skipped:")))
             .count()
     }
 

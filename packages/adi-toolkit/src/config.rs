@@ -35,6 +35,9 @@ pub struct ToolkitConfig {
 
     /// Timeout for container operations in seconds.
     pub timeout_seconds: u64,
+
+    /// Optional tag override. When set, bypasses protocol version-derived tag.
+    pub tag_override: Option<String>,
 }
 
 impl Default for ToolkitConfig {
@@ -43,6 +46,7 @@ impl Default for ToolkitConfig {
             registry: DEFAULT_REGISTRY.to_string(),
             image_name: DEFAULT_IMAGE_NAME.to_string(),
             timeout_seconds: DEFAULT_TIMEOUT_SECONDS,
+            tag_override: None,
         }
     }
 }
@@ -59,6 +63,7 @@ impl ToolkitConfig {
             registry: registry.into(),
             image_name: image_name.into(),
             timeout_seconds: DEFAULT_TIMEOUT_SECONDS,
+            tag_override: None,
         }
     }
 
@@ -69,7 +74,18 @@ impl ToolkitConfig {
         self
     }
 
+    /// Set a custom image tag override.
+    ///
+    /// When set, this overrides the protocol version-derived tag.
+    #[must_use]
+    pub fn with_tag_override(mut self, tag: impl Into<String>) -> Self {
+        self.tag_override = Some(tag.into());
+        self
+    }
+
     /// Build an image reference for a specific protocol version.
+    ///
+    /// If `tag_override` is set, it will be used instead of the version-derived tag.
     ///
     /// # Arguments
     ///
@@ -79,12 +95,16 @@ impl ToolkitConfig {
     ///
     /// An `ImageReference` with the full image URI.
     pub fn image_reference(&self, version: &Version) -> ImageReference {
-        let tag = format!("v{}.{}.{}", version.major, version.minor, version.patch);
+        let tag = self
+            .tag_override
+            .clone()
+            .unwrap_or_else(|| format!("v{}.{}.{}", version.major, version.minor, version.patch));
         log::debug!(
-            "Building image reference: registry={}, image={}, tag={}",
+            "Building image reference: registry={}, image={}, tag={} (override={})",
             self.registry,
             self.image_name,
-            tag
+            tag,
+            self.tag_override.is_some()
         );
         ImageReference {
             registry: self.registry.clone(),
@@ -161,5 +181,27 @@ mod tests {
         assert_eq!(config.registry, "my-registry.io");
         assert_eq!(config.image_name, "my-toolkit");
         assert_eq!(config.timeout_seconds, 3600);
+    }
+
+    #[test]
+    fn test_tag_override() {
+        let config = ToolkitConfig::default().with_tag_override("custom-tag");
+        let version = Version::new(30, 0, 2);
+        let image_ref = config.image_reference(&version);
+
+        assert_eq!(image_ref.tag, "custom-tag");
+        assert_eq!(
+            image_ref.full_uri(),
+            "harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:custom-tag"
+        );
+    }
+
+    #[test]
+    fn test_no_tag_override_uses_version() {
+        let config = ToolkitConfig::default();
+        let version = Version::new(30, 0, 2);
+        let image_ref = config.image_reference(&version);
+
+        assert_eq!(image_ref.tag, "v30.0.2");
     }
 }

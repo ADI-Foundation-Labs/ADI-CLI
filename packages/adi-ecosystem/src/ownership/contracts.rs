@@ -63,7 +63,13 @@ where
     let calldata = build_accept_ownership_calldata();
 
     match send_ownership_tx(
-        provider, chain_admin, calldata, governor, chain_id, *nonce, gas_price,
+        provider,
+        chain_admin,
+        calldata,
+        governor,
+        chain_id,
+        *nonce,
+        gas_price,
     )
     .await
     {
