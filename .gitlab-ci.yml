@@ -49,7 +49,7 @@ trigger-build-docker:
   stage: build
   # when: manual
   script:
-    - echo "Starting multiarch build for target $build_target..."
+    - echo "Starting multiarch build for target $[[ inputs.build_target ]]..."
 
 # Build AMD64 image on native AMD64 runner
 build-docker-amd64:
@@ -61,7 +61,7 @@ build-docker-amd64:
     # Initialize buildx
     - docker buildx create --name builder-amd64 --driver docker-container --use || true
     - docker buildx inspect --bootstrap
-    - task build:docker:amd64 TARGETS="$build_target" LOAD=false PUSH=true
+    - task build:docker:amd64 TARGETS="$[[ inputs.build_target ]]" LOAD=false PUSH=true
 
 # Build ARM64 image on native ARM64 runner
 build-docker-arm64:
@@ -73,7 +73,7 @@ build-docker-arm64:
     # Initialize buildx
     - docker buildx create --name builder-arm64 --driver docker-container --use || true
     - docker buildx inspect --bootstrap
-    - task build:docker:arm64 TARGETS="$build_target" LOAD=false PUSH=true
+    - task build:docker:arm64 TARGETS="$[[ inputs.build_target ]]" LOAD=false PUSH=true
 
 # Create multiarch manifest from AMD64 and ARM64 images
 build-docker-manifest:
@@ -84,4 +84,4 @@ build-docker-manifest:
     - build-docker-amd64
     - build-docker-arm64
   script:
-    - task build:docker:manifest TARGETS="$build_target"
+    - task build:docker:manifest TARGETS="$[[ inputs.build_target ]]"
