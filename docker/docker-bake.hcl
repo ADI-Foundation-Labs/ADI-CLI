@@ -26,9 +26,14 @@ variable "CACHE_TO_REF" {
   default = ""
 }
 
+variable "TAGS" {
+  default = null
+}
+
 target "common" {
   dockerfile = "docker/worker/Dockerfile"
   platforms = PLATFORM != "" ? [PLATFORM] : PLATFORMS
+  tags = TAGS != null ? TAGS : ["${REGISTRY}/adi-toolkit:${CI_COMMIT_REF_SLUG}"]
   cache-from = CACHE_FROM
   cache-to = notequal("", CACHE_TO_REF) ? ["type=registry,ref=${CACHE_TO_REF},mode=max"] : []
 }

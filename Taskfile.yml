@@ -53,17 +53,28 @@ tasks:
     internal: true
     vars:
       ARCH_SLUG: '{{default "arm64" .ARCH_SLUG}}'
-      CACHE_TO_REF: '{{.REGISTRY}}/adi-toolkit:cache-{{.ARCH_SLUG}}-{{.CACHE_REF_SLUG}}'
+      REF_SLUG: '{{default "main" .CI_COMMIT_REF_SLUG}}'
+      CACHE_TO_REF: '{{.REGISTRY}}/adi-toolkit:cache-{{.ARCH_SLUG}}-{{.REF_SLUG}}'
       LOAD: '{{default "true" .LOAD}}'
       PUSH: '{{default "false" .PUSH}}'
     cmds:
       - |
+        # Construct tags list
+        MAIN_TAG="{{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}}-{{.ARCH_SLUG}}-{{.CI_COMMIT_SHORT_SHA}}"
+        EXTRA_TAG="{{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}"
+
+        if [ "{{.LOAD}}" = "true" ]; then
+          TAGS="[\"$MAIN_TAG\",\"$EXTRA_TAG\"]"
+        else
+          TAGS="[\"$MAIN_TAG\"]"
+        fi
+
         PLATFORM={{.PLATFORM}} \
         CACHE_TO_REF={{.CACHE_TO_REF}} \
+        TAGS="$TAGS" \
         docker buildx bake -f docker/docker-bake.hcl \
         {{if eq .LOAD "true"}}--load{{end}} \
         {{if eq .PUSH "true"}}--push{{end}} \
-        --set "*.tags={{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.ARCH_SLUG}}-{{.CI_COMMIT_SHORT_SHA}}" \
         {{.TARGETS}}
 
   build:docker:amd64:
@@ -78,14 +89,27 @@ tasks:
       - task: build:docker:internal
         vars: { PLATFORM: "linux/arm64", ARCH_SLUG: "arm64" }
 
-  build:docker:manifest:
+  build:docker:
     desc: Create and push multiarch manifest
+    vars:
+      REF_SLUG: '{{default "main" .CI_COMMIT_REF_SLUG}}'
     cmds:
+      # Push mutable tag: v29-branch
       - |
-        docker buildx imagetools create -t {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}} \
-          {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-amd64-{{.CI_COMMIT_SHORT_SHA}} \
-          {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-arm64-{{.CI_COMMIT_SHORT_SHA}}
+        docker buildx imagetools create -t {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}} \
+          {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}}-amd64-{{.CI_COMMIT_SHORT_SHA}} \
+          {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}}-arm64-{{.CI_COMMIT_SHORT_SHA}}
+
+      # Push immutable tag: v29-branch-sha
       - |
-        docker buildx imagetools create -t {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.CI_COMMIT_SHORT_SHA}} \
-          {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-amd64-{{.CI_COMMIT_SHORT_SHA}} \
-          {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-arm64-{{.CI_COMMIT_SHORT_SHA}}
+        docker buildx imagetools create -t {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}}-{{.CI_COMMIT_SHORT_SHA}} \
+          {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}}-amd64-{{.CI_COMMIT_SHORT_SHA}} \
+          {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}}-arm64-{{.CI_COMMIT_SHORT_SHA}}
+
+      # Push "latest" version tag only for main: v29
+      - |
+        if [ "{{.REF_SLUG}}" = "main" ]; then
+          docker buildx imagetools create -t {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}} \
+            {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}}-amd64-{{.CI_COMMIT_SHORT_SHA}} \
+            {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}}-arm64-{{.CI_COMMIT_SHORT_SHA}}
+        fi
