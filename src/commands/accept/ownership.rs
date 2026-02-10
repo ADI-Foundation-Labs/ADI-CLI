@@ -5,7 +5,7 @@
 
 use adi_ecosystem::{
     accept_all_ownership, accept_chain_ownership, check_chain_ownership_status,
-    check_ecosystem_ownership_status, OwnershipStatusSummary, OwnershipSummary,
+    check_ecosystem_ownership_status, OwnershipState, OwnershipStatusSummary, OwnershipSummary,
 };
 use adi_state::StateManager;
 use adi_types::{ChainContracts, EcosystemContracts};
@@ -330,8 +330,8 @@ fn derive_address_from_key(key: &secrecy::SecretString) -> Result<Address> {
 /// Display ownership status for contracts.
 fn display_ownership_status(summary: &OwnershipStatusSummary) {
     for status in &summary.statuses {
-        match (status.address, status.is_pending) {
-            (Some(addr), true) => {
+        match (status.address, status.state) {
+            (Some(addr), OwnershipState::Pending) => {
                 log::info!(
                     "  {} {}: {} {}",
                     "⏳".yellow(),
@@ -340,13 +340,22 @@ fn display_ownership_status(summary: &OwnershipStatusSummary) {
                     "(pending)".yellow()
                 );
             }
-            (Some(addr), false) => {
+            (Some(addr), OwnershipState::Accepted) => {
                 log::info!(
                     "  {} {}: {} {}",
                     "✓".green(),
                     status.name,
                     addr.to_string().green(),
-                    "(already accepted)".green()
+                    "(accepted)".green()
+                );
+            }
+            (Some(addr), OwnershipState::NotTransferred) => {
+                log::info!(
+                    "  {} {}: {} {}",
+                    "⚠".red(),
+                    status.name,
+                    addr.to_string().green(),
+                    "(ownership not transferred!)".red()
                 );
             }
             (None, _) => {

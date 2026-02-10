@@ -3,7 +3,7 @@
 //! This module handles accepting ownership for contracts that use:
 //! - Ownable2Step pattern (`acceptOwnership()`)
 //! - Multicall pattern (via ChainAdmin)
-//! - Governance pattern (`acceptOwner(target)`)
+//! - Governance pattern (via scheduleTransparent + execute)
 //!
 //! # Contracts Handled
 //!
@@ -12,7 +12,7 @@
 //! - Validator Timelock (direct acceptOwnership)
 //! - Verifier (direct acceptOwnership)
 //! - Governance (direct acceptOwnership)
-//! - RollupDA Manager (via governance acceptOwner)
+//! - RollupDA Manager (via Governance scheduleTransparent + execute)
 
 use crate::error::{EcosystemError, Result};
 use adi_types::{ChainContracts, EcosystemContracts};
@@ -39,17 +39,40 @@ sol! {
     #[allow(missing_docs)]
     function owner() external view returns (address);
 
-    /// Governance acceptOwner for governance-controlled contracts.
-    /// Used by RollupDAManager.
-    #[allow(missing_docs)]
-    function acceptOwner(address target) external;
-
     /// ChainAdmin multicall interface.
     #[allow(missing_docs)]
     function multicall(
         (address, uint256, bytes)[] calls,
         bool requireSuccess
     ) external;
+
+    /// Governance Call struct for operations.
+    #[allow(missing_docs)]
+    struct Call {
+        address target;
+        uint256 value;
+        bytes data;
+    }
+
+    /// Governance Operation struct.
+    #[allow(missing_docs)]
+    struct Operation {
+        Call[] calls;
+        bytes32 predecessor;
+        bytes32 salt;
+    }
+
+    /// Governance scheduleTransparent function.
+    #[allow(missing_docs)]
+    function scheduleTransparent(Operation operation, uint256 delay) external;
+
+    /// Governance execute function.
+    #[allow(missing_docs)]
+    function execute(Operation operation) external payable;
+
+    /// Governance minDelay getter.
+    #[allow(missing_docs)]
+    function minDelay() external view returns (uint256);
 }
 
 /// Contract requiring ownership acceptance.
@@ -127,15 +150,26 @@ pub struct OwnershipSummary {
     pub results: Vec<OwnershipResult>,
 }
 
-/// Status of a contract's pending ownership.
+/// Ownership state for a contract.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OwnershipState {
+    /// Ownership transfer pending - needs acceptOwnership().
+    Pending,
+    /// Ownership already accepted - owner is governor.
+    Accepted,
+    /// Ownership transfer not initiated - owner is not governor, no pending owner.
+    NotTransferred,
+}
+
+/// Status of a contract's ownership.
 #[derive(Debug, Clone)]
 pub struct OwnershipStatus {
     /// Contract name.
     pub name: &'static str,
     /// Contract address (None if not configured).
     pub address: Option<Address>,
-    /// Whether ownership acceptance is pending.
-    pub is_pending: bool,
+    /// Current ownership state.
+    pub state: OwnershipState,
 }
 
 /// Summary of ownership status check.
@@ -148,7 +182,10 @@ pub struct OwnershipStatusSummary {
 impl OwnershipStatusSummary {
     /// Returns the number of contracts with pending ownership.
     pub fn pending_count(&self) -> usize {
-        self.statuses.iter().filter(|s| s.is_pending).count()
+        self.statuses
+            .iter()
+            .filter(|s| s.state == OwnershipState::Pending)
+            .count()
     }
 
     /// Returns the number of contracts not configured.
@@ -160,7 +197,15 @@ impl OwnershipStatusSummary {
     pub fn already_accepted_count(&self) -> usize {
         self.statuses
             .iter()
-            .filter(|s| s.address.is_some() && !s.is_pending)
+            .filter(|s| s.state == OwnershipState::Accepted)
+            .count()
+    }
+
+    /// Returns the number of contracts where ownership was not transferred.
+    pub fn not_transferred_count(&self) -> usize {
+        self.statuses
+            .iter()
+            .filter(|s| s.state == OwnershipState::NotTransferred)
             .count()
     }
 }
@@ -239,13 +284,66 @@ pub fn build_accept_ownership_multicall_calldata(target_contract: Address) -> By
     Bytes::from(multicall_call.abi_encode())
 }
 
-/// Build calldata for governance acceptOwner call.
+/// Build calldata for governance scheduleTransparent call.
 ///
-/// Used for contracts like RollupDAManager that are owned by governance.
+/// Used to schedule an acceptOwnership operation on a target contract
+/// through the Governance timelock.
 #[must_use]
-pub fn build_governance_accept_owner_calldata(target: Address) -> Bytes {
-    let call = acceptOwnerCall { target };
-    Bytes::from(call.abi_encode())
+pub fn build_governance_schedule_calldata(target: Address, salt: B256) -> Bytes {
+    // Build the inner acceptOwnership call
+    let accept_call = acceptOwnershipCall {};
+    let accept_calldata = Bytes::from(accept_call.abi_encode());
+
+    // Create the Call struct
+    let call = Call {
+        target,
+        value: U256::ZERO,
+        data: accept_calldata,
+    };
+
+    // Create the Operation struct
+    let operation = Operation {
+        calls: vec![call],
+        predecessor: B256::ZERO,
+        salt,
+    };
+
+    // Build scheduleTransparent(operation, 0) - delay=0 for immediate execution
+    let schedule_call = scheduleTransparentCall {
+        operation,
+        delay: U256::ZERO,
+    };
+
+    Bytes::from(schedule_call.abi_encode())
+}
+
+/// Build calldata for governance execute call.
+///
+/// Used to execute a previously scheduled operation.
+#[must_use]
+pub fn build_governance_execute_calldata(target: Address, salt: B256) -> Bytes {
+    // Build the inner acceptOwnership call
+    let accept_call = acceptOwnershipCall {};
+    let accept_calldata = Bytes::from(accept_call.abi_encode());
+
+    // Create the Call struct
+    let call = Call {
+        target,
+        value: U256::ZERO,
+        data: accept_calldata,
+    };
+
+    // Create the Operation struct (must match what was scheduled)
+    let operation = Operation {
+        calls: vec![call],
+        predecessor: B256::ZERO,
+        salt,
+    };
+
+    // Build execute(operation)
+    let execute_call = executeCall { operation };
+
+    Bytes::from(execute_call.abi_encode())
 }
 
 /// Check ownership status for all ecosystem contracts.
@@ -274,69 +372,71 @@ pub async fn check_ecosystem_ownership_status(
 
     let mut statuses = Vec::new();
 
-    // Check Server Notifier
+    // Get chain_admin for contracts that are owned by it
+    let chain_admin = contracts.chain_admin_addr();
+
+    // Check Server Notifier (owned by ChainAdmin, not governor)
     let server_notifier_addr = contracts.server_notifier_addr();
-    let is_pending = if let Some(addr) = server_notifier_addr {
-        check_pending_owner(&provider, addr, governor_address).await
-    } else {
-        false
+    let state = match (server_notifier_addr, chain_admin) {
+        (Some(addr), Some(ca)) => check_ownership_state(&provider, addr, ca).await,
+        _ => OwnershipState::NotTransferred,
     };
     statuses.push(OwnershipStatus {
         name: "Server Notifier",
         address: server_notifier_addr,
-        is_pending,
+        state,
     });
 
     // Check Validator Timelock
     let timelock_addr = contracts.validator_timelock_addr();
-    let is_pending = if let Some(addr) = timelock_addr {
-        check_pending_owner(&provider, addr, governor_address).await
+    let state = if let Some(addr) = timelock_addr {
+        check_ownership_state(&provider, addr, governor_address).await
     } else {
-        false
+        OwnershipState::NotTransferred
     };
     statuses.push(OwnershipStatus {
         name: "Validator Timelock",
         address: timelock_addr,
-        is_pending,
+        state,
     });
 
     // Check Verifier
     let verifier_addr = contracts.verifier_addr();
-    let is_pending = if let Some(addr) = verifier_addr {
-        check_pending_owner(&provider, addr, governor_address).await
+    let state = if let Some(addr) = verifier_addr {
+        check_ownership_state(&provider, addr, governor_address).await
     } else {
-        false
+        OwnershipState::NotTransferred
     };
     statuses.push(OwnershipStatus {
         name: "Verifier",
         address: verifier_addr,
-        is_pending,
+        state,
     });
 
     // Check Governance
     let governance_addr = contracts.governance_addr();
-    let is_pending = if let Some(addr) = governance_addr {
-        check_pending_owner(&provider, addr, governor_address).await
+    let state = if let Some(addr) = governance_addr {
+        check_ownership_state(&provider, addr, governor_address).await
     } else {
-        false
+        OwnershipState::NotTransferred
     };
     statuses.push(OwnershipStatus {
         name: "Governance",
         address: governance_addr,
-        is_pending,
+        state,
     });
 
     // Check Rollup DA Manager (pending owner should be governance, not governor)
     let da_manager_addr = contracts.l1_rollup_da_manager_addr();
-    let is_pending = if let (Some(da_addr), Some(gov_addr)) = (da_manager_addr, governance_addr) {
-        check_pending_owner(&provider, da_addr, gov_addr).await
+    let state = if let (Some(da_addr), Some(gov_addr)) = (da_manager_addr, governance_addr) {
+        check_ownership_state(&provider, da_addr, gov_addr).await
     } else {
-        false
+        OwnershipState::NotTransferred
     };
     statuses.push(OwnershipStatus {
         name: "Rollup DA Manager",
         address: da_manager_addr,
-        is_pending,
+        state,
     });
 
     Ok(OwnershipStatusSummary { statuses })
@@ -367,57 +467,90 @@ pub async fn check_chain_ownership_status(
 
     // Check Chain Admin
     let chain_admin_addr = contracts.chain_admin_addr();
-    let is_pending = if let Some(addr) = chain_admin_addr {
-        check_pending_owner(&provider, addr, governor_address).await
+    let state = if let Some(addr) = chain_admin_addr {
+        check_ownership_state(&provider, addr, governor_address).await
     } else {
-        false
+        OwnershipState::NotTransferred
     };
     statuses.push(OwnershipStatus {
         name: "Chain Admin",
         address: chain_admin_addr,
-        is_pending,
+        state,
     });
 
     Ok(OwnershipStatusSummary { statuses })
 }
 
-/// Check if governor is the pending owner of a contract.
-///
-/// Returns `true` if governor should call acceptOwnership (is pending owner).
-/// Returns `false` if ownership is already accepted or governor is not pending owner.
-async fn check_pending_owner<P>(
-    provider: &P,
-    contract_address: Address,
-    governor_address: Address,
-) -> bool
+/// Call pendingOwner() on a contract and return the result.
+async fn call_pending_owner<P>(provider: &P, contract_address: Address) -> Option<Address>
 where
     P: Provider + Clone,
 {
-    // Build calldata for pendingOwner() call
     let calldata = pendingOwnerCall {}.abi_encode();
-
-    // Create call request
     let tx = alloy_rpc_types::TransactionRequest::default()
         .to(contract_address)
         .input(calldata.into());
 
-    // Execute eth_call
     match provider.call(tx).await {
-        Ok(result) => {
-            // Decode the result as address (last 20 bytes of 32-byte word)
-            if let Some(slice) = result.get(12..32) {
-                let pending = Address::from_slice(slice);
-                pending == governor_address
-            } else {
-                false
-            }
-        }
+        Ok(result) => result.get(12..32).map(Address::from_slice),
         Err(e) => {
-            log::debug!("Failed to check pendingOwner for {}: {}", contract_address, e);
-            // If we can't check, assume we should try (fail-safe)
-            true
+            log::debug!(
+                "Failed to call pendingOwner for {}: {}",
+                contract_address,
+                e
+            );
+            None
         }
     }
+}
+
+/// Call owner() on a contract and return the result.
+async fn call_owner<P>(provider: &P, contract_address: Address) -> Option<Address>
+where
+    P: Provider + Clone,
+{
+    let calldata = ownerCall {}.abi_encode();
+    let tx = alloy_rpc_types::TransactionRequest::default()
+        .to(contract_address)
+        .input(calldata.into());
+
+    match provider.call(tx).await {
+        Ok(result) => result.get(12..32).map(Address::from_slice),
+        Err(e) => {
+            log::debug!("Failed to call owner for {}: {}", contract_address, e);
+            None
+        }
+    }
+}
+
+/// Check the ownership state of a contract.
+///
+/// Returns:
+/// - `Pending` if governor is the pending owner (needs acceptOwnership)
+/// - `Accepted` if governor is already the owner
+/// - `NotTransferred` if ownership was never transferred to governor
+async fn check_ownership_state<P>(
+    provider: &P,
+    contract_address: Address,
+    governor_address: Address,
+) -> OwnershipState
+where
+    P: Provider + Clone,
+{
+    // Check if governor is pending owner
+    let pending_owner = call_pending_owner(provider, contract_address).await;
+    if pending_owner == Some(governor_address) {
+        return OwnershipState::Pending;
+    }
+
+    // Check if governor is already owner
+    let current_owner = call_owner(provider, contract_address).await;
+    if current_owner == Some(governor_address) {
+        return OwnershipState::Accepted;
+    }
+
+    // Neither pending nor owner - ownership transfer not initiated
+    OwnershipState::NotTransferred
 }
 
 /// Accept ownership for all pending contracts.
@@ -720,13 +853,24 @@ where
     };
 
     // Check if ownership acceptance is needed
-    if !check_pending_owner(provider, chain_admin, governor).await {
-        log::info!(
-            "  {} Chain Admin: {}",
-            "⊘".cyan(),
-            "ownership already accepted".cyan()
-        );
-        return OwnershipResult::skipped("Chain Admin", "ownership already accepted");
+    match check_ownership_state(provider, chain_admin, governor).await {
+        OwnershipState::Accepted => {
+            log::info!(
+                "  {} Chain Admin: {}",
+                "✓".cyan(),
+                "ownership already accepted".cyan()
+            );
+            return OwnershipResult::skipped("Chain Admin", "ownership already accepted");
+        }
+        OwnershipState::NotTransferred => {
+            log::info!(
+                "  {} Chain Admin: {}",
+                "⚠".yellow(),
+                "ownership not transferred".yellow()
+            );
+            return OwnershipResult::skipped("Chain Admin", "ownership not transferred");
+        }
+        OwnershipState::Pending => {}
     }
 
     let calldata = build_accept_ownership_calldata();
@@ -787,13 +931,25 @@ where
     };
 
     // Check if ownership acceptance is needed
-    if !check_pending_owner(provider, server_notifier, governor).await {
-        log::info!(
-            "  {} Server Notifier: {}",
-            "⊘".cyan(),
-            "ownership already accepted".cyan()
-        );
-        return OwnershipResult::skipped("Server Notifier", "ownership already accepted");
+    // Note: Server Notifier is owned by ChainAdmin, not governor
+    match check_ownership_state(provider, server_notifier, chain_admin_addr).await {
+        OwnershipState::Accepted => {
+            log::info!(
+                "  {} Server Notifier: {}",
+                "✓".cyan(),
+                "ownership already accepted".cyan()
+            );
+            return OwnershipResult::skipped("Server Notifier", "ownership already accepted");
+        }
+        OwnershipState::NotTransferred => {
+            log::info!(
+                "  {} Server Notifier: {}",
+                "⚠".yellow(),
+                "ownership not transferred".yellow()
+            );
+            return OwnershipResult::skipped("Server Notifier", "ownership not transferred");
+        }
+        OwnershipState::Pending => {}
     }
 
     let calldata = build_accept_ownership_multicall_calldata(server_notifier);
@@ -852,13 +1008,24 @@ where
     };
 
     // Check if ownership acceptance is needed
-    if !check_pending_owner(provider, timelock, governor).await {
-        log::info!(
-            "  {} Validator Timelock: {}",
-            "⊘".cyan(),
-            "ownership already accepted".cyan()
-        );
-        return OwnershipResult::skipped("Validator Timelock", "ownership already accepted");
+    match check_ownership_state(provider, timelock, governor).await {
+        OwnershipState::Accepted => {
+            log::info!(
+                "  {} Validator Timelock: {}",
+                "✓".cyan(),
+                "ownership already accepted".cyan()
+            );
+            return OwnershipResult::skipped("Validator Timelock", "ownership already accepted");
+        }
+        OwnershipState::NotTransferred => {
+            log::info!(
+                "  {} Validator Timelock: {}",
+                "⚠".yellow(),
+                "ownership not transferred".yellow()
+            );
+            return OwnershipResult::skipped("Validator Timelock", "ownership not transferred");
+        }
+        OwnershipState::Pending => {}
     }
 
     let calldata = build_accept_ownership_calldata();
@@ -908,13 +1075,24 @@ where
     };
 
     // Check if ownership acceptance is needed
-    if !check_pending_owner(provider, verifier, governor).await {
-        log::info!(
-            "  {} Verifier: {}",
-            "⊘".cyan(),
-            "ownership already accepted".cyan()
-        );
-        return OwnershipResult::skipped("Verifier", "ownership already accepted");
+    match check_ownership_state(provider, verifier, governor).await {
+        OwnershipState::Accepted => {
+            log::info!(
+                "  {} Verifier: {}",
+                "✓".cyan(),
+                "ownership already accepted".cyan()
+            );
+            return OwnershipResult::skipped("Verifier", "ownership already accepted");
+        }
+        OwnershipState::NotTransferred => {
+            log::info!(
+                "  {} Verifier: {}",
+                "⚠".yellow(),
+                "ownership not transferred".yellow()
+            );
+            return OwnershipResult::skipped("Verifier", "ownership not transferred");
+        }
+        OwnershipState::Pending => {}
     }
 
     let calldata = build_accept_ownership_calldata();
@@ -964,13 +1142,24 @@ where
     };
 
     // Check if ownership acceptance is needed
-    if !check_pending_owner(provider, governance, governor).await {
-        log::info!(
-            "  {} Governance: {}",
-            "⊘".cyan(),
-            "ownership already accepted".cyan()
-        );
-        return OwnershipResult::skipped("Governance", "ownership already accepted");
+    match check_ownership_state(provider, governance, governor).await {
+        OwnershipState::Accepted => {
+            log::info!(
+                "  {} Governance: {}",
+                "✓".cyan(),
+                "ownership already accepted".cyan()
+            );
+            return OwnershipResult::skipped("Governance", "ownership already accepted");
+        }
+        OwnershipState::NotTransferred => {
+            log::info!(
+                "  {} Governance: {}",
+                "⚠".yellow(),
+                "ownership not transferred".yellow()
+            );
+            return OwnershipResult::skipped("Governance", "ownership not transferred");
+        }
+        OwnershipState::Pending => {}
     }
 
     let calldata = build_accept_ownership_calldata();
@@ -1000,10 +1189,13 @@ where
     }
 }
 
-/// Accept ownership for Rollup DA Manager via governance.
+/// Accept ownership for Rollup DA Manager via Governance.
 ///
-/// This contract uses `acceptOwner(target)` called on the Governance contract,
-/// not `acceptOwnership()` called on the contract itself.
+/// This uses the Governance timelock pattern:
+/// 1. Call scheduleTransparent(operation, 0) to schedule the acceptOwnership call
+/// 2. Call execute(operation) to execute the scheduled operation
+///
+/// The operation contains a Call to the DA Manager's acceptOwnership() function.
 async fn accept_rollup_da_manager<P>(
     provider: &P,
     contracts: &EcosystemContracts,
@@ -1030,27 +1222,84 @@ where
         None => {
             return OwnershipResult::skipped(
                 "Rollup DA Manager",
-                "governance_addr not configured (required for acceptOwner)",
+                "governance_addr not configured (required for Governance timelock)",
             );
         }
     };
 
     // Check if ownership acceptance is needed by checking pendingOwner on DA Manager
-    if !check_pending_owner(provider, da_manager, governance).await {
-        log::info!(
-            "  {} Rollup DA Manager: {}",
-            "⊘".cyan(),
-            "ownership already accepted".cyan()
-        );
-        return OwnershipResult::skipped("Rollup DA Manager", "ownership already accepted");
+    // Note: for DA Manager, the expected pending owner is the governance contract
+    match check_ownership_state(provider, da_manager, governance).await {
+        OwnershipState::Accepted => {
+            log::info!(
+                "  {} Rollup DA Manager: {}",
+                "✓".cyan(),
+                "ownership already accepted".cyan()
+            );
+            return OwnershipResult::skipped("Rollup DA Manager", "ownership already accepted");
+        }
+        OwnershipState::NotTransferred => {
+            log::info!(
+                "  {} Rollup DA Manager: {}",
+                "⚠".yellow(),
+                "ownership not transferred".yellow()
+            );
+            return OwnershipResult::skipped("Rollup DA Manager", "ownership not transferred");
+        }
+        OwnershipState::Pending => {}
     }
 
-    // Build calldata for acceptOwner(target) to be called on Governance
-    let calldata = build_governance_accept_owner_calldata(da_manager);
+    // Generate a unique salt for this operation (using current nonce as entropy)
+    let salt = B256::from(U256::from(*nonce));
 
-    // Send tx to Governance contract (not DA Manager!)
+    // Step 1: Schedule the operation via Governance
+    log::info!("    Scheduling operation via Governance timelock...");
+    let schedule_calldata = build_governance_schedule_calldata(da_manager, salt);
+
     match send_ownership_tx(
-        provider, governance, calldata, governor, chain_id, *nonce, gas_price,
+        provider,
+        governance,
+        schedule_calldata,
+        governor,
+        chain_id,
+        *nonce,
+        gas_price,
+    )
+    .await
+    {
+        Ok(tx_hash) => {
+            log::info!(
+                "    {} Scheduled: {}",
+                "✓".green(),
+                tx_hash.to_string().green()
+            );
+            *nonce += 1;
+        }
+        Err(e) => {
+            log::warn!(
+                "  {} Rollup DA Manager schedule failed: {}",
+                "✗".yellow(),
+                e.to_string().yellow()
+            );
+            return OwnershipResult::failure(
+                "Rollup DA Manager",
+                format!("Schedule failed: {}", e),
+            );
+        }
+    }
+
+    // Step 2: Execute the scheduled operation
+    log::info!("    Executing scheduled operation...");
+    let execute_calldata = build_governance_execute_calldata(da_manager, salt);
+
+    match send_ownership_tx(
+        provider,
+        governance,
+        execute_calldata,
+        governor,
+        chain_id,
+        *nonce,
+        gas_price,
     )
     .await
     {
@@ -1065,11 +1314,11 @@ where
         }
         Err(e) => {
             log::warn!(
-                "  {} Rollup DA Manager ownership failed: {}",
+                "  {} Rollup DA Manager execute failed: {}",
                 "✗".yellow(),
                 e.to_string().yellow()
             );
-            OwnershipResult::failure("Rollup DA Manager", e.to_string())
+            OwnershipResult::failure("Rollup DA Manager", format!("Execute failed: {}", e))
         }
     }
 }
