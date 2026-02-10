@@ -30,6 +30,10 @@ variable "TAGS" {
   default = null
 }
 
+variable "TAG_SUFFIX" {
+  default = ""
+}
+
 target "common" {
   dockerfile = "docker/worker/Dockerfile"
   platforms = PLATFORM != "" ? [PLATFORM] : PLATFORMS
@@ -39,11 +43,12 @@ target "common" {
 }
 
 group "default" {
-  targets = ["toolkit-v29", "toolkit-v30"]
+  targets = ["toolkit-v29", "toolkit-v30", "toolkit-v30-0-2"]
 }
 
 target "toolkit-v29" {
   inherits = ["common"]
+  tags = ["${REGISTRY}/adi-toolkit:v29${TAG_SUFFIX}"]
 
   args = {
     ZKSYNC_ERA_COMMIT = "7c4c428b1ea3fd75d9884f3e842fb12d847705c1"
@@ -55,7 +60,18 @@ target "toolkit-v29" {
 
 target "toolkit-v30" {
   inherits = ["common"]
+  tags = ["${REGISTRY}/adi-toolkit:v30${TAG_SUFFIX}"]
 
+  args = {
+    ZKSYNC_ERA_COMMIT = "a48fd5f99a3fad0542b514fc9c508094230b35f4"
+    ERA_CONTRACTS_TAG = "v30-zksync-os-upgrade"
+    FOUNDRY_ZKSYNC_VERSION = "latest"
+  }
+}
+
+target "toolkit-v30-0-2" {
+  inherits = ["common"]
+  tags = ["${REGISTRY}/adi-toolkit:v30.0.2${TAG_SUFFIX}"]
   args = {
     ZKSYNC_ERA_COMMIT = "a48fd5f99a3fad0542b514fc9c508094230b35f4"
     ERA_CONTRACTS_TAG = "v30-zksync-os-upgrade"

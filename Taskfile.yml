@@ -9,15 +9,6 @@ vars:
   PLATFORM: '{{default "linux/arm64" .PLATFORM}}'
   TARGETS: '{{default "default" .TARGETS}}'
 
-  # Determine VERSION_TAG based on TARGETS
-  VERSION_TAG:
-    sh: |
-      case "{{.TARGETS}}" in
-        "toolkit-v29") echo "v29" ;;
-        "toolkit-v30") echo "v30" ;;
-        *) echo "latest" ;;
-      esac
-
 tasks:
   _install_rust:
     internal: true
@@ -59,19 +50,18 @@ tasks:
       PUSH: '{{default "false" .PUSH}}'
     cmds:
       - |
-        # Construct tags list
-        MAIN_TAG="{{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}}-{{.ARCH_SLUG}}-{{.CI_COMMIT_SHORT_SHA}}"
-        EXTRA_TAG="{{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}"
-
+        # Calculate TAG_SUFFIX
+        # Local (LOAD=true): Empty suffix (clean version tag)
+        # Remote (PUSH=true): -branch-arch-sha (unique tracking tag)
         if [ "{{.LOAD}}" = "true" ]; then
-          TAGS="[\"$MAIN_TAG\",\"$EXTRA_TAG\"]"
+          TAG_SUFFIX=""
         else
-          TAGS="[\"$MAIN_TAG\"]"
+          TAG_SUFFIX="-{{.REF_SLUG}}-{{.ARCH_SLUG}}-{{.CI_COMMIT_SHORT_SHA}}"
         fi
 
         PLATFORM={{.PLATFORM}} \
         CACHE_TO_REF={{.CACHE_TO_REF}} \
-        TAGS="$TAGS" \
+        TAG_SUFFIX="$TAG_SUFFIX" \
         docker buildx bake -f docker/docker-bake.hcl \
         {{if eq .LOAD "true"}}--load{{end}} \
         {{if eq .PUSH "true"}}--push{{end}} \
@@ -94,22 +84,29 @@ tasks:
     vars:
       REF_SLUG: '{{default "main" .CI_COMMIT_REF_SLUG}}'
     cmds:
-      # Push mutable tag: v29-branch
       - |
-        docker buildx imagetools create -t {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}} \
-          {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}}-amd64-{{.CI_COMMIT_SHORT_SHA}} \
-          {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}}-arm64-{{.CI_COMMIT_SHORT_SHA}}
+        # Extract base tag from HCL (e.g. registry/adi-toolkit:v30.0.2)
+        # We run bake --print with empty suffix to get the clean target tag
+        BASE_TAG=$(TAG_SUFFIX="" docker buildx bake --print -f docker/docker-bake.hcl {{.TARGETS}} | grep -o '"tags": *\[[^]]*\]' | grep -o '"[^"]*"' | tr -d '"' | head -n 1)
 
-      # Push immutable tag: v29-branch-sha
-      - |
-        docker buildx imagetools create -t {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}}-{{.CI_COMMIT_SHORT_SHA}} \
-          {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}}-amd64-{{.CI_COMMIT_SHORT_SHA}} \
-          {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}}-arm64-{{.CI_COMMIT_SHORT_SHA}}
+        if [ -z "$BASE_TAG" ]; then
+          echo "Error: Could not extract base tag from docker-bake.hcl"
+          exit 1
+        fi
 
-      # Push "latest" version tag only for main: v29
-      - |
+        echo "Detected Base Tag: $BASE_TAG"
+
+        # Source images (pushed by build:docker:*)
+        SRC_AMD64="${BASE_TAG}-{{.REF_SLUG}}-amd64-{{.CI_COMMIT_SHORT_SHA}}"
+        SRC_ARM64="${BASE_TAG}-{{.REF_SLUG}}-arm64-{{.CI_COMMIT_SHORT_SHA}}"
+
+        # 1. Mutable Branch Tag: v30.0.2-branch
+        docker buildx imagetools create -t "${BASE_TAG}-{{.REF_SLUG}}" $SRC_AMD64 $SRC_ARM64
+
+        # 2. Immutable Branch Tag: v30.0.2-branch-sha
+        docker buildx imagetools create -t "${BASE_TAG}-{{.REF_SLUG}}-{{.CI_COMMIT_SHORT_SHA}}" $SRC_AMD64 $SRC_ARM64
+
+        # 3. Version Tag (Main Only): v30.0.2
         if [ "{{.REF_SLUG}}" = "main" ]; then
-          docker buildx imagetools create -t {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}} \
-            {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}}-amd64-{{.CI_COMMIT_SHORT_SHA}} \
-            {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.REF_SLUG}}-arm64-{{.CI_COMMIT_SHORT_SHA}}
+          docker buildx imagetools create -t "${BASE_TAG}" $SRC_AMD64 $SRC_ARM64
         fi
