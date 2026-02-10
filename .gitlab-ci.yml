@@ -2,6 +2,7 @@ spec:
   inputs:
     build_target:
       default: default
+      type: "string"
       options: [default, toolkit-v29, toolkit-v30]
       description: "Select the build target (default, toolkit-v29, toolkit-v30)"
 
@@ -46,7 +47,7 @@ variables:
 # Trigger job to start the multiarch build pipeline
 trigger-build-docker:
   stage: build
-  when: manual
+  # when: manual
   script:
     - echo "Starting multiarch build for target $build_target..."
 
