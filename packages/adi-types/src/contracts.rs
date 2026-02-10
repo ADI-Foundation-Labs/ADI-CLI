@@ -104,6 +104,10 @@ pub struct ZkSyncOsCtm {
     /// Verifier address.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verifier_addr: Option<Address>,
+
+    /// L1 Rollup DA manager address.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub l1_rollup_da_manager: Option<Address>,
 }
 
 /// Ecosystem contracts configuration from configs/contracts.yaml.
@@ -206,6 +210,14 @@ impl EcosystemContracts {
     pub fn verifier_addr(&self) -> Option<Address> {
         self.verifier_addr
             .or_else(|| self.zksync_os_ctm.as_ref().and_then(|c| c.verifier_addr))
+    }
+
+    /// Returns the L1 Rollup DA manager address if available.
+    ///
+    /// Checks root level first, then falls back to ZkSync OS CTM.
+    pub fn l1_rollup_da_manager_addr(&self) -> Option<Address> {
+        self.l1_rollup_da_manager
+            .or_else(|| self.zksync_os_ctm.as_ref().and_then(|c| c.l1_rollup_da_manager))
     }
 }
 

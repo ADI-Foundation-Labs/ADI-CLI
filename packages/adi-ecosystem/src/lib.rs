@@ -57,9 +57,10 @@ pub use config::{EcosystemConfig, EcosystemConfigBuilder};
 pub use deploy::{add_validator_roles, DeployedContracts};
 pub use error::{EcosystemError, Result};
 pub use ownership::{
-    accept_all_ownership, build_accept_ownership_calldata,
-    build_accept_ownership_multicall_calldata, OwnershipContract, OwnershipMethod, OwnershipResult,
-    OwnershipSummary,
+    accept_all_ownership, accept_chain_ownership, build_accept_ownership_calldata,
+    build_accept_ownership_multicall_calldata, build_governance_accept_owner_calldata,
+    check_chain_ownership_status, check_ecosystem_ownership_status, OwnershipContract,
+    OwnershipMethod, OwnershipResult, OwnershipStatus, OwnershipStatusSummary, OwnershipSummary,
 };
 pub use types::{L1Network, ProverMode};
 pub use validator::{build_add_validator_roles_calldata, ValidatorRoles};

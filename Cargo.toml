@@ -147,6 +147,8 @@ adi-types = { workspace = true }
 
 # EVM types
 alloy-primitives = { workspace = true }
+alloy-signer-local = { workspace = true }
+hex = { workspace = true }
 secrecy = { workspace = true }
 url = { workspace = true }
 

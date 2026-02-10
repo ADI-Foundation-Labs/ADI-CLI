@@ -3,17 +3,19 @@
 //! This module handles accepting ownership for contracts that use:
 //! - Ownable2Step pattern (`acceptOwnership()`)
 //! - Multicall pattern (via ChainAdmin)
+//! - Governance pattern (`acceptOwner(target)`)
 //!
 //! # Contracts Handled
 //!
 //! After ecosystem deployment, the following contracts may have pending ownership:
 //! - Server Notifier (via multicall through chain_admin)
-//! - RollupDA Manager (via governance acceptOwner)
 //! - Validator Timelock (direct acceptOwnership)
 //! - Verifier (direct acceptOwnership)
+//! - Governance (direct acceptOwnership)
+//! - RollupDA Manager (via governance acceptOwner)
 
 use crate::error::{EcosystemError, Result};
-use adi_types::EcosystemContracts;
+use adi_types::{ChainContracts, EcosystemContracts};
 use alloy_network::{EthereumWallet, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_provider::{Provider, ProviderBuilder};
@@ -28,6 +30,19 @@ sol! {
     /// Standard Ownable2Step acceptOwnership function.
     #[allow(missing_docs)]
     function acceptOwnership() external;
+
+    /// Read pending owner for Ownable2Step contracts.
+    #[allow(missing_docs)]
+    function pendingOwner() external view returns (address);
+
+    /// Read current owner.
+    #[allow(missing_docs)]
+    function owner() external view returns (address);
+
+    /// Governance acceptOwner for governance-controlled contracts.
+    /// Used by RollupDAManager.
+    #[allow(missing_docs)]
+    function acceptOwner(address target) external;
 
     /// ChainAdmin multicall interface.
     #[allow(missing_docs)]
@@ -112,6 +127,44 @@ pub struct OwnershipSummary {
     pub results: Vec<OwnershipResult>,
 }
 
+/// Status of a contract's pending ownership.
+#[derive(Debug, Clone)]
+pub struct OwnershipStatus {
+    /// Contract name.
+    pub name: &'static str,
+    /// Contract address (None if not configured).
+    pub address: Option<Address>,
+    /// Whether ownership acceptance is pending.
+    pub is_pending: bool,
+}
+
+/// Summary of ownership status check.
+#[derive(Debug)]
+pub struct OwnershipStatusSummary {
+    /// Status for each contract.
+    pub statuses: Vec<OwnershipStatus>,
+}
+
+impl OwnershipStatusSummary {
+    /// Returns the number of contracts with pending ownership.
+    pub fn pending_count(&self) -> usize {
+        self.statuses.iter().filter(|s| s.is_pending).count()
+    }
+
+    /// Returns the number of contracts not configured.
+    pub fn not_configured_count(&self) -> usize {
+        self.statuses.iter().filter(|s| s.address.is_none()).count()
+    }
+
+    /// Returns the number of contracts already accepted.
+    pub fn already_accepted_count(&self) -> usize {
+        self.statuses
+            .iter()
+            .filter(|s| s.address.is_some() && !s.is_pending)
+            .count()
+    }
+}
+
 impl OwnershipSummary {
     /// Create a new summary from results.
     pub fn new(results: Vec<OwnershipResult>) -> Self {
@@ -123,9 +176,30 @@ impl OwnershipSummary {
         self.results.iter().filter(|r| r.success).count()
     }
 
-    /// Returns the number of failed acceptances.
+    /// Returns the number of skipped contracts.
+    pub fn skipped_count(&self) -> usize {
+        self.results
+            .iter()
+            .filter(|r| {
+                !r.success
+                    && r.error
+                        .as_ref()
+                        .is_some_and(|e| e.starts_with("Skipped:"))
+            })
+            .count()
+    }
+
+    /// Returns the number of failed acceptances (excludes skipped).
     pub fn failed_count(&self) -> usize {
-        self.results.iter().filter(|r| !r.success).count()
+        self.results
+            .iter()
+            .filter(|r| {
+                !r.success
+                    && r.error
+                        .as_ref()
+                        .is_none_or(|e| !e.starts_with("Skipped:"))
+            })
+            .count()
     }
 
     /// Returns true if at least one acceptance succeeded.
@@ -163,6 +237,187 @@ pub fn build_accept_ownership_multicall_calldata(target_contract: Address) -> By
     };
 
     Bytes::from(multicall_call.abi_encode())
+}
+
+/// Build calldata for governance acceptOwner call.
+///
+/// Used for contracts like RollupDAManager that are owned by governance.
+#[must_use]
+pub fn build_governance_accept_owner_calldata(target: Address) -> Bytes {
+    let call = acceptOwnerCall { target };
+    Bytes::from(call.abi_encode())
+}
+
+/// Check ownership status for all ecosystem contracts.
+///
+/// This function queries `pendingOwner()` on each contract to determine
+/// which ones have pending ownership transfers that need to be accepted.
+///
+/// # Arguments
+///
+/// * `rpc_url` - Settlement layer RPC endpoint URL.
+/// * `contracts` - Ecosystem contracts containing addresses.
+/// * `governor_address` - Governor address to check as pending owner.
+///
+/// # Returns
+///
+/// Summary of ownership status for all contracts.
+pub async fn check_ecosystem_ownership_status(
+    rpc_url: &str,
+    contracts: &EcosystemContracts,
+    governor_address: Address,
+) -> Result<OwnershipStatusSummary> {
+    let url: url::Url = rpc_url
+        .parse()
+        .map_err(|e| EcosystemError::InvalidConfig(format!("Invalid RPC URL: {}", e)))?;
+    let provider = ProviderBuilder::new().connect_http(url);
+
+    let mut statuses = Vec::new();
+
+    // Check Server Notifier
+    let server_notifier_addr = contracts.server_notifier_addr();
+    let is_pending = if let Some(addr) = server_notifier_addr {
+        check_pending_owner(&provider, addr, governor_address).await
+    } else {
+        false
+    };
+    statuses.push(OwnershipStatus {
+        name: "Server Notifier",
+        address: server_notifier_addr,
+        is_pending,
+    });
+
+    // Check Validator Timelock
+    let timelock_addr = contracts.validator_timelock_addr();
+    let is_pending = if let Some(addr) = timelock_addr {
+        check_pending_owner(&provider, addr, governor_address).await
+    } else {
+        false
+    };
+    statuses.push(OwnershipStatus {
+        name: "Validator Timelock",
+        address: timelock_addr,
+        is_pending,
+    });
+
+    // Check Verifier
+    let verifier_addr = contracts.verifier_addr();
+    let is_pending = if let Some(addr) = verifier_addr {
+        check_pending_owner(&provider, addr, governor_address).await
+    } else {
+        false
+    };
+    statuses.push(OwnershipStatus {
+        name: "Verifier",
+        address: verifier_addr,
+        is_pending,
+    });
+
+    // Check Governance
+    let governance_addr = contracts.governance_addr();
+    let is_pending = if let Some(addr) = governance_addr {
+        check_pending_owner(&provider, addr, governor_address).await
+    } else {
+        false
+    };
+    statuses.push(OwnershipStatus {
+        name: "Governance",
+        address: governance_addr,
+        is_pending,
+    });
+
+    // Check Rollup DA Manager (pending owner should be governance, not governor)
+    let da_manager_addr = contracts.l1_rollup_da_manager_addr();
+    let is_pending = if let (Some(da_addr), Some(gov_addr)) = (da_manager_addr, governance_addr) {
+        check_pending_owner(&provider, da_addr, gov_addr).await
+    } else {
+        false
+    };
+    statuses.push(OwnershipStatus {
+        name: "Rollup DA Manager",
+        address: da_manager_addr,
+        is_pending,
+    });
+
+    Ok(OwnershipStatusSummary { statuses })
+}
+
+/// Check ownership status for chain contracts.
+///
+/// # Arguments
+///
+/// * `rpc_url` - Settlement layer RPC endpoint URL.
+/// * `contracts` - Chain contracts containing addresses.
+/// * `governor_address` - Governor address to check as pending owner.
+///
+/// # Returns
+///
+/// Summary of ownership status for chain contracts.
+pub async fn check_chain_ownership_status(
+    rpc_url: &str,
+    contracts: &ChainContracts,
+    governor_address: Address,
+) -> Result<OwnershipStatusSummary> {
+    let url: url::Url = rpc_url
+        .parse()
+        .map_err(|e| EcosystemError::InvalidConfig(format!("Invalid RPC URL: {}", e)))?;
+    let provider = ProviderBuilder::new().connect_http(url);
+
+    let mut statuses = Vec::new();
+
+    // Check Chain Admin
+    let chain_admin_addr = contracts.chain_admin_addr();
+    let is_pending = if let Some(addr) = chain_admin_addr {
+        check_pending_owner(&provider, addr, governor_address).await
+    } else {
+        false
+    };
+    statuses.push(OwnershipStatus {
+        name: "Chain Admin",
+        address: chain_admin_addr,
+        is_pending,
+    });
+
+    Ok(OwnershipStatusSummary { statuses })
+}
+
+/// Check if governor is the pending owner of a contract.
+///
+/// Returns `true` if governor should call acceptOwnership (is pending owner).
+/// Returns `false` if ownership is already accepted or governor is not pending owner.
+async fn check_pending_owner<P>(
+    provider: &P,
+    contract_address: Address,
+    governor_address: Address,
+) -> bool
+where
+    P: Provider + Clone,
+{
+    // Build calldata for pendingOwner() call
+    let calldata = pendingOwnerCall {}.abi_encode();
+
+    // Create call request
+    let tx = alloy_rpc_types::TransactionRequest::default()
+        .to(contract_address)
+        .input(calldata.into());
+
+    // Execute eth_call
+    match provider.call(tx).await {
+        Ok(result) => {
+            // Decode the result as address (last 20 bytes of 32-byte word)
+            if let Some(slice) = result.get(12..32) {
+                let pending = Address::from_slice(slice);
+                pending == governor_address
+            } else {
+                false
+            }
+        }
+        Err(e) => {
+            log::debug!("Failed to check pendingOwner for {}: {}", contract_address, e);
+            // If we can't check, assume we should try (fail-safe)
+            true
+        }
+    }
 }
 
 /// Accept ownership for all pending contracts.
@@ -306,7 +561,199 @@ pub async fn accept_all_ownership(
     .await;
     results.push(result);
 
+    // 4. Governance (direct)
+    log::info!("{}", "Processing Governance...".cyan());
+    let result = accept_governance(
+        &provider,
+        contracts,
+        governor_address,
+        chain_id,
+        &mut nonce,
+        gas_price,
+    )
+    .await;
+    results.push(result);
+
+    // 5. Rollup DA Manager (via governance acceptOwner)
+    log::info!("{}", "Processing Rollup DA Manager...".cyan());
+    let result = accept_rollup_da_manager(
+        &provider,
+        contracts,
+        governor_address,
+        chain_id,
+        &mut nonce,
+        gas_price,
+    )
+    .await;
+    results.push(result);
+
     OwnershipSummary::new(results)
+}
+
+/// Accept ownership for chain-level contracts.
+///
+/// This function attempts to accept ownership for chain-specific contracts:
+/// - Chain Admin (direct acceptOwnership)
+///
+/// # Arguments
+///
+/// * `rpc_url` - Settlement layer RPC endpoint URL.
+/// * `contracts` - Chain contracts containing addresses.
+/// * `governor_key` - Governor private key for signing transactions.
+/// * `gas_price_wei` - Optional gas price in wei (estimated if not provided).
+///
+/// # Returns
+///
+/// Summary of all ownership acceptance attempts.
+pub async fn accept_chain_ownership(
+    rpc_url: &str,
+    contracts: &ChainContracts,
+    governor_key: &SecretString,
+    gas_price_wei: Option<u128>,
+) -> OwnershipSummary {
+    let mut results = Vec::new();
+
+    // Create signer from governor key
+    let signer = match create_signer(governor_key) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Failed to create signer: {}", e);
+            results.push(OwnershipResult::failure(
+                "all",
+                format!("Failed to create signer: {}", e),
+            ));
+            return OwnershipSummary::new(results);
+        }
+    };
+    let governor_address = signer.address();
+
+    // Create signing provider
+    let wallet = EthereumWallet::from(signer);
+    let url: url::Url = match rpc_url.parse() {
+        Ok(u) => u,
+        Err(e) => {
+            log::error!("Invalid RPC URL: {}", e);
+            results.push(OwnershipResult::failure(
+                "all",
+                format!("Invalid RPC URL: {}", e),
+            ));
+            return OwnershipSummary::new(results);
+        }
+    };
+    let provider = ProviderBuilder::new().wallet(wallet).connect_http(url);
+
+    // Get chain ID
+    let chain_id = match provider.get_chain_id().await {
+        Ok(id) => id,
+        Err(e) => {
+            log::error!("Failed to get chain ID: {}", e);
+            results.push(OwnershipResult::failure(
+                "all",
+                format!("Failed to get chain ID: {}", e),
+            ));
+            return OwnershipSummary::new(results);
+        }
+    };
+
+    // Get initial nonce
+    let mut nonce = match provider.get_transaction_count(governor_address).await {
+        Ok(n) => n,
+        Err(e) => {
+            log::error!("Failed to get nonce: {}", e);
+            results.push(OwnershipResult::failure(
+                "all",
+                format!("Failed to get nonce: {}", e),
+            ));
+            return OwnershipSummary::new(results);
+        }
+    };
+
+    // Get gas price if not provided
+    let gas_price = match gas_price_wei {
+        Some(price) => price,
+        None => match provider.get_gas_price().await {
+            Ok(p) => p,
+            Err(e) => {
+                log::error!("Failed to get gas price: {}", e);
+                results.push(OwnershipResult::failure(
+                    "all",
+                    format!("Failed to get gas price: {}", e),
+                ));
+                return OwnershipSummary::new(results);
+            }
+        },
+    };
+
+    // 1. Chain Admin (direct)
+    log::info!("{}", "Processing Chain Admin...".cyan());
+    let result = accept_chain_admin(
+        &provider,
+        contracts,
+        governor_address,
+        chain_id,
+        &mut nonce,
+        gas_price,
+    )
+    .await;
+    results.push(result);
+
+    OwnershipSummary::new(results)
+}
+
+/// Accept ownership for Chain Admin contract.
+async fn accept_chain_admin<P>(
+    provider: &P,
+    contracts: &ChainContracts,
+    governor: Address,
+    chain_id: u64,
+    nonce: &mut u64,
+    gas_price: u128,
+) -> OwnershipResult
+where
+    P: Provider + Clone,
+{
+    let chain_admin = match contracts.chain_admin_addr() {
+        Some(addr) => addr,
+        None => {
+            return OwnershipResult::skipped("Chain Admin", "chain_admin_addr not configured");
+        }
+    };
+
+    // Check if ownership acceptance is needed
+    if !check_pending_owner(provider, chain_admin, governor).await {
+        log::info!(
+            "  {} Chain Admin: {}",
+            "⊘".cyan(),
+            "ownership already accepted".cyan()
+        );
+        return OwnershipResult::skipped("Chain Admin", "ownership already accepted");
+    }
+
+    let calldata = build_accept_ownership_calldata();
+
+    match send_ownership_tx(
+        provider, chain_admin, calldata, governor, chain_id, *nonce, gas_price,
+    )
+    .await
+    {
+        Ok(tx_hash) => {
+            log::info!(
+                "  {} Chain Admin ownership accepted: {}",
+                "✓".green(),
+                tx_hash.to_string().green()
+            );
+            *nonce += 1;
+            OwnershipResult::success("Chain Admin", tx_hash)
+        }
+        Err(e) => {
+            log::warn!(
+                "  {} Chain Admin ownership failed: {}",
+                "✗".yellow(),
+                e.to_string().yellow()
+            );
+            OwnershipResult::failure("Chain Admin", e.to_string())
+        }
+    }
 }
 
 /// Accept ownership for Server Notifier via multicall.
@@ -338,6 +785,16 @@ where
             return OwnershipResult::skipped("Server Notifier", "chain_admin_addr not configured");
         }
     };
+
+    // Check if ownership acceptance is needed
+    if !check_pending_owner(provider, server_notifier, governor).await {
+        log::info!(
+            "  {} Server Notifier: {}",
+            "⊘".cyan(),
+            "ownership already accepted".cyan()
+        );
+        return OwnershipResult::skipped("Server Notifier", "ownership already accepted");
+    }
 
     let calldata = build_accept_ownership_multicall_calldata(server_notifier);
 
@@ -394,6 +851,16 @@ where
         }
     };
 
+    // Check if ownership acceptance is needed
+    if !check_pending_owner(provider, timelock, governor).await {
+        log::info!(
+            "  {} Validator Timelock: {}",
+            "⊘".cyan(),
+            "ownership already accepted".cyan()
+        );
+        return OwnershipResult::skipped("Validator Timelock", "ownership already accepted");
+    }
+
     let calldata = build_accept_ownership_calldata();
 
     match send_ownership_tx(
@@ -440,6 +907,16 @@ where
         }
     };
 
+    // Check if ownership acceptance is needed
+    if !check_pending_owner(provider, verifier, governor).await {
+        log::info!(
+            "  {} Verifier: {}",
+            "⊘".cyan(),
+            "ownership already accepted".cyan()
+        );
+        return OwnershipResult::skipped("Verifier", "ownership already accepted");
+    }
+
     let calldata = build_accept_ownership_calldata();
 
     match send_ownership_tx(
@@ -463,6 +940,136 @@ where
                 e.to_string().yellow()
             );
             OwnershipResult::failure("Verifier", e.to_string())
+        }
+    }
+}
+
+/// Accept ownership for Governance contract.
+async fn accept_governance<P>(
+    provider: &P,
+    contracts: &EcosystemContracts,
+    governor: Address,
+    chain_id: u64,
+    nonce: &mut u64,
+    gas_price: u128,
+) -> OwnershipResult
+where
+    P: Provider + Clone,
+{
+    let governance = match contracts.governance_addr() {
+        Some(addr) => addr,
+        None => {
+            return OwnershipResult::skipped("Governance", "governance_addr not configured");
+        }
+    };
+
+    // Check if ownership acceptance is needed
+    if !check_pending_owner(provider, governance, governor).await {
+        log::info!(
+            "  {} Governance: {}",
+            "⊘".cyan(),
+            "ownership already accepted".cyan()
+        );
+        return OwnershipResult::skipped("Governance", "ownership already accepted");
+    }
+
+    let calldata = build_accept_ownership_calldata();
+
+    match send_ownership_tx(
+        provider, governance, calldata, governor, chain_id, *nonce, gas_price,
+    )
+    .await
+    {
+        Ok(tx_hash) => {
+            log::info!(
+                "  {} Governance ownership accepted: {}",
+                "✓".green(),
+                tx_hash.to_string().green()
+            );
+            *nonce += 1;
+            OwnershipResult::success("Governance", tx_hash)
+        }
+        Err(e) => {
+            log::warn!(
+                "  {} Governance ownership failed: {}",
+                "✗".yellow(),
+                e.to_string().yellow()
+            );
+            OwnershipResult::failure("Governance", e.to_string())
+        }
+    }
+}
+
+/// Accept ownership for Rollup DA Manager via governance.
+///
+/// This contract uses `acceptOwner(target)` called on the Governance contract,
+/// not `acceptOwnership()` called on the contract itself.
+async fn accept_rollup_da_manager<P>(
+    provider: &P,
+    contracts: &EcosystemContracts,
+    governor: Address,
+    chain_id: u64,
+    nonce: &mut u64,
+    gas_price: u128,
+) -> OwnershipResult
+where
+    P: Provider + Clone,
+{
+    let da_manager = match contracts.l1_rollup_da_manager_addr() {
+        Some(addr) => addr,
+        None => {
+            return OwnershipResult::skipped(
+                "Rollup DA Manager",
+                "l1_rollup_da_manager not configured",
+            );
+        }
+    };
+
+    let governance = match contracts.governance_addr() {
+        Some(addr) => addr,
+        None => {
+            return OwnershipResult::skipped(
+                "Rollup DA Manager",
+                "governance_addr not configured (required for acceptOwner)",
+            );
+        }
+    };
+
+    // Check if ownership acceptance is needed by checking pendingOwner on DA Manager
+    if !check_pending_owner(provider, da_manager, governance).await {
+        log::info!(
+            "  {} Rollup DA Manager: {}",
+            "⊘".cyan(),
+            "ownership already accepted".cyan()
+        );
+        return OwnershipResult::skipped("Rollup DA Manager", "ownership already accepted");
+    }
+
+    // Build calldata for acceptOwner(target) to be called on Governance
+    let calldata = build_governance_accept_owner_calldata(da_manager);
+
+    // Send tx to Governance contract (not DA Manager!)
+    match send_ownership_tx(
+        provider, governance, calldata, governor, chain_id, *nonce, gas_price,
+    )
+    .await
+    {
+        Ok(tx_hash) => {
+            log::info!(
+                "  {} Rollup DA Manager ownership accepted: {}",
+                "✓".green(),
+                tx_hash.to_string().green()
+            );
+            *nonce += 1;
+            OwnershipResult::success("Rollup DA Manager", tx_hash)
+        }
+        Err(e) => {
+            log::warn!(
+                "  {} Rollup DA Manager ownership failed: {}",
+                "✗".yellow(),
+                e.to_string().yellow()
+            );
+            OwnershipResult::failure("Rollup DA Manager", e.to_string())
         }
     }
 }
