@@ -75,7 +75,7 @@ build-docker-amd64:
 build-docker-arm64:
   stage: build
   image: docker:27.5.1
-  tags: [k8s, azure-arm64, dev]
+  tags: [k8s, azure-arm, dev]
   needs: ["trigger-build-docker"]
   services:
     - name: docker:27.5.1-dind
