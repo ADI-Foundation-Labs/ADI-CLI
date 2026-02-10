@@ -2,6 +2,22 @@
 
 version: "3"
 
+vars:
+  REGISTRY: harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli
+  CACHE_REF_SLUG: '{{default "main" .CI_COMMIT_REF_SLUG}}'
+  # Default platform to linux/arm64 for local dev (Apple Silicon friendly)
+  PLATFORM: '{{default "linux/arm64" .PLATFORM}}'
+  TARGETS: '{{default "default" .TARGETS}}'
+
+  # Determine VERSION_TAG based on TARGETS
+  VERSION_TAG:
+    sh: |
+      case "{{.TARGETS}}" in
+        "toolkit-v29") echo "v29" ;;
+        "toolkit-v30") echo "v30" ;;
+        *) echo "latest" ;;
+      esac
+
 tasks:
   _install_rust:
     internal: true
@@ -10,40 +26,66 @@ tasks:
     cmds:
       - curl https://sh.rustup.rs -sSf | sh
 
+  fmt:
+    desc: Format Rust code
+    cmds:
+      - cargo fmt
+
+  lint:
+    desc: Lint Rust code
+    cmds:
+      - cargo clippy -- -D warnings
+
+  test:
+    desc: Run Rust tests
+    cmds:
+      - cargo test
+
   build:
+    desc: Build Rust binary
     deps:
       - _install_rust
     cmds:
       - cargo build
 
-  build:docker:
-    desc: Build Docker images using Docker Bake
+  # Internal task to build and push docker image for a specific architecture
+  build:docker:internal:
+    internal: true
     vars:
-      TARGETS: '{{default "default" .TARGETS}}'
-    sources:
-      - docker/worker/Dockerfile
-      - docker/docker-bake.hcl
-    generates:
-      - .task/build_docker_{{.TARGETS}}
-    preconditions:
-      # Check if docker is running and have required commands
-      - docker ps
-      - docker buildx version
-      - docker buildx bake --help
+      ARCH_SLUG: '{{default "arm64" .ARCH_SLUG}}'
+      CACHE_TO_REF: '{{.REGISTRY}}/adi-toolkit:cache-{{.ARCH_SLUG}}-{{.CACHE_REF_SLUG}}'
+      LOAD: '{{default "true" .LOAD}}'
+      PUSH: '{{default "false" .PUSH}}'
     cmds:
-      - docker buildx bake -f docker/docker-bake.hcl {{.TARGETS}}
-      - mkdir -p .task && touch .task/build_docker_{{.TARGETS}}
+      - |
+        PLATFORM={{.PLATFORM}} \
+        CACHE_TO_REF={{.CACHE_TO_REF}} \
+        docker buildx bake -f docker/docker-bake.hcl \
+        {{if eq .LOAD "true"}}--load{{end}} \
+        {{if eq .PUSH "true"}}--push{{end}} \
+        --set "*.tags={{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.ARCH_SLUG}}-{{.CI_COMMIT_SHORT_SHA}}" \
+        {{.TARGETS}}
 
-  build:docker:load:
-    desc: Build Docker images for local architecture and load into daemon
-    vars:
-      TARGETS: '{{default "default" .TARGETS}}'
+  build:docker:amd64:
+    desc: Build and push Docker image for linux/amd64
     cmds:
-      - PLATFORMS=linux/{{ARCH}} docker buildx bake -f docker/docker-bake.hcl --load {{.TARGETS}}
+      - task: build:docker:internal
+        vars: { PLATFORM: "linux/amd64", ARCH_SLUG: "amd64" }
 
-  push:docker:
-    desc: Build and push Docker images using Docker Bake
-    vars:
-      TARGETS: '{{default "default" .TARGETS}}'
+  build:docker:arm64:
+    desc: Build and push Docker image for linux/arm64
     cmds:
-      - docker buildx bake -f docker/docker-bake.hcl --push {{.TARGETS}}
+      - task: build:docker:internal
+        vars: { PLATFORM: "linux/arm64", ARCH_SLUG: "arm64" }
+
+  build:docker:manifest:
+    desc: Create and push multiarch manifest
+    cmds:
+      - |
+        docker buildx imagetools create -t {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}} \
+          {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-amd64-{{.CI_COMMIT_SHORT_SHA}} \
+          {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-arm64-{{.CI_COMMIT_SHORT_SHA}}
+      - |
+        docker buildx imagetools create -t {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-{{.CI_COMMIT_SHORT_SHA}} \
+          {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-amd64-{{.CI_COMMIT_SHORT_SHA}} \
+          {{.REGISTRY}}/adi-toolkit:{{.VERSION_TAG}}-arm64-{{.CI_COMMIT_SHORT_SHA}}
