@@ -7,6 +7,10 @@ variable "PLATFORMS" {
   default = ["linux/amd64", "linux/arm64"]
 }
 
+variable "PLATFORM" {
+  default = ""  // Single platform override for CI
+}
+
 variable "CI_COMMIT_REF_SLUG" {
   default = "main"
 }
@@ -24,7 +28,7 @@ variable "CACHE_TO_REF" {
 
 target "common" {
   dockerfile = "docker/worker/Dockerfile"
-  platforms = PLATFORMS
+  platforms = PLATFORM != "" ? [PLATFORM] : PLATFORMS
   cache-from = CACHE_FROM
   cache-to = notequal("", CACHE_TO_REF) ? ["type=registry,ref=${CACHE_TO_REF},mode=max"] : []
 }
