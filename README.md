@@ -16,7 +16,6 @@
 - [State Management](#state-management)
 - [Docker Architecture](#docker-architecture)
 - [Development](#development)
-- [Contributing](#contributing)
 
 ## Features
 
@@ -245,7 +244,7 @@ ecosystem:
 # Default values for wallet funding during deployment
 funding:
   # RPC endpoint for the settlement layer
-  # For local development: http://localhost:8545
+  # For Anvil (local): http://host.docker.internal:8545
   # For Sepolia: https://sepolia.infura.io/v3/YOUR_KEY
   rpc_url: https://sepolia.infura.io/v3/YOUR_KEY
 
@@ -254,32 +253,39 @@ funding:
   # funder_key: "0x..."
 
   # Buffer added to estimated gas prices (percentage)
-  # 120 means 20% above the estimated price
+  # Recommended: 200 for Anvil, 300 for Sepolia
   # Default: 120
-  gas_multiplier: 120
+  gas_multiplier: 300
 
   # ETH amounts to send to each wallet role (in ether)
-  # Adjust based on expected transaction counts and gas prices
-  deployer_eth: 1.0      # Deploys contracts
-  governor_eth: 1.0      # Governance operations
-  operator_eth: 5.0      # Commits batches
-  prove_operator_eth: 5.0    # Submits proofs
-  execute_operator_eth: 5.0  # Executes batches
-
-  # Custom gas token funding for governor (only if using custom base token)
-  # governor_cgt_units: 5.0
+  #
+  # For Sepolia TESTING (short-term, minimal funding):
+  #   deployer_eth: 1.0
+  #   governor_eth: 1.0
+  #   governor_cgt_units: 5.0
+  #   operator_eth: 0.5
+  #   prove_operator_eth: 0.5
+  #   execute_operator_eth: 0.5
+  #
+  # For PRODUCTION or long-running chains (values below):
+  deployer_eth: 1.0           # Deploys contracts
+  governor_eth: 1.0           # Governance operations
+  governor_cgt_units: 5.0     # Custom gas token (if using custom base token)
+  operator_eth: 5.0           # Commits batches
+  prove_operator_eth: 5.0     # Submits proofs
+  execute_operator_eth: 5.0   # Executes batches
 ```
 
 ### Environment Variables
 
 For sensitive data like private keys, use environment variables instead of config files:
 
-| Variable | Purpose |
-|----------|---------|
+| Variable         | Purpose                                                                                                          |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `ADI_FUNDER_KEY` | Private key (hex) of the wallet that funds ecosystem wallets. This is the only wallet you need to fund manually. |
-| `ADI_RPC_URL` | Settlement layer RPC endpoint. Useful for switching networks without editing config. |
-| `ADI_CONFIG` | Path to an alternative config file. |
-| `RUST_LOG` | Logging verbosity: `error`, `warn`, `info`, `debug`, `trace` |
+| `ADI_RPC_URL`    | Settlement layer RPC endpoint. Useful for switching networks without editing config.                             |
+| `ADI_CONFIG`     | Path to an alternative config file.                                                                              |
+| `RUST_LOG`       | Logging verbosity: `error`, `warn`, `info`, `debug`, `trace`                                                     |
 
 You can also override any config value using the `ADI__` prefix with double underscores as path separators:
 
@@ -325,13 +331,13 @@ The `init ecosystem` command creates the foundational configuration for your ZkS
 
 **Common optional arguments:**
 
-| Flag | Description |
-|------|-------------|
-| `--ecosystem-name` | Override the ecosystem name from config |
-| `--l1-network` | Settlement layer: `localhost`, `sepolia`, or `mainnet` |
-| `--chain-name` | Name for the initial chain |
-| `--chain-id` | Unique numeric chain identifier |
-| `--prover-mode` | `no-proofs` for testing, `gpu` for production |
+| Flag               | Description                                            |
+| ------------------ | ------------------------------------------------------ |
+| `--ecosystem-name` | Override the ecosystem name from config                |
+| `--l1-network`     | Settlement layer: `localhost`, `sepolia`, or `mainnet` |
+| `--chain-name`     | Name for the initial chain                             |
+| `--chain-id`       | Unique numeric chain identifier                        |
+| `--prover-mode`    | `no-proofs` for testing, `gpu` for production          |
 
 **Example: Local development ecosystem**
 
@@ -370,13 +376,13 @@ After funding, the CLI runs zkstack inside a container to deploy ecosystem contr
 
 **Wallet roles explained:**
 
-| Role | Purpose | Typical Funding |
-|------|---------|-----------------|
-| Deployer | Deploys all smart contracts | 1-2 ETH |
-| Governor | Executes governance operations and upgrades | 1-2 ETH |
-| Operator | Commits transaction batches to L1 | 5+ ETH |
-| Prove Operator | Submits validity proofs | 5+ ETH |
-| Execute Operator | Executes verified batches | 5+ ETH |
+| Role             | Purpose                                     | Typical Funding |
+| ---------------- | ------------------------------------------- | --------------- |
+| Deployer         | Deploys all smart contracts                 | 1-2 ETH         |
+| Governor         | Executes governance operations and upgrades | 1-2 ETH         |
+| Operator         | Commits transaction batches to L1           | 5+ ETH          |
+| Prove Operator   | Submits validity proofs                     | 5+ ETH          |
+| Execute Operator | Executes verified batches                   | 5+ ETH          |
 
 **Recommended workflow:**
 
@@ -399,15 +405,44 @@ adi deploy ecosystem -p v30.0.2
 
 **Local development with Anvil:**
 
-When deploying to localhost, the CLI auto-detects Anvil and can use its pre-funded accounts:
+Anvil is a local Ethereum node for development. Install it from [Foundry](https://github.com/foundry-rs/foundry):
 
 ```bash
-# Start Anvil in another terminal
-anvil
-
-# Deploy using Anvil's default funded account
-adi deploy ecosystem -p v30.0.2 --rpc-url http://localhost:8545
+curl -L https://foundry.paradigm.xyz | bash
+foundryup
 ```
+
+Start Anvil with state persistence (recommended to preserve state between restarts):
+
+```bash
+anvil --state ~/.adi_cli/anvil-state
+```
+
+**Important:** Because the CLI runs blockchain tooling inside Docker containers, you must configure the RPC URL to use Docker's host networking. Create or update your `~/.adi.yml`:
+
+```yaml
+ecosystem:
+  # Use sepolia for Docker network compatibility (not localhost)
+  l1_network: sepolia
+
+funding:
+  # Docker containers access host machine via host.docker.internal
+  rpc_url: http://host.docker.internal:8545
+
+  # No funder_key needed - Anvil accounts are pre-funded
+  # funder_key: not required
+
+  # Higher gas multiplier recommended for Anvil
+  gas_multiplier: 200
+```
+
+Then deploy:
+
+```bash
+adi deploy ecosystem -p v30.0.2
+```
+
+> **Note:** We use `l1_network: sepolia` even for local Anvil because Docker containers cannot access `localhost` directly. The `host.docker.internal` hostname routes traffic from the container to your host machine where Anvil is running.
 
 **Skipping phases:**
 
@@ -494,12 +529,12 @@ The CLI uses Docker to ensure reproducible execution of blockchain tooling. This
 
 Pre-built images contain all required tools for ecosystem management:
 
-| Property | Value |
-|----------|-------|
-| Registry | `harbor.sde.adifoundation.ai/adi-chain/cli` |
-| Image | `adi-toolkit` |
-| Tag format | `v{MAJOR}.{MINOR}.{PATCH}` |
-| Default timeout | 30 minutes |
+| Property        | Value                                       |
+| --------------- | ------------------------------------------- |
+| Registry        | `harbor.sde.adifoundation.ai/adi-chain/cli` |
+| Image           | `adi-toolkit`                               |
+| Tag format      | `v{MAJOR}.{MINOR}.{PATCH}`                  |
+| Default timeout | 30 minutes                                  |
 
 Full image reference example:
 ```
@@ -610,58 +645,8 @@ The project enforces these rules via Clippy:
 
 ### Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | Runtime error |
-| 2 | Usage error (invalid arguments) |
-
-## Contributing
-
-### Commit Messages
-
-Follow conventional commit format:
-
-```
-<type>: <description>
-```
-
-Types:
-- `feat` — New feature
-- `fix` — Bug fix
-- `refactor` — Code restructuring without behavior change
-- `docs` — Documentation updates
-- `test` — Test additions or fixes
-- `chore` — Maintenance tasks
-- `ci` — CI/CD changes
-- `build` — Build system or dependency changes
-- `style` — Code style changes (formatting, etc.)
-
-Examples:
-```
-feat: add custom gas token support for chain deployment
-fix: handle missing genesis.json with helpful error message
-docs: add troubleshooting section for Docker connectivity
-```
-
-### Adding Commands
-
-Commands live in `src/commands/`. To add a new command:
-
-1. Create a module in the appropriate directory (e.g., `src/commands/mygroup/mycommand.rs`)
-2. Define the command struct with Clap derives
-3. Implement `async fn run(&self, context: &Context) -> Result<()>`
-4. Register in `commands/mod.rs`
-
-See `src/commands/show/version.rs` for a minimal example.
-
-### Adding SDK Packages
-
-To add a new library crate:
-
-1. Create the package: `mkdir packages/adi-mypackage`
-2. Add to workspace in root `Cargo.toml`
-3. Define dependencies in `[workspace.dependencies]`
-4. Use `{ workspace = true }` in the package's `Cargo.toml`
-5. Add `#![deny(missing_docs)]` to enforce documentation
-6. Document public API with `///` doc comments
+| Code | Meaning                         |
+| ---- | ------------------------------- |
+| 0    | Success                         |
+| 1    | Runtime error                   |
+| 2    | Usage error (invalid arguments) |
