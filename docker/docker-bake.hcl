@@ -33,7 +33,7 @@ variable "TAGS" {
 target "common" {
   dockerfile = "docker/worker/Dockerfile"
   platforms = PLATFORM != "" ? [PLATFORM] : PLATFORMS
-  tags = TAGS != null ? TAGS : ["${REGISTRY}/adi-toolkit:${CI_COMMIT_REF_SLUG}"]
+  tags = TAGS != null ? jsondecode(TAGS) : ["${REGISTRY}/adi-toolkit:${CI_COMMIT_REF_SLUG}"]
   cache-from = CACHE_FROM
   cache-to = notequal("", CACHE_TO_REF) ? ["type=registry,ref=${CACHE_TO_REF},mode=max"] : []
 }
@@ -44,7 +44,7 @@ group "default" {
 
 target "toolkit-v29" {
   inherits = ["common"]
-  tags = ["${REGISTRY}/adi-toolkit:v29"]
+
   args = {
     ZKSYNC_ERA_COMMIT = "7c4c428b1ea3fd75d9884f3e842fb12d847705c1"
     ZKSYNC_ERA_OS_INTEGRATION_COMMIT = "a135c3b09913d49a1323b44ab80e715616934fc7"
@@ -55,7 +55,7 @@ target "toolkit-v29" {
 
 target "toolkit-v30" {
   inherits = ["common"]
-  tags = ["${REGISTRY}/adi-toolkit:v30"]
+
   args = {
     ZKSYNC_ERA_COMMIT = "a48fd5f99a3fad0542b514fc9c508094230b35f4"
     ERA_CONTRACTS_TAG = "v30-zksync-os-upgrade"

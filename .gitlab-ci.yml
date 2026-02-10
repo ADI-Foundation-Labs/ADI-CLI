@@ -47,7 +47,7 @@ variables:
 # Trigger job to start the multiarch build pipeline
 trigger-build-docker:
   stage: build
-  # when: manual
+  when: manual
   script:
     - echo "Starting multiarch build for target $[[ inputs.build_target ]]..."
 
