@@ -46,7 +46,7 @@ build-docker-amd64:
   script:
     - |
       REGISTRY="harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli"
-      TARGET="${[[inputs.build_target]]}"
+      TARGET="[[inputs.build_target]]"
 
       # Determine version tag based on target
       if [ "$TARGET" = "toolkit-v29" ]; then
@@ -92,7 +92,7 @@ build-docker-arm64:
   script:
     - |
       REGISTRY="harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli"
-      TARGET="${[[inputs.build_target]]}"
+      TARGET="[[inputs.build_target]]"
 
       # Determine version tag based on target
       if [ "$TARGET" = "toolkit-v29" ]; then
@@ -124,7 +124,7 @@ build-docker-manifest:
   script:
     - |
       REGISTRY="harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli"
-      TARGET="${[[inputs.build_target]]}"
+      TARGET="[[inputs.build_target]]"
 
       # Determine version tag based on target
       if [ "$TARGET" = "toolkit-v29" ]; then
