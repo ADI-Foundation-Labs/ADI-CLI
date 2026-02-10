@@ -243,6 +243,32 @@ pub async fn run(args: OwnershipAcceptArgs, context: &Context) -> Result<()> {
     }
 }
 
+/// Category of ownership result for display purposes.
+enum ResultCategory<'a> {
+    SuccessWithTx(String),
+    SuccessNoTx,
+    Skipped(&'a str),
+    Failed(&'a str),
+}
+
+/// Categorize an ownership result for display.
+fn categorize_result(result: &adi_ecosystem::OwnershipResult) -> ResultCategory<'_> {
+    if result.success {
+        match &result.tx_hash {
+            Some(tx) => ResultCategory::SuccessWithTx(tx.to_string()),
+            None => ResultCategory::SuccessNoTx,
+        }
+    } else {
+        match &result.error {
+            Some(e) if e.starts_with("Skipped: ") => {
+                ResultCategory::Skipped(e.strip_prefix("Skipped: ").unwrap_or(e))
+            }
+            Some(e) => ResultCategory::Failed(e),
+            None => ResultCategory::Failed("unknown error"),
+        }
+    }
+}
+
 /// Display the ownership acceptance summary.
 fn display_summary(summary: &OwnershipSummary) {
     log::info!(
@@ -254,28 +280,19 @@ fn display_summary(summary: &OwnershipSummary) {
     log::info!("");
 
     for result in &summary.results {
-        if result.success {
-            if let Some(tx) = &result.tx_hash {
-                log::info!(
-                    "  {} {}: {}",
-                    "✓".green(),
-                    result.name,
-                    tx.to_string().green()
-                );
-            } else {
+        match categorize_result(result) {
+            ResultCategory::SuccessWithTx(tx) => {
+                log::info!("  {} {}: {}", "✓".green(), result.name, tx.green());
+            }
+            ResultCategory::SuccessNoTx => {
                 log::info!("  {} {}", "✓".green(), result.name);
             }
-        } else if let Some(error) = &result.error {
-            if error.starts_with("Skipped:") {
-                // Skipped - show with different indicator
-                let reason = error.strip_prefix("Skipped: ").unwrap_or(error);
+            ResultCategory::Skipped(reason) => {
                 log::info!("  {} {}: {}", "⊘".cyan(), result.name, reason.cyan());
-            } else {
-                // Failed
+            }
+            ResultCategory::Failed(error) => {
                 log::info!("  {} {}: {}", "✗".yellow(), result.name, error.yellow());
             }
-        } else {
-            log::info!("  {} {}: unknown error", "✗".yellow(), result.name);
         }
     }
 }
