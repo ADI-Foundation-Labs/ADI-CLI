@@ -257,105 +257,105 @@ pub async fn run(args: EcosystemDeployArgs, context: &Context) -> Result<()> {
         .await;
 
     let plan = match plan_result {
-        Ok(p) => p,
+        Ok(p) => Some(p),
         Err(FundingError::NoFundingRequired) => {
             log::info!("All wallets already funded - no funding required!");
-            log::info!("Ecosystem deployment complete (no funding needed)");
-            log::info!("Note: Contract deployment not yet implemented");
-            return Ok(());
+            None
         }
         Err(e) => return Err(e).wrap_err("Failed to build funding plan"),
     };
 
-    // 13. Display plan summary
-    log::info!("");
-    log::info!("============================================================");
-    log::info!("Funding Plan Summary");
-    log::info!("============================================================");
-    log::info!("  Transfers needed: {}", plan.transfer_count());
-    log::info!(
-        "  Total ETH to transfer: {}",
-        green_eth(plan.total_eth_transfers())
-    );
-    if !plan.total_token_required.is_zero() {
-        let symbol = funding_config.token_symbol.as_deref().unwrap_or("tokens");
-        log::info!(
-            "  Total {} to transfer: {}",
-            symbol,
-            green_token(plan.total_token_required, symbol)
-        );
-    }
-    log::info!("  Estimated gas cost: {}", green_eth(plan.total_gas_cost));
-    log::info!(
-        "  Total ETH required: {}",
-        green_eth(plan.total_eth_required)
-    );
-    log::info!("");
-    log::info!("  Funder balance: {}", green_eth(plan.funder_eth_balance));
-    if let Some(token_balance) = plan.funder_token_balance {
-        let symbol = funding_config.token_symbol.as_deref().unwrap_or("tokens");
-        log::info!(
-            "  Funder {} balance: {}",
-            symbol,
-            green_token(token_balance, symbol)
-        );
-    }
-
-    if !plan.is_valid() {
-        let needed = plan.total_eth_required;
-        let have = plan.funder_eth_balance;
-        return Err(eyre::eyre!(
-            "Funder has insufficient balance.\n  Have: {} ETH\n  Need: {} ETH\n  \
-             Please fund the funder wallet with at least {} ETH",
-            format_eth(have),
-            format_eth(needed),
-            format_eth(needed - have)
-        ));
-    }
-    log::info!("  Status: Sufficient balance");
-    log::info!("============================================================");
-
-    // 14. Dry-run mode - show plan without executing
-    if args.dry_run {
+    // 13-16. Funding plan display, confirmation, and execution (if needed)
+    if let Some(plan) = plan {
         log::info!("");
-        log::info!("Dry-run mode: funding plan created but not executed");
-        display_plan_details(&plan);
-        return Ok(());
-    }
-
-    // 15. Confirmation prompt (unless --yes)
-    if !args.yes {
+        log::info!("============================================================");
+        log::info!("Funding Plan Summary");
+        log::info!("============================================================");
+        log::info!("  Transfers needed: {}", plan.transfer_count());
+        log::info!(
+            "  Total ETH to transfer: {}",
+            green_eth(plan.total_eth_transfers())
+        );
+        if !plan.total_token_required.is_zero() {
+            let symbol = funding_config.token_symbol.as_deref().unwrap_or("tokens");
+            log::info!(
+                "  Total {} to transfer: {}",
+                symbol,
+                green_token(plan.total_token_required, symbol)
+            );
+        }
+        log::info!("  Estimated gas cost: {}", green_eth(plan.total_gas_cost));
+        log::info!(
+            "  Total ETH required: {}",
+            green_eth(plan.total_eth_required)
+        );
         log::info!("");
-        let confirmed = Confirm::new()
-            .with_prompt("Proceed with funding?")
-            .default(false)
-            .interact()
-            .wrap_err("Failed to read confirmation")?;
+        log::info!("  Funder balance: {}", green_eth(plan.funder_eth_balance));
+        if let Some(token_balance) = plan.funder_token_balance {
+            let symbol = funding_config.token_symbol.as_deref().unwrap_or("tokens");
+            log::info!(
+                "  Funder {} balance: {}",
+                symbol,
+                green_token(token_balance, symbol)
+            );
+        }
 
-        if !confirmed {
-            log::info!("Funding cancelled by user");
+        if !plan.is_valid() {
+            let needed = plan.total_eth_required;
+            let have = plan.funder_eth_balance;
+            return Err(eyre::eyre!(
+                "Funder has insufficient balance.\n  Have: {} ETH\n  Need: {} ETH\n  \
+                 Please fund the funder wallet with at least {} ETH",
+                format_eth(have),
+                format_eth(needed),
+                format_eth(needed - have)
+            ));
+        }
+        log::info!("  Status: Sufficient balance");
+        log::info!("============================================================");
+
+        // Dry-run mode - show plan without executing
+        if args.dry_run {
+            log::info!("");
+            log::info!("Dry-run mode: funding plan created but not executed");
+            display_plan_details(&plan);
             return Ok(());
         }
+
+        // Confirmation prompt (unless --yes)
+        if !args.yes {
+            log::info!("");
+            let confirmed = Confirm::new()
+                .with_prompt("Proceed with funding?")
+                .default(false)
+                .interact()
+                .wrap_err("Failed to read confirmation")?;
+
+            if !confirmed {
+                log::info!("Funding cancelled by user");
+                return Ok(());
+            }
+        }
+
+        // Execute funding
+        log::info!("");
+        log::info!("Executing funding transfers...");
+        let result = executor
+            .execute(&plan)
+            .await
+            .wrap_err("Funding execution failed")?;
+
+        log::info!("");
+        log::info!("============================================================");
+        log::info!("Funding Complete!");
+        log::info!("============================================================");
+        log::info!("  Successful transfers: {}", result.successful);
+        log::info!("  Total gas used: {}", result.total_gas_used);
+        log::info!("============================================================");
+
+        log::info!("");
+        log::info!("Ecosystem wallets funded successfully!");
     }
-
-    // 16. Execute funding
-    log::info!("");
-    log::info!("Executing funding transfers...");
-    let result = executor
-        .execute(&plan)
-        .await
-        .wrap_err("Funding execution failed")?;
-
-    log::info!("");
-    log::info!("============================================================");
-    log::info!("Funding Complete!");
-    log::info!("============================================================");
-    log::info!("  Successful transfers: {}", result.successful);
-    log::info!("  Total gas used: {}", result.total_gas_used);
-    log::info!("============================================================");
-
-    log::info!("");
-    log::info!("Ecosystem wallets funded successfully!");
 
     // 17. Skip deployment if requested
     if args.skip_deployment {

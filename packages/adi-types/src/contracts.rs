@@ -72,6 +72,44 @@ pub struct CoreEcosystemContracts {
     pub native_token_vault_addr: Option<Address>,
 }
 
+/// ZkSync OS Chain Type Manager (CTM) contracts.
+///
+/// These contracts are deployed as part of the ZkSync OS ecosystem.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct ZkSyncOsCtm {
+    /// Governance address for the CTM.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub governance: Option<Address>,
+
+    /// Chain admin address for the CTM.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chain_admin: Option<Address>,
+
+    /// Proxy admin address.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proxy_admin: Option<Address>,
+
+    /// State transition proxy address.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state_transition_proxy_addr: Option<Address>,
+
+    /// Validator timelock address.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub validator_timelock_addr: Option<Address>,
+
+    /// Server notifier proxy address.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_notifier_proxy_addr: Option<Address>,
+
+    /// Verifier address.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verifier_addr: Option<Address>,
+
+    /// L1 Rollup DA manager address.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub l1_rollup_da_manager: Option<Address>,
+}
+
 /// Ecosystem contracts configuration from configs/contracts.yaml.
 ///
 /// Complex nested structure with many optional fields.
@@ -102,6 +140,22 @@ pub struct EcosystemContracts {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub l1: Option<L1Contracts>,
 
+    /// ZkSync OS Chain Type Manager contracts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zksync_os_ctm: Option<ZkSyncOsCtm>,
+
+    /// Server notifier proxy address.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_notifier_proxy_addr: Option<Address>,
+
+    /// Verifier address.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verifier_addr: Option<Address>,
+
+    /// L1 Rollup DA manager address.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub l1_rollup_da_manager: Option<Address>,
+
     /// Additional unmapped fields for forward compatibility.
     #[serde(flatten)]
     pub extra: HashMap<String, serde_yaml::Value>,
@@ -116,8 +170,54 @@ impl EcosystemContracts {
     }
 
     /// Returns the governance address if available.
+    ///
+    /// Checks L1 contracts first, then falls back to ZkSync OS CTM.
     pub fn governance_addr(&self) -> Option<Address> {
-        self.l1.as_ref().and_then(|l| l.governance_addr)
+        self.l1
+            .as_ref()
+            .and_then(|l| l.governance_addr)
+            .or_else(|| self.zksync_os_ctm.as_ref().and_then(|c| c.governance))
+    }
+
+    /// Returns the chain admin address if available.
+    ///
+    /// Checks L1 contracts first, then falls back to ZkSync OS CTM.
+    pub fn chain_admin_addr(&self) -> Option<Address> {
+        self.l1
+            .as_ref()
+            .and_then(|l| l.chain_admin_addr)
+            .or_else(|| self.zksync_os_ctm.as_ref().and_then(|c| c.chain_admin))
+    }
+
+    /// Returns the validator timelock address if available.
+    pub fn validator_timelock_addr(&self) -> Option<Address> {
+        self.zksync_os_ctm
+            .as_ref()
+            .and_then(|c| c.validator_timelock_addr)
+    }
+
+    /// Returns the server notifier proxy address if available.
+    ///
+    /// Checks root level first, then falls back to ZkSync OS CTM.
+    pub fn server_notifier_addr(&self) -> Option<Address> {
+        self.server_notifier_proxy_addr
+            .or_else(|| self.zksync_os_ctm.as_ref().and_then(|c| c.server_notifier_proxy_addr))
+    }
+
+    /// Returns the verifier address if available.
+    ///
+    /// Checks root level first, then falls back to ZkSync OS CTM.
+    pub fn verifier_addr(&self) -> Option<Address> {
+        self.verifier_addr
+            .or_else(|| self.zksync_os_ctm.as_ref().and_then(|c| c.verifier_addr))
+    }
+
+    /// Returns the L1 Rollup DA manager address if available.
+    ///
+    /// Checks root level first, then falls back to ZkSync OS CTM.
+    pub fn l1_rollup_da_manager_addr(&self) -> Option<Address> {
+        self.l1_rollup_da_manager
+            .or_else(|| self.zksync_os_ctm.as_ref().and_then(|c| c.l1_rollup_da_manager))
     }
 }
 
