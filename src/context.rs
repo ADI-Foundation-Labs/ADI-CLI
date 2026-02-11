@@ -3,9 +3,12 @@
 //! The Context struct carries configuration through command execution.
 
 use adi_toolkit::ToolkitConfig;
+use adi_types::Logger;
+use std::sync::Arc;
 
 use crate::config::Config;
 use crate::error::{Result, WrapErr};
+use crate::ui;
 
 /// Execution context for CLI commands.
 ///
@@ -15,6 +18,8 @@ pub struct Context {
     cfg: Config,
     /// CLI-provided image tag override (highest priority).
     image_tag_override: Option<String>,
+    /// Shared logger instance.
+    logger: Arc<dyn Logger>,
 }
 
 impl Context {
@@ -28,7 +33,13 @@ impl Context {
         Ok(Self {
             cfg,
             image_tag_override: options.image_tag.clone(),
+            logger: ui::cli_logger(),
         })
+    }
+
+    /// Get the shared logger instance.
+    pub fn logger(&self) -> &Arc<dyn Logger> {
+        &self.logger
     }
 
     /// Get a reference to the configuration.

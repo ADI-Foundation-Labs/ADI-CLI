@@ -21,3 +21,4 @@ bollard = { workspace = true }
 cliclack = { workspace = true }
 url = { workspace = true }
 chrono = { workspace = true }
+adi-types = { workspace = true }

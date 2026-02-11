@@ -14,8 +14,9 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::commands::helpers::{
-    create_state_manager, derive_address_from_key, display_ownership_status, display_summary,
-    resolve_chain_name, resolve_ecosystem_name, resolve_new_owner, resolve_rpc_url,
+    create_state_manager_with_context, derive_address_from_key, display_ownership_status,
+    display_summary, resolve_chain_name, resolve_ecosystem_name, resolve_new_owner,
+    resolve_rpc_url,
 };
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
@@ -87,7 +88,7 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
     ui::info(format!("New owner: {}", new_owner))?;
 
     // Create state manager
-    let state_manager = create_state_manager(&ecosystem_name, context.config());
+    let state_manager = create_state_manager_with_context(&ecosystem_name, context);
 
     // Load ecosystem contracts
     let ecosystem_contracts: EcosystemContracts = state_manager

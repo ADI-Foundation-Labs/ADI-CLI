@@ -3,6 +3,7 @@
 use adi_ecosystem::{build_ecosystem_create_args, verify_ecosystem_created, EcosystemConfig};
 use adi_state::{import_ecosystem_state, StateManager};
 use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
+use std::sync::Arc;
 use tempfile::TempDir;
 
 use super::InitArgs;
@@ -30,39 +31,49 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     // 1. Parse and validate protocol version
     let version =
         ProtocolVersion::parse(&args.protocol_version).wrap_err("Invalid protocol version")?;
-    ui::info(format!("Protocol version: {}", version))?;
-
     // 2. Merge CLI args with config defaults (CLI > Config)
     let config_defaults = &context.config().ecosystem;
     let config = build_ecosystem_config(args, config_defaults);
 
-    ui::info(format!("Ecosystem: {}", config.name))?;
-    ui::info(format!("  L1 network: {}", config.l1_network))?;
     ui::info(format!(
-        "  Chain: {} (ID: {})",
-        config.chain_name, config.chain_id
+        "Protocol version: {}\n\
+         Ecosystem: {}\n\
+           L1 network: {}\n\
+           Chain: {} (ID: {})\n\
+           Prover mode: {}",
+        version,
+        config.name,
+        config.l1_network,
+        config.chain_name,
+        config.chain_id,
+        config.prover_mode
     ))?;
-    ui::info(format!("  Prover mode: {}", config.prover_mode))?;
     log::debug!("Full ecosystem config: {:?}", config);
 
     // 3. Check if ecosystem state already exists
     let state_dir = &context.config().state_dir;
     let ecosystem_path = state_dir.join(&config.name);
-    let state_manager =
-        StateManager::with_backend_type(context.config().state_backend.clone(), &ecosystem_path);
+    let state_manager = StateManager::with_backend_type_and_logger(
+        context.config().state_backend.clone(),
+        &ecosystem_path,
+        Arc::clone(context.logger()),
+    );
 
     if state_manager.exists().await? {
         // Show files that will be deleted
         let files = state_manager.list_state_files();
+        let file_list: String = files
+            .iter()
+            .map(|f| format!("  - {}", f))
+            .collect::<Vec<_>>()
+            .join("\n");
         ui::warning(format!(
-            "Ecosystem '{}' already exists at {}",
+            "Ecosystem '{}' already exists at {}\n\
+             The following files will be deleted:\n{}",
             config.name,
-            ecosystem_path.display()
+            ecosystem_path.display(),
+            file_list
         ))?;
-        ui::warning("The following files will be deleted:")?;
-        for file in &files {
-            ui::warning(format!("  - {}", file))?;
-        }
 
         if args.force {
             ui::info("Force flag set, skipping confirmation")?;
@@ -126,9 +137,12 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
 
     // 7. Create toolkit runner and execute pointing to temp dir
     ui::info("Connecting to Docker...")?;
-    let runner = ToolkitRunner::with_config(context.toolkit_config())
-        .await
-        .wrap_err("Failed to create toolkit runner")?;
+    let runner = ToolkitRunner::with_config_and_logger(
+        context.toolkit_config(),
+        Arc::clone(context.logger()),
+    )
+    .await
+    .wrap_err("Failed to create toolkit runner")?;
 
     ui::info("Running zkstack ecosystem create...")?;
     let args_refs: Vec<&str> = zkstack_args.iter().map(String::as_str).collect();

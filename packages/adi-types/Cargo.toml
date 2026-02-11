@@ -18,3 +18,4 @@ strum = { workspace = true }
 clap = { workspace = true }
 alloy-primitives = { workspace = true }
 secrecy = { workspace = true }
+log = { workspace = true }

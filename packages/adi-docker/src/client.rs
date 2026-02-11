@@ -2,7 +2,9 @@
 
 use crate::error::{DockerError, Result};
 use crate::image::ImageManager;
+use adi_types::{LogCrateLogger, Logger};
 use bollard::Docker;
+use std::sync::Arc;
 
 /// Wrapper around bollard::Docker with helper methods.
 ///
@@ -25,29 +27,42 @@ use bollard::Docker;
 #[derive(Clone)]
 pub struct DockerClient {
     inner: Docker,
+    logger: Arc<dyn Logger>,
 }
 
 impl DockerClient {
     /// Create a new DockerClient by connecting to the Docker daemon.
     ///
-    /// Attempts to connect using the default socket location.
-    /// On Unix, this uses the Unix socket at `/var/run/docker.sock`.
-    /// On Windows, this uses the named pipe.
+    /// Uses the default `LogCrateLogger` for logging.
     ///
     /// # Errors
     ///
     /// Returns an error if connection to Docker daemon fails.
     pub async fn new() -> Result<Self> {
-        log::debug!("Connecting to Docker daemon...");
+        Self::with_logger(Arc::new(LogCrateLogger)).await
+    }
+
+    /// Create a new DockerClient with a custom logger.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if connection to Docker daemon fails.
+    pub async fn with_logger(logger: Arc<dyn Logger>) -> Result<Self> {
+        logger.debug("Connecting to Docker daemon...");
         let docker = Docker::connect_with_defaults()
             .map_err(|e: bollard::errors::Error| DockerError::DaemonNotRunning(e.to_string()))?;
 
-        let client = Self { inner: docker };
+        let client = Self {
+            inner: docker,
+            logger,
+        };
 
         // Verify connection works
         client.is_daemon_running().await?;
 
-        log::debug!("Successfully connected to Docker daemon");
+        client
+            .logger
+            .debug("Successfully connected to Docker daemon");
         Ok(client)
     }
 
@@ -57,12 +72,12 @@ impl DockerClient {
     ///
     /// Returns an error if daemon is not accessible.
     pub async fn is_daemon_running(&self) -> Result<bool> {
-        log::debug!("Pinging Docker daemon...");
+        self.logger.debug("Pinging Docker daemon...");
         self.inner
             .ping()
             .await
             .map_err(|e| DockerError::DaemonNotRunning(e.to_string()))?;
-        log::debug!("Docker daemon ping successful");
+        self.logger.debug("Docker daemon ping successful");
         Ok(true)
     }
 
@@ -72,10 +87,12 @@ impl DockerClient {
     ///
     /// * `image_uri` - The full image URI (e.g., "registry/image:tag").
     pub async fn image_exists(&self, image_uri: &str) -> Result<bool> {
-        log::debug!("Checking if image exists: {}", image_uri);
-        let image_manager = ImageManager::new(self.inner.clone());
+        self.logger
+            .debug(&format!("Checking if image exists: {}", image_uri));
+        let image_manager = ImageManager::new(self.inner.clone(), Arc::clone(&self.logger));
         let exists = image_manager.exists(image_uri).await?;
-        log::debug!("Image {} exists: {}", image_uri, exists);
+        self.logger
+            .debug(&format!("Image {} exists: {}", image_uri, exists));
         Ok(exists)
     }
 
@@ -92,8 +109,9 @@ impl DockerClient {
     /// - Network issues
     /// - Image does not exist in registry
     pub async fn pull_image(&self, image_uri: &str) -> Result<()> {
-        log::debug!("Ensuring image is available: {}", image_uri);
-        let image_manager = ImageManager::new(self.inner.clone());
+        self.logger
+            .debug(&format!("Ensuring image is available: {}", image_uri));
+        let image_manager = ImageManager::new(self.inner.clone(), Arc::clone(&self.logger));
         image_manager.pull_if_missing(image_uri).await
     }
 
@@ -101,5 +119,11 @@ impl DockerClient {
     #[must_use]
     pub fn inner(&self) -> &Docker {
         &self.inner
+    }
+
+    /// Get a reference to the logger.
+    #[must_use]
+    pub fn logger(&self) -> &Arc<dyn Logger> {
+        &self.logger
     }
 }

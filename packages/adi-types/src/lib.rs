@@ -37,6 +37,7 @@ mod apps;
 mod base_token;
 mod contracts;
 mod deployments;
+mod logger;
 mod metadata;
 mod network;
 mod partial;
@@ -72,3 +73,6 @@ pub use prover::{BatchCommitDataMode, ProverMode, WalletCreation};
 
 // Re-export wallet types
 pub use wallet::{Wallet, Wallets};
+
+// Re-export logger types
+pub use logger::{LogCrateLogger, Logger, NoopLogger};

@@ -5,9 +5,10 @@
 
 use crate::error::{Result, StateError};
 use crate::StateManager;
-use adi_types::{ChainMetadata, EcosystemMetadata, Wallets};
+use adi_types::{ChainMetadata, EcosystemMetadata, Logger, Wallets};
 use serde::de::DeserializeOwned;
 use std::path::Path;
+use std::sync::Arc;
 use tokio::fs;
 
 /// Read and deserialize a YAML file from the filesystem.
@@ -46,27 +47,35 @@ pub async fn import_ecosystem_state(
     ecosystem_name: &str,
     chain_name: &str,
 ) -> Result<()> {
+    let logger = state_manager.logger();
     let ecosystem_dir = source_dir.join(ecosystem_name);
-    log::info!("Importing ecosystem state from {}", ecosystem_dir.display());
+    logger.info(&format!(
+        "Importing ecosystem state from {}",
+        ecosystem_dir.display()
+    ));
 
     // Import ecosystem-level files
-    import_ecosystem_metadata(state_manager, &ecosystem_dir).await?;
-    import_ecosystem_wallets(state_manager, &ecosystem_dir).await?;
+    import_ecosystem_metadata(state_manager, &ecosystem_dir, logger).await?;
+    import_ecosystem_wallets(state_manager, &ecosystem_dir, logger).await?;
 
     // Import chain-level files
-    import_chain_metadata(state_manager, &ecosystem_dir, chain_name).await?;
-    import_chain_wallets(state_manager, &ecosystem_dir, chain_name).await?;
+    import_chain_metadata(state_manager, &ecosystem_dir, chain_name, logger).await?;
+    import_chain_wallets(state_manager, &ecosystem_dir, chain_name, logger).await?;
 
-    log::info!("Ecosystem state imported successfully");
+    logger.success("Ecosystem state imported successfully");
     Ok(())
 }
 
 async fn import_ecosystem_metadata(
     state_manager: &StateManager,
     ecosystem_dir: &Path,
+    logger: &Arc<dyn Logger>,
 ) -> Result<()> {
     let path = ecosystem_dir.join("ZkStack.yaml");
-    log::debug!("Importing ecosystem metadata from {}", path.display());
+    logger.debug(&format!(
+        "Importing ecosystem metadata from {}",
+        path.display()
+    ));
 
     let mut metadata: EcosystemMetadata = read_yaml_file(&path).await?;
 
@@ -81,9 +90,13 @@ async fn import_ecosystem_metadata(
 async fn import_ecosystem_wallets(
     state_manager: &StateManager,
     ecosystem_dir: &Path,
+    logger: &Arc<dyn Logger>,
 ) -> Result<()> {
     let path = ecosystem_dir.join("configs").join("wallets.yaml");
-    log::debug!("Importing ecosystem wallets from {}", path.display());
+    logger.debug(&format!(
+        "Importing ecosystem wallets from {}",
+        path.display()
+    ));
 
     let wallets: Wallets = read_yaml_file(&path).await?;
     state_manager.ecosystem().create_wallets(&wallets).await
@@ -93,16 +106,17 @@ async fn import_chain_metadata(
     state_manager: &StateManager,
     ecosystem_dir: &Path,
     chain_name: &str,
+    logger: &Arc<dyn Logger>,
 ) -> Result<()> {
     let path = ecosystem_dir
         .join("chains")
         .join(chain_name)
         .join("ZkStack.yaml");
-    log::debug!(
+    logger.debug(&format!(
         "Importing chain '{}' metadata from {}",
         chain_name,
         path.display()
-    );
+    ));
 
     let mut metadata: ChainMetadata = read_yaml_file(&path).await?;
 
@@ -122,17 +136,18 @@ async fn import_chain_wallets(
     state_manager: &StateManager,
     ecosystem_dir: &Path,
     chain_name: &str,
+    logger: &Arc<dyn Logger>,
 ) -> Result<()> {
     let path = ecosystem_dir
         .join("chains")
         .join(chain_name)
         .join("configs")
         .join("wallets.yaml");
-    log::debug!(
+    logger.debug(&format!(
         "Importing chain '{}' wallets from {}",
         chain_name,
         path.display()
-    );
+    ));
 
     let wallets: Wallets = read_yaml_file(&path).await?;
     state_manager

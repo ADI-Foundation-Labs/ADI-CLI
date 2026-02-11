@@ -6,9 +6,11 @@
 use adi_ecosystem::{OwnershipResult, OwnershipState, OwnershipStatusSummary, OwnershipSummary};
 use adi_state::StateManager;
 use alloy_primitives::Address;
+use std::sync::Arc;
 use url::Url;
 
 use crate::config::Config;
+use crate::context::Context;
 use crate::error::{Result, WrapErr};
 use crate::ui;
 
@@ -109,10 +111,14 @@ pub fn derive_address_from_key(key: &secrecy::SecretString) -> Result<Address> {
     Ok(signer.address())
 }
 
-/// Create state manager for the ecosystem.
-pub fn create_state_manager(ecosystem_name: &str, config: &Config) -> StateManager {
-    let ecosystem_path = config.state_dir.join(ecosystem_name);
-    StateManager::with_backend_type(config.state_backend.clone(), &ecosystem_path)
+/// Create state manager for the ecosystem with context's logger.
+pub fn create_state_manager_with_context(ecosystem_name: &str, context: &Context) -> StateManager {
+    let ecosystem_path = context.config().state_dir.join(ecosystem_name);
+    StateManager::with_backend_type_and_logger(
+        context.config().state_backend.clone(),
+        &ecosystem_path,
+        Arc::clone(context.logger()),
+    )
 }
 
 /// Resolve ecosystem name from optional arg or config.

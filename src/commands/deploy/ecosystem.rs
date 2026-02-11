@@ -557,9 +557,12 @@ async fn run_ecosystem_deployment(
     ui::info("Deploying Ecosystem Contracts")?;
     ui::info("============================================================")?;
 
-    let runner = ToolkitRunner::with_config(context.toolkit_config())
-        .await
-        .wrap_err("Failed to create toolkit runner")?;
+    let runner = ToolkitRunner::with_config_and_logger(
+        context.toolkit_config(),
+        std::sync::Arc::clone(context.logger()),
+    )
+    .await
+    .wrap_err("Failed to create toolkit runner")?;
 
     let ecosystem_path = context.config().state_dir.join(ecosystem_name);
 
@@ -687,9 +690,10 @@ fn resolve_chain_name(args: &DeployArgs, context: &Context) -> Result<String> {
 /// Create state manager for the ecosystem.
 fn create_state_manager(ecosystem_name: &str, context: &Context) -> Result<StateManager> {
     let ecosystem_path = context.config().state_dir.join(ecosystem_name);
-    Ok(StateManager::with_backend_type(
+    Ok(StateManager::with_backend_type_and_logger(
         context.config().state_backend.clone(),
         &ecosystem_path,
+        std::sync::Arc::clone(context.logger()),
     ))
 }
 

@@ -1,19 +1,22 @@
 //! Image pulling and management.
 
 use crate::error::{DockerError, Result};
+use adi_types::Logger;
 use bollard::image::CreateImageOptions;
 use bollard::Docker;
 use futures_util::StreamExt;
+use std::sync::Arc;
 
 /// Manages Docker images (pull, check existence).
 pub(crate) struct ImageManager {
     docker: Docker,
+    logger: Arc<dyn Logger>,
 }
 
 impl ImageManager {
     /// Create a new ImageManager.
-    pub fn new(docker: Docker) -> Self {
-        Self { docker }
+    pub fn new(docker: Docker, logger: Arc<dyn Logger>) -> Self {
+        Self { docker, logger }
     }
 
     /// Check if an image exists locally.
@@ -30,7 +33,8 @@ impl ImageManager {
     /// Pull an image from registry if not available locally.
     pub async fn pull_if_missing(&self, image_uri: &str) -> Result<()> {
         if self.exists(image_uri).await? {
-            log::debug!("Image {} already exists locally", image_uri);
+            self.logger
+                .debug(&format!("Image {} already exists locally", image_uri));
             return Ok(());
         }
 
@@ -39,7 +43,7 @@ impl ImageManager {
 
     /// Pull an image from registry.
     async fn pull(&self, image_uri: &str) -> Result<()> {
-        log::info!("Pulling image: {}", image_uri);
+        self.logger.info(&format!("Pulling image: {}", image_uri));
 
         let options = CreateImageOptions {
             from_image: image_uri.to_string(),
@@ -52,7 +56,7 @@ impl ImageManager {
             match result {
                 Ok(info) => {
                     if let Some(status) = info.status {
-                        log::debug!("Pull status: {}", status);
+                        self.logger.debug(&format!("Pull status: {}", status));
                     }
                     if let Some(error) = info.error {
                         return Err(DockerError::PullFailed {
@@ -70,7 +74,7 @@ impl ImageManager {
             }
         }
 
-        log::info!("Successfully pulled image: {}", image_uri);
+        self.logger.success(&format!("Pulled image: {}", image_uri));
         Ok(())
     }
 }

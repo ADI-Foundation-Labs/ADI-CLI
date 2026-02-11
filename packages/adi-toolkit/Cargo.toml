@@ -13,6 +13,7 @@ path = "src/lib.rs"
 
 [dependencies]
 adi-docker = { workspace = true }
+adi-types = { workspace = true }
 tokio = { workspace = true }
 eyre = { workspace = true }
 thiserror = { workspace = true }

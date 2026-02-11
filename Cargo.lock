@@ -36,6 +36,7 @@ dependencies = [
 name = "adi-docker"
 version = "0.1.0"
 dependencies = [
+ "adi-types",
  "bollard",
  "chrono",
  "cliclack",
@@ -115,6 +116,7 @@ name = "adi-toolkit"
 version = "0.1.0"
 dependencies = [
  "adi-docker",
+ "adi-types",
  "eyre",
  "log",
  "semver 1.0.27",
@@ -131,6 +133,7 @@ version = "0.1.0"
 dependencies = [
  "alloy-primitives",
  "clap",
+ "log",
  "secrecy",
  "serde",
  "serde_yaml",

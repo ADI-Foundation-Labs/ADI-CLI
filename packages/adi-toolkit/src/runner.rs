@@ -4,8 +4,10 @@ use crate::cleanup::cleanup_tmp_dir;
 use crate::config::ToolkitConfig;
 use crate::error::Result;
 use adi_docker::{transform_url_for_container, ContainerConfig, ContainerManager, DockerClient};
+use adi_types::{LogCrateLogger, Logger};
 use semver::Version;
 use std::path::Path;
+use std::sync::Arc;
 
 /// Genesis file name expected in state directory.
 pub const GENESIS_FILENAME: &str = "genesis.json";
@@ -19,22 +21,41 @@ pub const GENESIS_CONTAINER_PATH: &str = "/deps/zksync-era/etc/env/file_based/ge
 pub struct ToolkitRunner {
     client: DockerClient,
     config: ToolkitConfig,
+    logger: Arc<dyn Logger>,
 }
 
 impl ToolkitRunner {
     /// Create a new ToolkitRunner by connecting to Docker.
     pub async fn new() -> Result<Self> {
-        let client = DockerClient::new().await?;
+        Self::with_logger(Arc::new(LogCrateLogger)).await
+    }
+
+    /// Create a new ToolkitRunner with custom logger.
+    pub async fn with_logger(logger: Arc<dyn Logger>) -> Result<Self> {
+        let client = DockerClient::with_logger(Arc::clone(&logger)).await?;
         Ok(Self {
             client,
             config: ToolkitConfig::default(),
+            logger,
         })
     }
 
     /// Create a new ToolkitRunner with custom configuration.
     pub async fn with_config(config: ToolkitConfig) -> Result<Self> {
-        let client = DockerClient::new().await?;
-        Ok(Self { client, config })
+        Self::with_config_and_logger(config, Arc::new(LogCrateLogger)).await
+    }
+
+    /// Create a new ToolkitRunner with custom configuration and logger.
+    pub async fn with_config_and_logger(
+        config: ToolkitConfig,
+        logger: Arc<dyn Logger>,
+    ) -> Result<Self> {
+        let client = DockerClient::with_logger(Arc::clone(&logger)).await?;
+        Ok(Self {
+            client,
+            config,
+            logger,
+        })
     }
 
     /// Execute a generic command in the toolkit container.
@@ -76,13 +97,14 @@ impl ToolkitRunner {
         let image_ref = self.config.image_reference(protocol_version);
         let image_uri = image_ref.full_uri();
 
-        log::info!("Using toolkit image: {}", image_uri);
-        log::debug!(
+        self.logger
+            .info(&format!("Using toolkit image: {}", image_uri));
+        self.logger.debug(&format!(
             "Running command: {:?} (state_dir: {}, log_dir: {})",
             command,
             state_dir.display(),
             log_dir.display()
-        );
+        ));
 
         self.client.pull_image(&image_uri).await?;
 
@@ -100,13 +122,13 @@ impl ToolkitRunner {
             ..Default::default()
         };
 
-        log::debug!(
+        self.logger.debug(&format!(
             "Container config: working_dir={}, timeout={}s",
-            container_config.working_dir,
-            container_config.timeout_seconds
-        );
+            container_config.working_dir, container_config.timeout_seconds
+        ));
 
-        let manager = ContainerManager::new(self.client.inner().clone());
+        let manager =
+            ContainerManager::with_logger(self.client.inner().clone(), Arc::clone(&self.logger));
         let result = manager.run(&image_uri, &container_config).await;
 
         // Always clean up tmp directory (keep only *.md files), even on error/interrupt
@@ -122,10 +144,10 @@ impl ToolkitRunner {
                             if filename_str.starts_with("report-")
                                 && filename_str.ends_with(".toml")
                             {
-                                log::error!(
+                                self.logger.error(&format!(
                                     "Crash report available at: {}",
                                     entry.path().display()
-                                );
+                                ));
                             }
                         }
                     }
@@ -135,7 +157,8 @@ impl ToolkitRunner {
         }
 
         let exit_code = result?;
-        log::debug!("Command completed with exit code: {}", exit_code);
+        self.logger
+            .debug(&format!("Command completed with exit code: {}", exit_code));
 
         Ok(exit_code)
     }
@@ -154,7 +177,8 @@ impl ToolkitRunner {
         log_dir: &Path,
         protocol_version: &Version,
     ) -> Result<i64> {
-        log::debug!("Running zkstack with args: {:?}", args);
+        self.logger
+            .debug(&format!("Running zkstack with args: {:?}", args));
 
         let zkstack_cmd = format!("zkstack {}", args.join(" "));
         let shell_cmd = format!(
@@ -162,7 +186,10 @@ impl ToolkitRunner {
             GENESIS_FILENAME, GENESIS_CONTAINER_PATH, zkstack_cmd
         );
 
-        log::info!("Copying genesis.json to {}", GENESIS_CONTAINER_PATH);
+        self.logger.debug(&format!(
+            "Copying genesis.json to {}",
+            GENESIS_CONTAINER_PATH
+        ));
 
         let command = vec!["sh", "-c", &shell_cmd];
         let label = format!("Running zkstack {}...", args.first().unwrap_or(&""));
@@ -186,7 +213,8 @@ impl ToolkitRunner {
         state_dir: &Path,
         protocol_version: &Version,
     ) -> Result<i64> {
-        log::debug!("Running forge with args: {:?}", args);
+        self.logger
+            .debug(&format!("Running forge with args: {:?}", args));
         let mut command = vec!["forge"];
         command.extend(args);
 
@@ -203,12 +231,16 @@ impl ToolkitRunner {
 
     /// Execute cast command in toolkit container.
     pub async fn run_cast(&self, args: &[&str], protocol_version: &Version) -> Result<i64> {
-        log::debug!("Running cast with args: {:?}", args);
+        self.logger
+            .debug(&format!("Running cast with args: {:?}", args));
         let mut command = vec!["cast"];
         command.extend(args);
 
         let temp_dir = std::env::temp_dir();
-        log::debug!("Using temp directory for cast: {}", temp_dir.display());
+        self.logger.debug(&format!(
+            "Using temp directory for cast: {}",
+            temp_dir.display()
+        ));
 
         self.run_command(
             &command,
@@ -229,11 +261,11 @@ impl ToolkitRunner {
         gas_price_wei: Option<u128>,
         protocol_version: &Version,
     ) -> Result<i64> {
-        log::debug!(
+        self.logger.debug(&format!(
             "Running zkstack ecosystem init (ecosystem_dir: {}, rpc: {})",
             ecosystem_dir.display(),
             l1_rpc_url
-        );
+        ));
 
         let foundry_fix = r#"sed -i.bak 's/{ access = "read", path = "\.\.\/l1-contracts\/script-out\/" }/{ access = "read-write", path = "..\/l1-contracts\/script-out\/" }/' /deps/zksync-era/contracts/l1-contracts/foundry.toml"#;
 
@@ -275,7 +307,8 @@ exit [lindex $result 3]'"#,
             zkstack = zkstack_args
         );
 
-        log::info!("Fixing foundry.toml permissions and deploying ecosystem contracts");
+        self.logger
+            .debug("Fixing foundry.toml permissions and deploying ecosystem contracts");
 
         let shell_command = vec!["sh", "-c", &shell_cmd];
 

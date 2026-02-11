@@ -3,6 +3,7 @@
 use crate::config::ContainerConfig;
 use crate::error::{DockerError, Result};
 use crate::stream::OutputStreamer;
+use adi_types::{LogCrateLogger, Logger};
 use bollard::container::{
     Config, CreateContainerOptions, RemoveContainerOptions, StartContainerOptions,
     WaitContainerOptions,
@@ -11,25 +12,35 @@ use bollard::models::{HostConfig, Mount, MountTypeEnum};
 use bollard::Docker;
 use futures_util::StreamExt;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
 
 /// Manages container lifecycle (create, start, wait, remove).
 pub struct ContainerManager {
     docker: Docker,
+    logger: Arc<dyn Logger>,
 }
 
 impl ContainerManager {
-    /// Create a new ContainerManager.
+    /// Create a new ContainerManager with default logger.
     pub fn new(docker: Docker) -> Self {
-        Self { docker }
+        Self::with_logger(docker, Arc::new(LogCrateLogger))
+    }
+
+    /// Create a new ContainerManager with custom logger.
+    pub fn with_logger(docker: Docker, logger: Arc<dyn Logger>) -> Self {
+        Self { docker, logger }
     }
 
     /// Run a container to completion and return exit code.
     ///
     /// Lifecycle: create -> start -> stream logs -> wait -> remove
     pub async fn run(&self, image_uri: &str, config: &ContainerConfig) -> Result<i64> {
-        log::debug!("Starting container lifecycle for image: {}", image_uri);
+        self.logger.debug(&format!(
+            "Starting container lifecycle for image: {}",
+            image_uri
+        ));
         let container_id = self.create(image_uri, config).await?;
 
         let result = self
@@ -42,9 +53,12 @@ impl ContainerManager {
             )
             .await;
 
-        log::info!("Cleaning up container...");
+        self.logger.debug("Cleaning up container...");
         if let Err(e) = self.remove(&container_id).await {
-            log::warn!("Failed to remove container {}: {}", container_id, e);
+            self.logger.warning(&format!(
+                "Failed to remove container {}: {}",
+                container_id, e
+            ));
         }
 
         result
@@ -59,12 +73,12 @@ impl ContainerManager {
             ))
         })?;
 
-        log::debug!(
+        self.logger.debug(&format!(
             "Creating container: image={}, working_dir={}, mount={}:/workspace",
             image_uri,
             config.working_dir,
             state_dir_absolute.display()
-        );
+        ));
 
         let workspace_mount = Mount {
             target: Some("/workspace".to_string()),
@@ -141,8 +155,9 @@ impl ContainerManager {
             .await
             .map_err(|e| DockerError::ContainerCreateFailed(e.to_string()))?;
 
-        log::info!("Container created: {}", container_name);
-        log::debug!("Container ID: {}", response.id);
+        self.logger
+            .debug(&format!("Container created: {}", container_name));
+        self.logger.debug(&format!("Container ID: {}", response.id));
         Ok(response.id)
     }
 
@@ -154,18 +169,17 @@ impl ContainerManager {
         log_command: &str,
         log_label: &str,
     ) -> Result<i64> {
-        log::debug!(
+        self.logger.debug(&format!(
             "Starting container: {} (timeout: {}s)",
-            container_id,
-            timeout_seconds
-        );
+            container_id, timeout_seconds
+        ));
 
         self.docker
             .start_container(container_id, None::<StartContainerOptions<String>>)
             .await
             .map_err(|e| DockerError::ContainerCreateFailed(e.to_string()))?;
 
-        log::info!("Container started, streaming output...");
+        self.logger.debug("Container started, streaming output...");
 
         let streamer = OutputStreamer::new(self.docker.clone());
         let duration = Duration::from_secs(timeout_seconds);
@@ -188,8 +202,8 @@ impl ContainerManager {
             }
             Ok(Err(e)) => {
                 // Stream was interrupted (CTRL+C)
-                log::warn!("Stream interrupted: {}", e);
-                log::info!("Stopping container...");
+                self.logger.warning(&format!("Stream interrupted: {}", e));
+                self.logger.info("Stopping container...");
                 let _ = self.docker.stop_container(container_id, None).await;
                 Err(DockerError::StreamError("Interrupted by user".to_string()))
             }
@@ -232,7 +246,8 @@ impl ContainerManager {
             .await
             .map_err(DockerError::ConnectionFailed)?;
 
-        log::debug!("Removed container: {}", container_id);
+        self.logger
+            .debug(&format!("Removed container: {}", container_id));
         Ok(())
     }
 }

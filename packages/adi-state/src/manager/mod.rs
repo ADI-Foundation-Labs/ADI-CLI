@@ -9,6 +9,7 @@ pub use ecosystem::EcosystemStateOps;
 use crate::backend::{create_backend, BackendType, StateBackend};
 use crate::error::Result;
 use crate::paths;
+use adi_types::{LogCrateLogger, Logger};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -39,6 +40,7 @@ use std::sync::Arc;
 pub struct StateManager {
     backend: Arc<dyn StateBackend>,
     base_path: PathBuf,
+    logger: Arc<dyn Logger>,
 }
 
 impl StateManager {
@@ -49,14 +51,26 @@ impl StateManager {
     /// * `ecosystem_path` - Path to the ecosystem directory.
     #[must_use]
     pub fn new(ecosystem_path: &Path) -> Self {
-        log::debug!(
+        Self::with_logger(ecosystem_path, Arc::new(LogCrateLogger))
+    }
+
+    /// Create a new state manager with filesystem backend and custom logger.
+    ///
+    /// # Arguments
+    ///
+    /// * `ecosystem_path` - Path to the ecosystem directory.
+    /// * `logger` - Custom logger implementation.
+    #[must_use]
+    pub fn with_logger(ecosystem_path: &Path, logger: Arc<dyn Logger>) -> Self {
+        logger.debug(&format!(
             "Creating StateManager with filesystem backend at {}",
             ecosystem_path.display()
-        );
+        ));
         let backend = create_backend(BackendType::Filesystem, ecosystem_path);
         Self {
             backend: Arc::from(backend),
             base_path: ecosystem_path.to_path_buf(),
+            logger,
         }
     }
 
@@ -71,6 +85,7 @@ impl StateManager {
         Self {
             backend,
             base_path: base_path.to_path_buf(),
+            logger: Arc::new(LogCrateLogger),
         }
     }
 
@@ -82,16 +97,39 @@ impl StateManager {
     /// * `ecosystem_path` - Path to the ecosystem directory.
     #[must_use]
     pub fn with_backend_type(backend_type: BackendType, ecosystem_path: &Path) -> Self {
-        log::debug!(
+        Self::with_backend_type_and_logger(backend_type, ecosystem_path, Arc::new(LogCrateLogger))
+    }
+
+    /// Create a state manager with the specified backend type and custom logger.
+    ///
+    /// # Arguments
+    ///
+    /// * `backend_type` - The backend type to use.
+    /// * `ecosystem_path` - Path to the ecosystem directory.
+    /// * `logger` - Custom logger implementation.
+    #[must_use]
+    pub fn with_backend_type_and_logger(
+        backend_type: BackendType,
+        ecosystem_path: &Path,
+        logger: Arc<dyn Logger>,
+    ) -> Self {
+        logger.debug(&format!(
             "Creating StateManager with {:?} backend at {}",
             backend_type,
             ecosystem_path.display()
-        );
+        ));
         let backend = create_backend(backend_type, ecosystem_path);
         Self {
             backend: Arc::from(backend),
             base_path: ecosystem_path.to_path_buf(),
+            logger,
         }
+    }
+
+    /// Get a reference to the logger.
+    #[must_use]
+    pub fn logger(&self) -> &Arc<dyn Logger> {
+        &self.logger
     }
 
     /// Get ecosystem-level state operations.
@@ -107,7 +145,10 @@ impl StateManager {
     /// * `chain_name` - Name of the chain.
     #[must_use]
     pub fn chain(&self, chain_name: &str) -> ChainStateOps {
-        log::debug!("Getting chain state operations for '{}'", chain_name);
+        self.logger.debug(&format!(
+            "Getting chain state operations for '{}'",
+            chain_name
+        ));
         ChainStateOps::new(Arc::clone(&self.backend), chain_name.to_string())
     }
 
@@ -125,7 +166,7 @@ impl StateManager {
     ///
     /// Returns error if reading the chains directory fails.
     pub async fn list_chains(&self) -> Result<Vec<String>> {
-        log::debug!("Listing chains in ecosystem");
+        self.logger.debug("Listing chains in ecosystem");
         let entries = self.backend.list(paths::CHAINS_DIR).await?;
 
         let mut chains = Vec::new();
@@ -136,7 +177,8 @@ impl StateManager {
             }
         }
 
-        log::debug!("Found {} chains: {:?}", chains.len(), chains);
+        self.logger
+            .debug(&format!("Found {} chains: {:?}", chains.len(), chains));
         Ok(chains)
     }
 
@@ -155,7 +197,10 @@ impl StateManager {
     ///
     /// Returns error if the directory doesn't exist or deletion fails.
     pub async fn delete_all(&self) -> Result<()> {
-        log::info!("Deleting ecosystem state at {}", self.base_path.display());
+        self.logger.info(&format!(
+            "Deleting ecosystem state at {}",
+            self.base_path.display()
+        ));
         tokio::fs::remove_dir_all(&self.base_path)
             .await
             .map_err(|e| crate::error::StateError::DeleteFailed {
