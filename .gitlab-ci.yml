@@ -26,6 +26,8 @@ variables:
       alias: docker
   before_script:
     - set -euo pipefail
+    # Install dependencies
+    - apk add --no-cache jq
     # Install Taskfile
     - wget -qO- https://taskfile.dev/install.sh | sh -s -- -d -b /usr/local/bin
 
