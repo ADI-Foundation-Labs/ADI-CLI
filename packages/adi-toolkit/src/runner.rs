@@ -1,5 +1,6 @@
 //! Toolkit command execution via Docker containers.
 
+use crate::cleanup::cleanup_tmp_dir;
 use crate::config::ToolkitConfig;
 use crate::error::Result;
 use adi_docker::{transform_url_for_container, ContainerConfig, ContainerManager, DockerClient};
@@ -148,6 +149,12 @@ impl ToolkitRunner {
                     }
                 }
             }
+        }
+
+        // Clean up tmp directory (keep only *.md files)
+        let tmp_dir = state_dir.join(".tmp");
+        if tmp_dir.exists() {
+            cleanup_tmp_dir(&tmp_dir);
         }
 
         Ok(exit_code)

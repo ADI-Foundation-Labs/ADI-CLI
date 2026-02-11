@@ -57,12 +57,14 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 
+mod cleanup;
 mod config;
 mod error;
 mod runner;
 mod version;
 
 // Public re-exports
+pub use cleanup::cleanup_tmp_dir;
 pub use config::{ImageReference, ToolkitConfig};
 pub use config::{DEFAULT_IMAGE_NAME, DEFAULT_REGISTRY, DEFAULT_TIMEOUT_SECONDS};
 pub use error::{Result, ToolkitError};
