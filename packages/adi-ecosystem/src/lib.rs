@@ -59,9 +59,10 @@ pub use error::{EcosystemError, Result};
 pub use ownership::{
     accept_all_ownership, accept_chain_ownership, build_accept_ownership_calldata,
     build_accept_ownership_multicall_calldata, build_governance_execute_calldata,
-    build_governance_schedule_calldata, check_chain_ownership_status,
-    check_ecosystem_ownership_status, OwnershipContract, OwnershipMethod, OwnershipResult,
-    OwnershipState, OwnershipStatus, OwnershipStatusSummary, OwnershipSummary,
+    build_governance_schedule_calldata, build_transfer_ownership_calldata,
+    check_chain_ownership_status, check_ecosystem_ownership_status, transfer_all_ownership,
+    transfer_chain_ownership, OwnershipContract, OwnershipMethod, OwnershipResult, OwnershipState,
+    OwnershipStatus, OwnershipStatusSummary, OwnershipSummary,
 };
 pub use types::{L1Network, ProverMode};
 pub use validator::{build_add_validator_roles_calldata, ValidatorRoles};

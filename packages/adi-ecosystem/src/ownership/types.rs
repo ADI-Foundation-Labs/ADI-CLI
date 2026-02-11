@@ -12,6 +12,10 @@ sol! {
     #[allow(missing_docs)]
     function acceptOwnership() external;
 
+    /// Transfer ownership to new address (Ownable/Ownable2Step pattern).
+    #[allow(missing_docs)]
+    function transferOwnership(address newOwner) external;
+
     /// Read pending owner for Ownable2Step contracts.
     #[allow(missing_docs)]
     function pendingOwner() external view returns (address);
@@ -19,6 +23,10 @@ sol! {
     /// Read current owner.
     #[allow(missing_docs)]
     function owner() external view returns (address);
+
+    /// Get bridged token beacon address from NativeTokenVault.
+    #[allow(missing_docs)]
+    function bridgedTokenBeacon() external view returns (address);
 
     /// ChainAdmin multicall interface.
     #[allow(missing_docs)]

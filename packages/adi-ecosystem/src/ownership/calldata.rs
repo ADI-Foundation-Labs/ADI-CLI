@@ -3,7 +3,9 @@
 //! This module provides functions to build encoded calldata for
 //! various ownership acceptance patterns.
 
-use super::types::{acceptOwnershipCall, executeCall, multicallCall, scheduleTransparentCall};
+use super::types::{
+    acceptOwnershipCall, executeCall, multicallCall, scheduleTransparentCall, transferOwnershipCall,
+};
 use super::types::{Call, Operation};
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_sol_types::SolCall;
@@ -12,6 +14,15 @@ use alloy_sol_types::SolCall;
 #[must_use]
 pub fn build_accept_ownership_calldata() -> Bytes {
     let call = acceptOwnershipCall {};
+    Bytes::from(call.abi_encode())
+}
+
+/// Build calldata for transferOwnership(newOwner) call.
+#[must_use]
+pub fn build_transfer_ownership_calldata(new_owner: Address) -> Bytes {
+    let call = transferOwnershipCall {
+        newOwner: new_owner,
+    };
     Bytes::from(call.abi_encode())
 }
 
@@ -106,6 +117,16 @@ mod tests {
         // acceptOwnership() selector is 0x79ba5097
         assert!(!calldata.is_empty());
         assert!(calldata.len() >= 4);
+    }
+
+    #[test]
+    fn test_build_transfer_ownership_calldata() {
+        let new_owner = Address::ZERO;
+        let calldata = build_transfer_ownership_calldata(new_owner);
+        // transferOwnership(address) selector is 0xf2fde38b
+        assert!(!calldata.is_empty());
+        // 4 bytes selector + 32 bytes address
+        assert!(calldata.len() >= 36);
     }
 
     #[test]

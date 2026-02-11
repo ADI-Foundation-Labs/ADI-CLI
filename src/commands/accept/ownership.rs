@@ -5,16 +5,18 @@
 
 use adi_ecosystem::{
     accept_all_ownership, accept_chain_ownership, check_chain_ownership_status,
-    check_ecosystem_ownership_status, OwnershipState, OwnershipStatusSummary, OwnershipSummary,
+    check_ecosystem_ownership_status, OwnershipStatusSummary,
 };
-use adi_state::StateManager;
 use adi_types::{ChainContracts, EcosystemContracts};
-use alloy_primitives::Address;
 use clap::Args;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+use crate::commands::helpers::{
+    create_state_manager, derive_address_from_key, display_ownership_status, display_summary,
+    resolve_ecosystem_name, resolve_rpc_url,
+};
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
 
@@ -61,15 +63,15 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
     log::info!("{}", "Accepting pending ownership transfers...".cyan());
 
     // Resolve ecosystem name
-    let ecosystem_name = resolve_ecosystem_name(&args, context)?;
+    let ecosystem_name = resolve_ecosystem_name(args.ecosystem_name.as_ref(), context.config())?;
     log::info!("Ecosystem: {}", ecosystem_name.green());
 
     // Resolve RPC URL
-    let rpc_url = resolve_rpc_url(&args, context)?;
+    let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
     log::info!("RPC URL: {}", rpc_url.to_string().green());
 
     // Create state manager
-    let state_manager = create_state_manager(&ecosystem_name, context)?;
+    let state_manager = create_state_manager(&ecosystem_name, context.config());
 
     // Load ecosystem contracts
     let ecosystem_contracts: EcosystemContracts = state_manager
@@ -241,148 +243,5 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
         Ok(())
     } else {
         Err(eyre::eyre!("All ownership acceptances failed"))
-    }
-}
-
-/// Category of ownership result for display purposes.
-enum ResultCategory<'a> {
-    SuccessWithTx(String),
-    SuccessNoTx,
-    Skipped(&'a str),
-    Failed(&'a str),
-}
-
-/// Categorize an ownership result for display.
-fn categorize_result(result: &adi_ecosystem::OwnershipResult) -> ResultCategory<'_> {
-    if result.success {
-        match &result.tx_hash {
-            Some(tx) => ResultCategory::SuccessWithTx(tx.to_string()),
-            None => ResultCategory::SuccessNoTx,
-        }
-    } else {
-        match &result.error {
-            Some(e) if e.starts_with("Skipped: ") => {
-                ResultCategory::Skipped(e.strip_prefix("Skipped: ").unwrap_or(e))
-            }
-            Some(e) => ResultCategory::Failed(e),
-            None => ResultCategory::Failed("unknown error"),
-        }
-    }
-}
-
-/// Display the ownership acceptance summary.
-fn display_summary(summary: &OwnershipSummary) {
-    log::info!(
-        "Successful: {}",
-        summary.successful_count().to_string().green()
-    );
-    log::info!("Skipped: {}", summary.skipped_count().to_string().cyan());
-    log::info!("Failed: {}", summary.failed_count().to_string().yellow());
-    log::info!("");
-
-    for result in &summary.results {
-        match categorize_result(result) {
-            ResultCategory::SuccessWithTx(tx) => {
-                log::info!("  {} {}: {}", "✓".green(), result.name, tx.green());
-            }
-            ResultCategory::SuccessNoTx => {
-                log::info!("  {} {}", "✓".green(), result.name);
-            }
-            ResultCategory::Skipped(reason) => {
-                log::info!("  {} {}: {}", "⊘".cyan(), result.name, reason.cyan());
-            }
-            ResultCategory::Failed(error) => {
-                log::info!("  {} {}: {}", "✗".yellow(), result.name, error.yellow());
-            }
-        }
-    }
-}
-
-/// Resolve ecosystem name from args or config.
-fn resolve_ecosystem_name(args: &AcceptArgs, context: &Context) -> Result<String> {
-    args.ecosystem_name
-        .clone()
-        .or_else(|| Some(context.config().ecosystem.name.clone()))
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| {
-            eyre::eyre!("Ecosystem name required: use --ecosystem-name or set in config")
-        })
-}
-
-/// Resolve RPC URL from args or config.
-fn resolve_rpc_url(args: &AcceptArgs, context: &Context) -> Result<Url> {
-    args.rpc_url
-        .clone()
-        .or_else(|| context.config().funding.rpc_url.clone())
-        .ok_or_else(|| eyre::eyre!("RPC URL required: use --rpc-url or set in config"))
-}
-
-/// Create state manager for the ecosystem.
-fn create_state_manager(ecosystem_name: &str, context: &Context) -> Result<StateManager> {
-    let ecosystem_path = context.config().state_dir.join(ecosystem_name);
-    Ok(StateManager::with_backend_type(
-        context.config().state_backend.clone(),
-        &ecosystem_path,
-    ))
-}
-
-/// Derive address from private key.
-fn derive_address_from_key(key: &secrecy::SecretString) -> Result<Address> {
-    use alloy_signer_local::PrivateKeySigner;
-    use secrecy::ExposeSecret;
-
-    let key_str = key.expose_secret();
-    let key_hex = key_str.strip_prefix("0x").unwrap_or(key_str);
-
-    let key_bytes: [u8; 32] = hex::decode(key_hex)
-        .wrap_err("Invalid private key hex")?
-        .try_into()
-        .map_err(|_| eyre::eyre!("Private key must be 32 bytes"))?;
-
-    let signer = PrivateKeySigner::from_bytes(&key_bytes.into()).wrap_err("Invalid private key")?;
-
-    Ok(signer.address())
-}
-
-/// Display ownership status for contracts.
-fn display_ownership_status(summary: &OwnershipStatusSummary) {
-    for status in &summary.statuses {
-        match (status.address, status.state) {
-            (Some(addr), OwnershipState::Pending) => {
-                log::info!(
-                    "  {} {}: {} {}",
-                    "⏳".yellow(),
-                    status.name,
-                    addr.to_string().green(),
-                    "(pending)".yellow()
-                );
-            }
-            (Some(addr), OwnershipState::Accepted) => {
-                log::info!(
-                    "  {} {}: {} {}",
-                    "✓".green(),
-                    status.name,
-                    addr.to_string().green(),
-                    "(accepted)".green()
-                );
-            }
-            (Some(addr), OwnershipState::NotTransferred) => {
-                log::info!(
-                    "  {} {}: {} {}",
-                    "⚠".red(),
-                    status.name,
-                    addr.to_string().green(),
-                    "(ownership not transferred!)".red()
-                );
-            }
-            (None, _) => {
-                log::info!(
-                    "  {} {}: {}",
-                    "⊘".cyan(),
-                    status.name,
-                    "not configured".cyan()
-                );
-            }
-        }
     }
 }

@@ -8,7 +8,9 @@ use crate::{context::Context, error::Result};
 mod accept;
 mod config;
 mod deploy;
+pub mod helpers;
 mod init;
+mod transfer;
 mod version;
 
 /// Available CLI commands.
@@ -25,6 +27,8 @@ pub enum Commands {
     Deploy(deploy::DeployArgs),
     /// Accept pending ownership transfers for deployed contracts
     Accept(accept::AcceptArgs),
+    /// Accept and transfer ownership of ecosystem contracts to a new owner
+    Transfer(transfer::TransferArgs),
 }
 
 impl Commands {
@@ -36,6 +40,7 @@ impl Commands {
             Commands::Init(args) => init::run(&args, context).await,
             Commands::Deploy(args) => deploy::run(args, context).await,
             Commands::Accept(args) => accept::run(args, context).await,
+            Commands::Transfer(args) => transfer::run(args, context).await,
         }
     }
 }

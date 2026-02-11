@@ -72,6 +72,7 @@ cargo test               # Run tests
 - `adi init` - Initialize new ecosystem configuration
 - `adi deploy` - Deploy ecosystem contracts to settlement layer
 - `adi accept` - Accept pending ownership transfers for deployed contracts
+- `adi transfer` - Accept ownership and transfer to a new owner address
 
 ## Architecture
 

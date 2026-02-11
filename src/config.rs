@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use crate::error::{Result, WrapErr};
 use adi_ecosystem::EcosystemConfig;
 use adi_state::BackendType;
+use alloy_primitives::Address;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -74,6 +75,17 @@ fn default_gas_multiplier() -> u64 {
     120
 }
 
+/// Default ownership transfer configuration values.
+///
+/// These can be overridden by CLI flags.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct OwnershipDefaults {
+    /// Address to transfer ownership to.
+    /// Can be overridden with --new-owner flag.
+    #[serde(default)]
+    pub new_owner: Option<Address>,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     /// State directory path for storing ecosystem and chain data.
@@ -105,6 +117,11 @@ pub struct Config {
     /// These can be overridden by CLI flags.
     #[serde(default)]
     pub toolkit: ToolkitDefaults,
+
+    /// Default ownership transfer configuration values.
+    /// These can be overridden by CLI flags.
+    #[serde(default)]
+    pub ownership: OwnershipDefaults,
 }
 
 impl Config {

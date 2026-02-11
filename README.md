@@ -275,6 +275,12 @@ funding:
   prove_operator_eth: 5.0     # Submits proofs
   execute_operator_eth: 5.0   # Executes batches
 
+# Default values for ownership transfer operations
+ownership:
+  # Address to transfer ownership to after accepting
+  # Can be overridden with --new-owner flag
+  new_owner: "0x..."
+
 # OPTIONAL: Override Docker toolkit image settings
 # toolkit:
 #   # Use a custom image tag instead of protocol version-derived tag
@@ -487,6 +493,38 @@ The output shows the status of each contract:
 - **Accepted** — Successfully accepted
 - **Skipped** — Already owned correctly
 - **Failed** — Acceptance failed (check logs)
+
+### Step 5: Transfer Ownership (Optional)
+
+After accepting ownership, you may want to transfer it to a final owner address (such as a multisig or governance contract). The `transfer` command combines acceptance and transfer into a single operation.
+
+**What this command does:**
+1. Accepts all pending ownership transfers (same as `accept` command)
+2. Calls `transferOwnership()` on each contract to transfer to the new owner
+3. For Ownable2Step contracts, the new owner must still call `acceptOwnership()`
+
+**Example workflow:**
+
+```bash
+# Preview what will be transferred
+adi transfer --dry-run
+
+# Transfer to a multisig address
+adi transfer --new-owner 0x1234...abcd --yes
+
+# Or configure in ~/.adi.yml and run without flags
+adi transfer --yes
+```
+
+**Contracts transferred:**
+- Governance (Ownable2Step)
+- Ecosystem Chain Admin (Ownable2Step)
+- Validator Timelock (Ownable2Step)
+- Bridged Token Beacon (Ownable - immediate transfer)
+- Chain Governance (Ownable2Step)
+- Chain Chain Admin (Ownable2Step)
+
+> **Note:** For Ownable2Step contracts, ownership transfer is a two-step process. After running `transfer`, the new owner must call `acceptOwnership()` on each contract to complete the transfer. The Bridged Token Beacon uses standard Ownable, so its ownership transfers immediately.
 
 ## State Management
 

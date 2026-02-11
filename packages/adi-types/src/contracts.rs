@@ -225,6 +225,13 @@ impl EcosystemContracts {
                 .and_then(|c| c.l1_rollup_da_manager)
         })
     }
+
+    /// Returns the native token vault address if available.
+    pub fn native_token_vault_addr(&self) -> Option<Address> {
+        self.core_ecosystem_contracts
+            .as_ref()
+            .and_then(|c| c.native_token_vault_addr)
+    }
 }
 
 /// Chain L1 contracts from chains/*/configs/contracts.yaml.
