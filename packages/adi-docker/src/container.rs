@@ -10,6 +10,7 @@ use bollard::container::{
 use bollard::models::{HostConfig, Mount, MountTypeEnum};
 use bollard::Docker;
 use futures_util::StreamExt;
+use std::path::Path;
 use std::time::Duration;
 use tokio::time::timeout;
 
@@ -26,17 +27,21 @@ impl ContainerManager {
 
     /// Run a container to completion and return exit code.
     ///
-    /// Lifecycle: create -> start -> attach streams -> wait -> remove
+    /// Lifecycle: create -> start -> stream logs -> wait -> remove
     pub async fn run(&self, image_uri: &str, config: &ContainerConfig) -> Result<i64> {
         log::debug!("Starting container lifecycle for image: {}", image_uri);
         let container_id = self.create(image_uri, config).await?;
 
-        // Ensure cleanup on any exit path
         let result = self
-            .run_and_wait(&container_id, config.timeout_seconds)
+            .run_and_wait(
+                &container_id,
+                config.timeout_seconds,
+                &config.log_dir,
+                &config.log_command,
+                &config.log_label,
+            )
             .await;
 
-        // Always attempt to remove, even if run failed
         log::info!("Cleaning up container...");
         if let Err(e) = self.remove(&container_id).await {
             log::warn!("Failed to remove container {}: {}", container_id, e);
@@ -46,7 +51,6 @@ impl ContainerManager {
     }
 
     async fn create(&self, image_uri: &str, config: &ContainerConfig) -> Result<String> {
-        // Docker requires absolute paths for bind mounts
         let state_dir_absolute = config.state_dir.canonicalize().map_err(|e| {
             DockerError::ContainerCreateFailed(format!(
                 "Failed to resolve state directory '{}' to absolute path: {}",
@@ -70,7 +74,6 @@ impl ContainerManager {
             ..Default::default()
         };
 
-        // Mount Docker socket to allow container to communicate with host Docker daemon
         let docker_socket_mount = Mount {
             target: Some("/var/run/docker.sock".to_string()),
             source: Some("/var/run/docker.sock".to_string()),
@@ -79,7 +82,6 @@ impl ContainerManager {
             ..Default::default()
         };
 
-        // Mount container /tmp to host state_dir/.tmp for crash reports
         let tmp_dir = state_dir_absolute.join(".tmp");
         std::fs::create_dir_all(&tmp_dir).map_err(|e| {
             DockerError::ContainerCreateFailed(format!(
@@ -104,7 +106,7 @@ impl ContainerManager {
             } else {
                 None
             },
-            auto_remove: Some(false), // We remove manually for better control
+            auto_remove: Some(false),
             ..Default::default()
         };
 
@@ -117,13 +119,13 @@ impl ContainerManager {
         let container_config = Config {
             image: Some(image_uri.to_string()),
             cmd: Some(config.command.clone()),
-            entrypoint: Some(vec![]), // Clear image entrypoint to run command directly
+            entrypoint: Some(vec![]),
             working_dir: Some(config.working_dir.clone()),
             env: Some(env_vars),
             host_config: Some(host_config),
             attach_stdout: Some(true),
             attach_stderr: Some(true),
-            tty: Some(true), // Enable TTY for interactive prompts
+            tty: Some(true),
             ..Default::default()
         };
 
@@ -144,14 +146,20 @@ impl ContainerManager {
         Ok(response.id)
     }
 
-    async fn run_and_wait(&self, container_id: &str, timeout_seconds: u64) -> Result<i64> {
+    async fn run_and_wait(
+        &self,
+        container_id: &str,
+        timeout_seconds: u64,
+        log_dir: &Path,
+        log_command: &str,
+        log_label: &str,
+    ) -> Result<i64> {
         log::debug!(
             "Starting container: {} (timeout: {}s)",
             container_id,
             timeout_seconds
         );
 
-        // Start container
         self.docker
             .start_container(container_id, None::<StartContainerOptions<String>>)
             .await
@@ -159,37 +167,40 @@ impl ContainerManager {
 
         log::info!("Container started, streaming output...");
 
-        // Stream output to terminal
         let streamer = OutputStreamer::new(self.docker.clone());
-
-        // Run streaming and waiting with timeout
         let duration = Duration::from_secs(timeout_seconds);
 
-        let stream_future = streamer.stream_logs(container_id);
-        let wait_future = self.wait_for_exit(container_id);
+        // Stream logs first - it will complete when container output ends
+        // Don't race with wait_for_exit, as that would cancel streaming
+        let stream_result = timeout(
+            duration,
+            streamer.stream_logs(container_id, log_dir, log_command, log_label),
+        )
+        .await;
 
-        // Run streaming in background, wait for exit with timeout
-        let (stream_result, wait_result) =
-            tokio::join!(stream_future, timeout(duration, wait_future));
-
-        // Check for timeout
-        let exit_code = match wait_result {
-            Ok(result) => result?,
-            Err(_) => {
-                // Timeout occurred, try to stop the container
-                let _ = self.docker.stop_container(container_id, None).await;
-                return Err(DockerError::Timeout {
-                    seconds: timeout_seconds,
-                });
+        match stream_result {
+            Ok(Ok(())) => {
+                // Streaming completed normally, get exit code
+                match timeout(Duration::from_secs(10), self.wait_for_exit(container_id)).await {
+                    Ok(result) => result,
+                    Err(_) => Ok(0), // Container already exited, assume success
+                }
             }
-        };
-
-        // Log any stream errors but don't fail
-        if let Err(e) = stream_result {
-            log::debug!("Stream ended with error (may be normal): {}", e);
+            Ok(Err(e)) => {
+                // Stream was interrupted (CTRL+C)
+                log::warn!("Stream interrupted: {}", e);
+                log::info!("Stopping container...");
+                let _ = self.docker.stop_container(container_id, None).await;
+                Err(DockerError::StreamError("Interrupted by user".to_string()))
+            }
+            Err(_) => {
+                // Timeout
+                let _ = self.docker.stop_container(container_id, None).await;
+                Err(DockerError::Timeout {
+                    seconds: timeout_seconds,
+                })
+            }
         }
-
-        Ok(exit_code)
     }
 
     async fn wait_for_exit(&self, container_id: &str) -> Result<i64> {
@@ -226,7 +237,6 @@ impl ContainerManager {
     }
 }
 
-/// Generate a unique container name.
 fn generate_container_name() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
 

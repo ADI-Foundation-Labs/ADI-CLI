@@ -65,22 +65,26 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
             log::warn!("  - {}", file);
         }
 
-        // Require typing ecosystem name to confirm deletion
-        let prompt = format!(
-            "Type '{}' to confirm deletion and reinitialize",
-            config.name
-        );
-        let input: String = Input::new()
-            .with_prompt(prompt)
-            .interact_text()
-            .wrap_err("Failed to read user input")?;
+        if args.force {
+            log::info!("Force flag set, skipping confirmation");
+        } else {
+            // Require typing ecosystem name to confirm deletion
+            let prompt = format!(
+                "Type '{}' to confirm deletion and reinitialize",
+                config.name
+            );
+            let input: String = Input::new()
+                .with_prompt(prompt)
+                .interact_text()
+                .wrap_err("Failed to read user input")?;
 
-        if input != config.name {
-            return Err(eyre::eyre!(
-                "Confirmation failed: expected '{}', got '{}'",
-                config.name,
-                input
-            ));
+            if input != config.name {
+                return Err(eyre::eyre!(
+                    "Confirmation failed: expected '{}', got '{}'",
+                    config.name,
+                    input
+                ));
+            }
         }
 
         log::info!("Deleting existing ecosystem state...");
@@ -132,7 +136,7 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     let args_refs: Vec<&str> = zkstack_args.iter().map(String::as_str).collect();
 
     let exit_code = runner
-        .run_zkstack(&args_refs, &temp_path, &version.to_semver())
+        .run_zkstack(&args_refs, &temp_path, state_dir, &version.to_semver())
         .await
         .wrap_err("Failed to run zkstack ecosystem create")?;
 

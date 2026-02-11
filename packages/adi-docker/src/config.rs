@@ -25,6 +25,15 @@ pub struct ContainerConfig {
 
     /// Timeout in seconds.
     pub timeout_seconds: u64,
+
+    /// Directory for log files.
+    pub log_dir: PathBuf,
+
+    /// Command name for log filename (e.g., "init", "deploy").
+    pub log_command: String,
+
+    /// Label to show in progress messages (e.g., "Initializing...").
+    pub log_label: String,
 }
 
 impl Default for ContainerConfig {
@@ -36,6 +45,9 @@ impl Default for ContainerConfig {
             env_vars: Vec::new(),
             host_network: true,
             timeout_seconds: DEFAULT_TIMEOUT_SECONDS,
+            log_dir: PathBuf::new(),
+            log_command: "container".to_string(),
+            log_label: "Running...".to_string(),
         }
     }
 }

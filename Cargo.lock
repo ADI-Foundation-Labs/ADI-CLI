@@ -38,6 +38,8 @@ name = "adi-docker"
 version = "0.1.0"
 dependencies = [
  "bollard",
+ "chrono",
+ "colored",
  "crossterm",
  "eyre",
  "futures-util",

@@ -85,4 +85,12 @@ pub struct InitArgs {
         help = "Enable EVM bytecode emulator for running unmodified Ethereum contracts"
     )]
     pub evm_emulator: Option<bool>,
+
+    /// Force reinitialization without confirmation prompt
+    #[arg(
+        long,
+        short = 'f',
+        help = "Force reinitialization without confirmation"
+    )]
+    pub force: bool,
 }

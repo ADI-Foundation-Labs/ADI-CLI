@@ -12,7 +12,7 @@ name = "adi_docker"
 path = "src/lib.rs"
 
 [dependencies]
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["signal"] }
 eyre = { workspace = true }
 thiserror = { workspace = true }
 log = { workspace = true }
@@ -20,3 +20,5 @@ futures-util = { workspace = true }
 bollard = { workspace = true }
 crossterm = { workspace = true }
 url = { workspace = true }
+colored = { workspace = true }
+chrono = { workspace = true }
