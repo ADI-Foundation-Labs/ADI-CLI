@@ -8,6 +8,8 @@ vars:
   # Default platform to linux/arm64 for local dev (Apple Silicon friendly)
   PLATFORM: '{{default "linux/arm64" .PLATFORM}}'
   TARGETS: '{{default "default" .TARGETS}}'
+  CI_COMMIT_SHORT_SHA:
+    sh: git rev-parse --short HEAD || echo "unknown"
 
 tasks:
   _install_rust:
@@ -87,26 +89,28 @@ tasks:
       - |
         # Extract base tag from HCL (e.g. registry/adi-toolkit:v30.0.2)
         # We run bake --print with empty suffix to get the clean target tag
-        BASE_TAG=$(TAG_SUFFIX="" docker buildx bake --print -f docker/docker-bake.hcl {{.TARGETS}} | grep -o '"tags": *\[[^]]*\]' | grep -o '"[^"]*"' | tr -d '"' | head -n 1)
+        BASE_TAGS=$(TAG_SUFFIX="" docker buildx bake --print -f docker/docker-bake.hcl {{.TARGETS}} | jq -r '.target[].tags[0]')
 
-        if [ -z "$BASE_TAG" ]; then
-          echo "Error: Could not extract base tag from docker-bake.hcl"
+        if [ -z "$BASE_TAGS" ] || [ "$BASE_TAGS" = "null" ]; then
+          echo "Error: Could not extract base tags from docker-bake.hcl"
           exit 1
         fi
 
-        echo "Detected Base Tag: $BASE_TAG"
+        for BASE_TAG in $BASE_TAGS; do
+          echo "Processing Base Tag: $BASE_TAG"
 
-        # Source images (pushed by build:docker:*)
-        SRC_AMD64="${BASE_TAG}-{{.REF_SLUG}}-amd64-{{.CI_COMMIT_SHORT_SHA}}"
-        SRC_ARM64="${BASE_TAG}-{{.REF_SLUG}}-arm64-{{.CI_COMMIT_SHORT_SHA}}"
+          # Source images (pushed by build:docker:*)
+          SRC_AMD64="${BASE_TAG}-{{.REF_SLUG}}-amd64-{{.CI_COMMIT_SHORT_SHA}}"
+          SRC_ARM64="${BASE_TAG}-{{.REF_SLUG}}-arm64-{{.CI_COMMIT_SHORT_SHA}}"
 
-        # 1. Mutable Branch Tag: v30.0.2-branch
-        docker buildx imagetools create -t "${BASE_TAG}-{{.REF_SLUG}}" $SRC_AMD64 $SRC_ARM64
+          # 1. Mutable Branch Tag: v30.0.2-branch
+          docker buildx imagetools create -t "${BASE_TAG}-{{.REF_SLUG}}" $SRC_AMD64 $SRC_ARM64
 
-        # 2. Immutable Branch Tag: v30.0.2-branch-sha
-        docker buildx imagetools create -t "${BASE_TAG}-{{.REF_SLUG}}-{{.CI_COMMIT_SHORT_SHA}}" $SRC_AMD64 $SRC_ARM64
+          # 2. Immutable Branch Tag: v30.0.2-branch-sha
+          docker buildx imagetools create -t "${BASE_TAG}-{{.REF_SLUG}}-{{.CI_COMMIT_SHORT_SHA}}" $SRC_AMD64 $SRC_ARM64
 
-        # 3. Version Tag (Main Only): v30.0.2
-        if [ "{{.REF_SLUG}}" = "main" ]; then
-          docker buildx imagetools create -t "${BASE_TAG}" $SRC_AMD64 $SRC_ARM64
-        fi
+          # 3. Version Tag (Main Only): v30.0.2
+          if [ "{{.REF_SLUG}}" = "main" ]; then
+            docker buildx imagetools create -t "${BASE_TAG}" $SRC_AMD64 $SRC_ARM64
+          fi
+        done
