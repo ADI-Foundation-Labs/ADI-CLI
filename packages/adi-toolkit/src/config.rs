@@ -1,5 +1,6 @@
 //! Configuration types for toolkit operations.
 
+use adi_types::Logger;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
@@ -90,22 +91,23 @@ impl ToolkitConfig {
     /// # Arguments
     ///
     /// * `version` - The protocol version (e.g., 29.0.11).
+    /// * `logger` - Logger for debug output.
     ///
     /// # Returns
     ///
     /// An `ImageReference` with the full image URI.
-    pub fn image_reference(&self, version: &Version) -> ImageReference {
+    pub fn image_reference(&self, version: &Version, logger: &dyn Logger) -> ImageReference {
         let tag = self
             .tag_override
             .clone()
             .unwrap_or_else(|| format!("v{}.{}.{}", version.major, version.minor, version.patch));
-        log::debug!(
+        logger.debug(&format!(
             "Building image reference: registry={}, image={}, tag={} (override={})",
             self.registry,
             self.image_name,
             tag,
             self.tag_override.is_some()
-        );
+        ));
         ImageReference {
             registry: self.registry.clone(),
             image_name: self.image_name.clone(),
@@ -120,11 +122,13 @@ impl ToolkitConfig {
 ///
 /// ```rust
 /// use adi_toolkit::{ToolkitConfig, ImageReference};
+/// use adi_types::NoopLogger;
 /// use semver::Version;
 ///
 /// let config = ToolkitConfig::default();
 /// let version = Version::new(30, 0, 2);
-/// let image_ref = config.image_reference(&version);
+/// let logger = NoopLogger;
+/// let image_ref = config.image_reference(&version, &logger);
 ///
 /// assert_eq!(image_ref.full_uri(), "harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:v30.0.2");
 /// ```
@@ -153,6 +157,7 @@ impl ImageReference {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use adi_types::NoopLogger;
 
     #[test]
     fn test_default_config() {
@@ -164,9 +169,10 @@ mod tests {
 
     #[test]
     fn test_image_reference_format() {
+        let logger = NoopLogger;
         let config = ToolkitConfig::default();
         let version = Version::new(30, 0, 2);
-        let image_ref = config.image_reference(&version);
+        let image_ref = config.image_reference(&version, &logger);
 
         assert_eq!(
             image_ref.full_uri(),
@@ -185,9 +191,10 @@ mod tests {
 
     #[test]
     fn test_tag_override() {
+        let logger = NoopLogger;
         let config = ToolkitConfig::default().with_tag_override("custom-tag");
         let version = Version::new(30, 0, 2);
-        let image_ref = config.image_reference(&version);
+        let image_ref = config.image_reference(&version, &logger);
 
         assert_eq!(image_ref.tag, "custom-tag");
         assert_eq!(
@@ -198,9 +205,10 @@ mod tests {
 
     #[test]
     fn test_no_tag_override_uses_version() {
+        let logger = NoopLogger;
         let config = ToolkitConfig::default();
         let version = Version::new(30, 0, 2);
-        let image_ref = config.image_reference(&version);
+        let image_ref = config.image_reference(&version, &logger);
 
         assert_eq!(image_ref.tag, "v30.0.2");
     }

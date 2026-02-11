@@ -152,7 +152,7 @@ pub struct DeployArgs {
 /// 8. (Future) Deploys ecosystem contracts
 pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     ui::intro("ADI Deploy")?;
-    log::debug!("Starting ecosystem deployment");
+    context.logger().debug("Starting ecosystem deployment");
 
     // 1. Resolve ecosystem name
     let ecosystem_name = resolve_ecosystem_name(&args, context)?;
@@ -196,7 +196,7 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
 
     // 8. Get funder key (args > config) - required for production mode
     let funder_key = resolve_funder_key(&args, context)?;
-    log::debug!("Funder key resolved");
+    context.logger().debug("Funder key resolved");
 
     // 8. Load wallets from state
     let ecosystem_wallets = state_manager
@@ -220,7 +220,9 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     // 9. Create executor with logging handler (needed for provider)
     let executor = FundingExecutor::new(rpc_url.as_str(), &funder_key)
         .wrap_err("Failed to create funding executor")?
-        .with_event_handler(Arc::new(LoggingEventHandler));
+        .with_event_handler(Arc::new(LoggingEventHandler::new(Arc::clone(
+            context.logger(),
+        ))));
 
     let funder_address = executor.funder_address();
     ui::info(format!("Funder address: {}", funder_address))?;
@@ -415,7 +417,9 @@ async fn run_anvil_funding(
     // Create funder to check balances (normalize URL for host-side connection)
     let funder = AnvilFunder::with_rpc(&normalize_rpc_url(rpc_url.as_str()))?
         .with_amounts(amounts)
-        .with_event_handler(Arc::new(LoggingEventHandler));
+        .with_event_handler(Arc::new(LoggingEventHandler::new(Arc::clone(
+            context.logger(),
+        ))));
 
     // Get funding targets with current balances
     let targets = funder
@@ -496,10 +500,11 @@ async fn run_anvil_funding(
 
 /// Display Anvil funding plan with current balances and status.
 fn display_anvil_funding_plan(targets: &[AnvilFundingTarget]) -> Result<()> {
-    ui::info("============================================================")?;
-    ui::info("Anvil Funding Plan")?;
-    ui::info("============================================================")?;
-    ui::info("  Using Anvil default account (account 0)")?;
+    let mut lines = vec![
+        "Anvil Funding Plan".to_string(),
+        "============================================================".to_string(),
+        "Using Anvil default account (account 0)".to_string(),
+    ];
 
     for target in targets {
         let current = format_eth(target.current_balance);
@@ -509,24 +514,24 @@ fn display_anvil_funding_plan(targets: &[AnvilFundingTarget]) -> Result<()> {
         } else {
             "Already funded"
         };
-
-        ui::info(format!(
-            "  {:20} {} ETH (current: {} ETH) {}",
+        lines.push(format!(
+            "{:20} {} ETH (current: {} ETH) {}",
             target.role.to_string(),
             required,
             current,
             status
-        ))?;
+        ));
     }
 
     let needs_funding = targets.iter().filter(|t| t.needs_funding).count();
     let already_funded = targets.len() - needs_funding;
-
-    ui::info(format!(
-        "  Summary: {} need funding, {} already funded",
+    lines.push("============================================================".to_string());
+    lines.push(format!(
+        "Summary: {} need funding, {} already funded",
         needs_funding, already_funded
-    ))?;
-    ui::info("============================================================")?;
+    ));
+
+    ui::info(lines.join("\n"))?;
     Ok(())
 }
 
@@ -645,6 +650,7 @@ async fn run_ecosystem_deployment(
         chain_wallets,
         &governor_key,
         args.gas_price_wei,
+        context.logger().as_ref(),
     )
     .await
     .wrap_err("Failed to add validator roles")?;
@@ -708,7 +714,6 @@ async fn validate_ecosystem_exists(
             ecosystem_name
         ));
     }
-    log::debug!("Ecosystem '{}' exists", ecosystem_name);
     Ok(())
 }
 
@@ -725,7 +730,6 @@ async fn validate_chain_exists(
             ecosystem_name
         ));
     }
-    log::debug!("Chain '{}' exists", chain_name);
     Ok(())
 }
 
@@ -787,7 +791,9 @@ async fn build_funding_config(
         .gas_multiplier
         .unwrap_or(funding_defaults.gas_multiplier);
     config = config.with_gas_multiplier(multiplier);
-    log::debug!("Gas multiplier: {}%", multiplier);
+    context
+        .logger()
+        .debug(&format!("Gas multiplier: {}%", multiplier));
 
     // Build custom amounts (args > config > library defaults)
     let amounts = build_default_amounts(args, funding_defaults);
@@ -809,11 +815,11 @@ async fn build_funding_config(
         if config_token != adi_types::ETH_TOKEN_ADDRESS {
             // Config has custom token but chain metadata has ETH
             // This happens when zkstack ignores --base-token-address
-            log::warn!(
+            context.logger().warning(&format!(
                 "Chain metadata has ETH as base_token, but config specifies {}. \
                  Using config value (zkstack may have ignored --base-token-address).",
                 config_token
-            );
+            ));
             Some(config_token)
         } else {
             None // Both are ETH, no custom token

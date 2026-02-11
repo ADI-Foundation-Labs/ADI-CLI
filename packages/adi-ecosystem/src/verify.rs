@@ -5,6 +5,7 @@
 
 use crate::config::EcosystemConfig;
 use crate::error::{EcosystemError, Result};
+use adi_types::Logger;
 use std::path::Path;
 
 /// Verify ecosystem was created successfully.
@@ -16,6 +17,7 @@ use std::path::Path;
 ///
 /// * `state_dir` - The state directory where ecosystem was created.
 /// * `config` - The ecosystem configuration used for creation.
+/// * `logger` - Logger for debug/error output.
 ///
 /// # Errors
 ///
@@ -25,15 +27,21 @@ use std::path::Path;
 ///
 /// ```rust,no_run
 /// use adi_ecosystem::{EcosystemConfig, verify_ecosystem_created};
+/// use adi_types::NoopLogger;
 /// use std::path::Path;
 ///
 /// let config = EcosystemConfig::default();
 /// let state_dir = Path::new("/home/user/.adi_cli/state");
+/// let logger = NoopLogger;
 ///
-/// verify_ecosystem_created(state_dir, &config)?;
+/// verify_ecosystem_created(state_dir, &config, &logger)?;
 /// # Ok::<(), adi_ecosystem::EcosystemError>(())
 /// ```
-pub fn verify_ecosystem_created(state_dir: &Path, config: &EcosystemConfig) -> Result<()> {
+pub fn verify_ecosystem_created(
+    state_dir: &Path,
+    config: &EcosystemConfig,
+    logger: &dyn Logger,
+) -> Result<()> {
     let ecosystem_dir = state_dir.join(&config.name);
 
     let required_files = [
@@ -48,13 +56,13 @@ pub fn verify_ecosystem_created(state_dir: &Path, config: &EcosystemConfig) -> R
 
     for path in &required_files {
         if !path.exists() {
-            log::error!("Required file is missing: {}", path.display());
+            logger.error(&format!("Required file is missing: {}", path.display()));
             return Err(EcosystemError::MissingFile(path.clone()));
         }
-        log::debug!("Verified file exists: {}", path.display());
+        logger.debug(&format!("Verified file exists: {}", path.display()));
     }
 
-    log::debug!("All required ecosystem files verified");
+    logger.debug("All required ecosystem files verified");
     Ok(())
 }
 
@@ -62,6 +70,7 @@ pub fn verify_ecosystem_created(state_dir: &Path, config: &EcosystemConfig) -> R
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use adi_types::NoopLogger;
     use std::fs;
     use std::path::PathBuf;
 
@@ -73,10 +82,11 @@ mod tests {
 
     #[test]
     fn test_verify_missing_files() {
+        let logger = NoopLogger;
         let state_dir = create_test_dir();
         let config = EcosystemConfig::default();
 
-        let result = verify_ecosystem_created(&state_dir, &config);
+        let result = verify_ecosystem_created(&state_dir, &config, &logger);
         assert!(result.is_err());
 
         // Cleanup
@@ -85,6 +95,7 @@ mod tests {
 
     #[test]
     fn test_verify_success() {
+        let logger = NoopLogger;
         let state_dir = create_test_dir();
         let config = EcosystemConfig {
             name: "test_eco".to_string(),
@@ -115,7 +126,7 @@ mod tests {
         )
         .unwrap();
 
-        let result = verify_ecosystem_created(&state_dir, &config);
+        let result = verify_ecosystem_created(&state_dir, &config, &logger);
         assert!(result.is_ok());
 
         // Cleanup

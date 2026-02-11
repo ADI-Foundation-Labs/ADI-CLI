@@ -8,12 +8,11 @@ use super::calldata::build_transfer_ownership_calldata;
 use super::status::check_ownership_state;
 use super::transaction::send_ownership_tx;
 use super::types::{bridgedTokenBeaconCall, OwnershipResult, OwnershipState};
-use adi_types::{ChainContracts, EcosystemContracts};
+use adi_types::{ChainContracts, EcosystemContracts, Logger};
 use alloy_primitives::Address;
 use alloy_provider::Provider;
 use alloy_rpc_types::TransactionRequest;
 use alloy_sol_types::SolCall;
-use colored::Colorize;
 
 /// Query bridged token beacon address from NativeTokenVault contract.
 pub(crate) async fn get_bridged_token_beacon<P>(
@@ -30,18 +29,15 @@ where
 
     match provider.call(tx).await {
         Ok(result) => result.get(12..32).map(Address::from_slice),
-        Err(e) => {
-            log::debug!(
-                "Failed to query bridgedTokenBeacon from {}: {}",
-                native_token_vault,
-                e
-            );
+        Err(_e) => {
+            // Debug logging happens at call site
             None
         }
     }
 }
 
 /// Transfer ownership for Governance contract.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn transfer_governance<P>(
     provider: &P,
     contracts: &EcosystemContracts,
@@ -50,6 +46,7 @@ pub(crate) async fn transfer_governance<P>(
     chain_id: u64,
     nonce: &mut u64,
     gas_price: u128,
+    logger: &dyn Logger,
 ) -> OwnershipResult
 where
     P: Provider + Clone,
@@ -83,26 +80,22 @@ where
     .await
     {
         Ok(tx_hash) => {
-            log::info!(
-                "  {} Governance ownership transferred: {}",
-                "✓".green(),
-                tx_hash.to_string().green()
-            );
+            logger.info(&format!(
+                "  ✓ Governance ownership transferred: {}",
+                tx_hash
+            ));
             *nonce += 1;
             OwnershipResult::success("Governance", tx_hash)
         }
         Err(e) => {
-            log::warn!(
-                "  {} Governance transfer failed: {}",
-                "✗".yellow(),
-                e.to_string().yellow()
-            );
+            logger.warning(&format!("  ✗ Governance transfer failed: {}", e));
             OwnershipResult::failure("Governance", e.to_string())
         }
     }
 }
 
 /// Transfer ownership for ecosystem Chain Admin contract.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn transfer_ecosystem_chain_admin<P>(
     provider: &P,
     contracts: &EcosystemContracts,
@@ -111,6 +104,7 @@ pub(crate) async fn transfer_ecosystem_chain_admin<P>(
     chain_id: u64,
     nonce: &mut u64,
     gas_price: u128,
+    logger: &dyn Logger,
 ) -> OwnershipResult
 where
     P: Provider + Clone,
@@ -156,26 +150,22 @@ where
     .await
     {
         Ok(tx_hash) => {
-            log::info!(
-                "  {} Ecosystem Chain Admin ownership transferred: {}",
-                "✓".green(),
-                tx_hash.to_string().green()
-            );
+            logger.info(&format!(
+                "  ✓ Ecosystem Chain Admin ownership transferred: {}",
+                tx_hash
+            ));
             *nonce += 1;
             OwnershipResult::success("Ecosystem Chain Admin", tx_hash)
         }
         Err(e) => {
-            log::warn!(
-                "  {} Ecosystem Chain Admin transfer failed: {}",
-                "✗".yellow(),
-                e.to_string().yellow()
-            );
+            logger.warning(&format!("  ✗ Ecosystem Chain Admin transfer failed: {}", e));
             OwnershipResult::failure("Ecosystem Chain Admin", e.to_string())
         }
     }
 }
 
 /// Transfer ownership for Validator Timelock contract.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn transfer_validator_timelock<P>(
     provider: &P,
     contracts: &EcosystemContracts,
@@ -184,6 +174,7 @@ pub(crate) async fn transfer_validator_timelock<P>(
     chain_id: u64,
     nonce: &mut u64,
     gas_price: u128,
+    logger: &dyn Logger,
 ) -> OwnershipResult
 where
     P: Provider + Clone,
@@ -223,20 +214,15 @@ where
     .await
     {
         Ok(tx_hash) => {
-            log::info!(
-                "  {} Validator Timelock ownership transferred: {}",
-                "✓".green(),
-                tx_hash.to_string().green()
-            );
+            logger.info(&format!(
+                "  ✓ Validator Timelock ownership transferred: {}",
+                tx_hash
+            ));
             *nonce += 1;
             OwnershipResult::success("Validator Timelock", tx_hash)
         }
         Err(e) => {
-            log::warn!(
-                "  {} Validator Timelock transfer failed: {}",
-                "✗".yellow(),
-                e.to_string().yellow()
-            );
+            logger.warning(&format!("  ✗ Validator Timelock transfer failed: {}", e));
             OwnershipResult::failure("Validator Timelock", e.to_string())
         }
     }
@@ -246,6 +232,7 @@ where
 ///
 /// Note: This contract uses Ownable (not Ownable2Step), so ownership
 /// transfers immediately without requiring an accept step.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn transfer_bridged_token_beacon<P>(
     provider: &P,
     contracts: &EcosystemContracts,
@@ -254,6 +241,7 @@ pub(crate) async fn transfer_bridged_token_beacon<P>(
     chain_id: u64,
     nonce: &mut u64,
     gas_price: u128,
+    logger: &dyn Logger,
 ) -> OwnershipResult
 where
     P: Provider + Clone,
@@ -280,7 +268,7 @@ where
         }
     };
 
-    log::info!("    Bridged Token Beacon address: {}", beacon);
+    logger.info(&format!("    Bridged Token Beacon address: {}", beacon));
 
     // Verify governor is current owner before transferring
     // Note: Bridged Token Beacon uses Ownable, not Ownable2Step
@@ -302,26 +290,22 @@ where
     .await
     {
         Ok(tx_hash) => {
-            log::info!(
-                "  {} Bridged Token Beacon ownership transferred: {}",
-                "✓".green(),
-                tx_hash.to_string().green()
-            );
+            logger.info(&format!(
+                "  ✓ Bridged Token Beacon ownership transferred: {}",
+                tx_hash
+            ));
             *nonce += 1;
             OwnershipResult::success("Bridged Token Beacon", tx_hash)
         }
         Err(e) => {
-            log::warn!(
-                "  {} Bridged Token Beacon transfer failed: {}",
-                "✗".yellow(),
-                e.to_string().yellow()
-            );
+            logger.warning(&format!("  ✗ Bridged Token Beacon transfer failed: {}", e));
             OwnershipResult::failure("Bridged Token Beacon", e.to_string())
         }
     }
 }
 
 /// Transfer ownership for chain Governance contract.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn transfer_chain_governance<P>(
     provider: &P,
     contracts: &ChainContracts,
@@ -330,6 +314,7 @@ pub(crate) async fn transfer_chain_governance<P>(
     chain_id: u64,
     nonce: &mut u64,
     gas_price: u128,
+    logger: &dyn Logger,
 ) -> OwnershipResult
 where
     P: Provider + Clone,
@@ -366,26 +351,22 @@ where
     .await
     {
         Ok(tx_hash) => {
-            log::info!(
-                "  {} Chain Governance ownership transferred: {}",
-                "✓".green(),
-                tx_hash.to_string().green()
-            );
+            logger.info(&format!(
+                "  ✓ Chain Governance ownership transferred: {}",
+                tx_hash
+            ));
             *nonce += 1;
             OwnershipResult::success("Chain Governance", tx_hash)
         }
         Err(e) => {
-            log::warn!(
-                "  {} Chain Governance transfer failed: {}",
-                "✗".yellow(),
-                e.to_string().yellow()
-            );
+            logger.warning(&format!("  ✗ Chain Governance transfer failed: {}", e));
             OwnershipResult::failure("Chain Governance", e.to_string())
         }
     }
 }
 
 /// Transfer ownership for chain Chain Admin contract.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn transfer_chain_chain_admin<P>(
     provider: &P,
     contracts: &ChainContracts,
@@ -394,6 +375,7 @@ pub(crate) async fn transfer_chain_chain_admin<P>(
     chain_id: u64,
     nonce: &mut u64,
     gas_price: u128,
+    logger: &dyn Logger,
 ) -> OwnershipResult
 where
     P: Provider + Clone,
@@ -439,20 +421,15 @@ where
     .await
     {
         Ok(tx_hash) => {
-            log::info!(
-                "  {} Chain Chain Admin ownership transferred: {}",
-                "✓".green(),
-                tx_hash.to_string().green()
-            );
+            logger.info(&format!(
+                "  ✓ Chain Chain Admin ownership transferred: {}",
+                tx_hash
+            ));
             *nonce += 1;
             OwnershipResult::success("Chain Chain Admin", tx_hash)
         }
         Err(e) => {
-            log::warn!(
-                "  {} Chain Chain Admin transfer failed: {}",
-                "✗".yellow(),
-                e.to_string().yellow()
-            );
+            logger.warning(&format!("  ✗ Chain Chain Admin transfer failed: {}", e));
             OwnershipResult::failure("Chain Chain Admin", e.to_string())
         }
     }

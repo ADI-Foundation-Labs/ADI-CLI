@@ -23,12 +23,6 @@ thiserror = { workspace = true }
 # Serialization
 serde = { workspace = true }
 
-# Logging
-log = { workspace = true }
-
-# CLI styling
-colored = { workspace = true }
-
 # Domain types
 adi-types = { workspace = true }
 

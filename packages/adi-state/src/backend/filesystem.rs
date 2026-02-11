@@ -5,22 +5,25 @@ use crate::error::{Result, StateError};
 use crate::paths;
 use adi_types::{
     Apps, ChainContracts, ChainMetadata, EcosystemContracts, EcosystemMetadata, Erc20Deployments,
-    InitialDeployments, Wallets,
+    InitialDeployments, Logger, Wallets,
 };
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tokio::fs;
 
 /// Filesystem-based state backend.
 ///
 /// Stores state as YAML files in the filesystem.
 /// The base path is the ecosystem directory root.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct FilesystemBackend {
     /// Base path for all state operations.
     base_path: PathBuf,
+    /// Logger for debug messages.
+    logger: Arc<dyn Logger>,
 }
 
 impl FilesystemBackend {
@@ -29,10 +32,12 @@ impl FilesystemBackend {
     /// # Arguments
     ///
     /// * `base_path` - Root directory for state storage (ecosystem directory).
+    /// * `logger` - Logger for debug messages.
     #[must_use]
-    pub fn new(base_path: &Path) -> Self {
+    pub fn new(base_path: &Path, logger: Arc<dyn Logger>) -> Self {
         Self {
             base_path: base_path.to_path_buf(),
+            logger,
         }
     }
 
@@ -64,7 +69,8 @@ impl StateBackend for FilesystemBackend {
 
     async fn read_raw(&self, key: &str) -> Result<String> {
         let path = self.full_path(key);
-        log::debug!("Reading state file: {}", path.display());
+        self.logger
+            .debug(&format!("Reading state file: {}", path.display()));
 
         if !path.exists() {
             return Err(StateError::NotFound(path));
@@ -77,7 +83,8 @@ impl StateBackend for FilesystemBackend {
 
     async fn write_raw(&self, key: &str, content: &str) -> Result<()> {
         let path = self.full_path(key);
-        log::debug!("Writing state file: {}", path.display());
+        self.logger
+            .debug(&format!("Writing state file: {}", path.display()));
 
         // Per user requirement: file must exist for write operations
         if !path.exists() {
@@ -91,7 +98,8 @@ impl StateBackend for FilesystemBackend {
 
     async fn create_raw(&self, key: &str, content: &str) -> Result<()> {
         let path = self.full_path(key);
-        log::debug!("Creating state file: {}", path.display());
+        self.logger
+            .debug(&format!("Creating state file: {}", path.display()));
 
         // Safety check: file must NOT exist for create operations
         if path.exists() {
@@ -117,13 +125,17 @@ impl StateBackend for FilesystemBackend {
 
     async fn exists(&self, key: &str) -> Result<bool> {
         let path = self.full_path(key);
-        log::debug!("Checking if state file exists: {}", path.display());
+        self.logger.debug(&format!(
+            "Checking if state file exists: {}",
+            path.display()
+        ));
         Ok(path.exists())
     }
 
     async fn list(&self, prefix: &str) -> Result<Vec<String>> {
         let dir_path = self.full_path(prefix);
-        log::debug!("Listing state directory: {}", dir_path.display());
+        self.logger
+            .debug(&format!("Listing state directory: {}", dir_path.display()));
 
         if !dir_path.exists() || !dir_path.is_dir() {
             return Ok(Vec::new());
@@ -159,7 +171,8 @@ impl StateBackend for FilesystemBackend {
 
     async fn delete(&self, key: &str) -> Result<()> {
         let path = self.full_path(key);
-        log::debug!("Deleting state file: {}", path.display());
+        self.logger
+            .debug(&format!("Deleting state file: {}", path.display()));
 
         if !path.exists() {
             return Err(StateError::NotFound(path));
@@ -172,7 +185,8 @@ impl StateBackend for FilesystemBackend {
 
     async fn delete_dir(&self, key: &str) -> Result<()> {
         let path = self.full_path(key);
-        log::debug!("Deleting state directory: {}", path.display());
+        self.logger
+            .debug(&format!("Deleting state directory: {}", path.display()));
 
         if !path.exists() {
             return Err(StateError::NotFound(path));
@@ -187,21 +201,24 @@ impl StateBackend for FilesystemBackend {
 
     async fn read_ecosystem_metadata(&self) -> Result<EcosystemMetadata> {
         let key = paths::ECOSYSTEM_METADATA;
-        log::debug!("Reading ecosystem metadata from {}", key);
+        self.logger
+            .debug(&format!("Reading ecosystem metadata from {}", key));
         let content = self.read_raw(key).await?;
         self.deserialize(&content, key)
     }
 
     async fn write_ecosystem_metadata(&self, data: &EcosystemMetadata) -> Result<()> {
         let key = paths::ECOSYSTEM_METADATA;
-        log::debug!("Writing ecosystem metadata to {}", key);
+        self.logger
+            .debug(&format!("Writing ecosystem metadata to {}", key));
         let yaml = self.serialize(data, key)?;
         self.write_raw(key, &yaml).await
     }
 
     async fn create_ecosystem_metadata(&self, data: &EcosystemMetadata) -> Result<()> {
         let key = paths::ECOSYSTEM_METADATA;
-        log::debug!("Creating ecosystem metadata at {}", key);
+        self.logger
+            .debug(&format!("Creating ecosystem metadata at {}", key));
         let yaml = self.serialize(data, key)?;
         self.create_raw(key, &yaml).await
     }
@@ -210,21 +227,24 @@ impl StateBackend for FilesystemBackend {
 
     async fn read_ecosystem_wallets(&self) -> Result<Wallets> {
         let key = paths::ecosystem_wallets_path();
-        log::debug!("Reading ecosystem wallets from {}", key);
+        self.logger
+            .debug(&format!("Reading ecosystem wallets from {}", key));
         let content = self.read_raw(&key).await?;
         self.deserialize(&content, &key)
     }
 
     async fn write_ecosystem_wallets(&self, data: &Wallets) -> Result<()> {
         let key = paths::ecosystem_wallets_path();
-        log::debug!("Writing ecosystem wallets to {}", key);
+        self.logger
+            .debug(&format!("Writing ecosystem wallets to {}", key));
         let yaml = self.serialize(data, &key)?;
         self.write_raw(&key, &yaml).await
     }
 
     async fn create_ecosystem_wallets(&self, data: &Wallets) -> Result<()> {
         let key = paths::ecosystem_wallets_path();
-        log::debug!("Creating ecosystem wallets at {}", key);
+        self.logger
+            .debug(&format!("Creating ecosystem wallets at {}", key));
         let yaml = self.serialize(data, &key)?;
         self.create_raw(&key, &yaml).await
     }
@@ -233,21 +253,24 @@ impl StateBackend for FilesystemBackend {
 
     async fn read_ecosystem_contracts(&self) -> Result<EcosystemContracts> {
         let key = paths::ecosystem_contracts_path();
-        log::debug!("Reading ecosystem contracts from {}", key);
+        self.logger
+            .debug(&format!("Reading ecosystem contracts from {}", key));
         let content = self.read_raw(&key).await?;
         self.deserialize(&content, &key)
     }
 
     async fn write_ecosystem_contracts(&self, data: &EcosystemContracts) -> Result<()> {
         let key = paths::ecosystem_contracts_path();
-        log::debug!("Writing ecosystem contracts to {}", key);
+        self.logger
+            .debug(&format!("Writing ecosystem contracts to {}", key));
         let yaml = self.serialize(data, &key)?;
         self.write_raw(&key, &yaml).await
     }
 
     async fn create_ecosystem_contracts(&self, data: &EcosystemContracts) -> Result<()> {
         let key = paths::ecosystem_contracts_path();
-        log::debug!("Creating ecosystem contracts at {}", key);
+        self.logger
+            .debug(&format!("Creating ecosystem contracts at {}", key));
         let yaml = self.serialize(data, &key)?;
         self.create_raw(&key, &yaml).await
     }
@@ -256,21 +279,24 @@ impl StateBackend for FilesystemBackend {
 
     async fn read_initial_deployments(&self) -> Result<InitialDeployments> {
         let key = paths::initial_deployments_path();
-        log::debug!("Reading initial deployments from {}", key);
+        self.logger
+            .debug(&format!("Reading initial deployments from {}", key));
         let content = self.read_raw(&key).await?;
         self.deserialize(&content, &key)
     }
 
     async fn write_initial_deployments(&self, data: &InitialDeployments) -> Result<()> {
         let key = paths::initial_deployments_path();
-        log::debug!("Writing initial deployments to {}", key);
+        self.logger
+            .debug(&format!("Writing initial deployments to {}", key));
         let yaml = self.serialize(data, &key)?;
         self.write_raw(&key, &yaml).await
     }
 
     async fn create_initial_deployments(&self, data: &InitialDeployments) -> Result<()> {
         let key = paths::initial_deployments_path();
-        log::debug!("Creating initial deployments at {}", key);
+        self.logger
+            .debug(&format!("Creating initial deployments at {}", key));
         let yaml = self.serialize(data, &key)?;
         self.create_raw(&key, &yaml).await
     }
@@ -279,21 +305,24 @@ impl StateBackend for FilesystemBackend {
 
     async fn read_erc20_deployments(&self) -> Result<Erc20Deployments> {
         let key = paths::erc20_deployments_path();
-        log::debug!("Reading ERC20 deployments from {}", key);
+        self.logger
+            .debug(&format!("Reading ERC20 deployments from {}", key));
         let content = self.read_raw(&key).await?;
         self.deserialize(&content, &key)
     }
 
     async fn write_erc20_deployments(&self, data: &Erc20Deployments) -> Result<()> {
         let key = paths::erc20_deployments_path();
-        log::debug!("Writing ERC20 deployments to {}", key);
+        self.logger
+            .debug(&format!("Writing ERC20 deployments to {}", key));
         let yaml = self.serialize(data, &key)?;
         self.write_raw(&key, &yaml).await
     }
 
     async fn create_erc20_deployments(&self, data: &Erc20Deployments) -> Result<()> {
         let key = paths::erc20_deployments_path();
-        log::debug!("Creating ERC20 deployments at {}", key);
+        self.logger
+            .debug(&format!("Creating ERC20 deployments at {}", key));
         let yaml = self.serialize(data, &key)?;
         self.create_raw(&key, &yaml).await
     }
@@ -302,21 +331,24 @@ impl StateBackend for FilesystemBackend {
 
     async fn read_apps(&self) -> Result<Apps> {
         let key = paths::apps_path();
-        log::debug!("Reading apps config from {}", key);
+        self.logger
+            .debug(&format!("Reading apps config from {}", key));
         let content = self.read_raw(&key).await?;
         self.deserialize(&content, &key)
     }
 
     async fn write_apps(&self, data: &Apps) -> Result<()> {
         let key = paths::apps_path();
-        log::debug!("Writing apps config to {}", key);
+        self.logger
+            .debug(&format!("Writing apps config to {}", key));
         let yaml = self.serialize(data, &key)?;
         self.write_raw(&key, &yaml).await
     }
 
     async fn create_apps(&self, data: &Apps) -> Result<()> {
         let key = paths::apps_path();
-        log::debug!("Creating apps config at {}", key);
+        self.logger
+            .debug(&format!("Creating apps config at {}", key));
         let yaml = self.serialize(data, &key)?;
         self.create_raw(&key, &yaml).await
     }
@@ -325,21 +357,24 @@ impl StateBackend for FilesystemBackend {
 
     async fn read_chain_metadata(&self, chain: &str) -> Result<ChainMetadata> {
         let key = paths::chain_metadata_path(chain);
-        log::debug!("Reading chain '{}' metadata from {}", chain, key);
+        self.logger
+            .debug(&format!("Reading chain '{}' metadata from {}", chain, key));
         let content = self.read_raw(&key).await?;
         self.deserialize(&content, &key)
     }
 
     async fn write_chain_metadata(&self, chain: &str, data: &ChainMetadata) -> Result<()> {
         let key = paths::chain_metadata_path(chain);
-        log::debug!("Writing chain '{}' metadata to {}", chain, key);
+        self.logger
+            .debug(&format!("Writing chain '{}' metadata to {}", chain, key));
         let yaml = self.serialize(data, &key)?;
         self.write_raw(&key, &yaml).await
     }
 
     async fn create_chain_metadata(&self, chain: &str, data: &ChainMetadata) -> Result<()> {
         let key = paths::chain_metadata_path(chain);
-        log::debug!("Creating chain '{}' metadata at {}", chain, key);
+        self.logger
+            .debug(&format!("Creating chain '{}' metadata at {}", chain, key));
         let yaml = self.serialize(data, &key)?;
         self.create_raw(&key, &yaml).await
     }
@@ -348,21 +383,24 @@ impl StateBackend for FilesystemBackend {
 
     async fn read_chain_wallets(&self, chain: &str) -> Result<Wallets> {
         let key = paths::chain_wallets_path(chain);
-        log::debug!("Reading chain '{}' wallets from {}", chain, key);
+        self.logger
+            .debug(&format!("Reading chain '{}' wallets from {}", chain, key));
         let content = self.read_raw(&key).await?;
         self.deserialize(&content, &key)
     }
 
     async fn write_chain_wallets(&self, chain: &str, data: &Wallets) -> Result<()> {
         let key = paths::chain_wallets_path(chain);
-        log::debug!("Writing chain '{}' wallets to {}", chain, key);
+        self.logger
+            .debug(&format!("Writing chain '{}' wallets to {}", chain, key));
         let yaml = self.serialize(data, &key)?;
         self.write_raw(&key, &yaml).await
     }
 
     async fn create_chain_wallets(&self, chain: &str, data: &Wallets) -> Result<()> {
         let key = paths::chain_wallets_path(chain);
-        log::debug!("Creating chain '{}' wallets at {}", chain, key);
+        self.logger
+            .debug(&format!("Creating chain '{}' wallets at {}", chain, key));
         let yaml = self.serialize(data, &key)?;
         self.create_raw(&key, &yaml).await
     }
@@ -371,21 +409,24 @@ impl StateBackend for FilesystemBackend {
 
     async fn read_chain_contracts(&self, chain: &str) -> Result<ChainContracts> {
         let key = paths::chain_contracts_path(chain);
-        log::debug!("Reading chain '{}' contracts from {}", chain, key);
+        self.logger
+            .debug(&format!("Reading chain '{}' contracts from {}", chain, key));
         let content = self.read_raw(&key).await?;
         self.deserialize(&content, &key)
     }
 
     async fn write_chain_contracts(&self, chain: &str, data: &ChainContracts) -> Result<()> {
         let key = paths::chain_contracts_path(chain);
-        log::debug!("Writing chain '{}' contracts to {}", chain, key);
+        self.logger
+            .debug(&format!("Writing chain '{}' contracts to {}", chain, key));
         let yaml = self.serialize(data, &key)?;
         self.write_raw(&key, &yaml).await
     }
 
     async fn create_chain_contracts(&self, chain: &str, data: &ChainContracts) -> Result<()> {
         let key = paths::chain_contracts_path(chain);
-        log::debug!("Creating chain '{}' contracts at {}", chain, key);
+        self.logger
+            .debug(&format!("Creating chain '{}' contracts at {}", chain, key));
         let yaml = self.serialize(data, &key)?;
         self.create_raw(&key, &yaml).await
     }
@@ -395,6 +436,7 @@ impl StateBackend for FilesystemBackend {
 #[allow(clippy::expect_used)]
 mod tests {
     use super::*;
+    use adi_types::NoopLogger;
     use std::fs::File;
     use std::io::Write;
     use tempfile::TempDir;
@@ -429,7 +471,7 @@ mod tests {
     #[allow(clippy::unwrap_used)]
     async fn test_read_existing_file() {
         let dir = setup_test_dir();
-        let backend = FilesystemBackend::new(dir.path());
+        let backend = FilesystemBackend::new(dir.path(), Arc::new(NoopLogger));
 
         let content = backend.read_raw("ZkStack.yaml").await.unwrap();
         assert!(content.contains("test_ecosystem"));
@@ -439,7 +481,7 @@ mod tests {
     #[allow(clippy::unwrap_used)]
     async fn test_read_nonexistent_file() {
         let dir = setup_test_dir();
-        let backend = FilesystemBackend::new(dir.path());
+        let backend = FilesystemBackend::new(dir.path(), Arc::new(NoopLogger));
 
         let result = backend.read_raw("nonexistent.yaml").await;
         assert!(matches!(result, Err(StateError::NotFound(_))));
@@ -449,7 +491,7 @@ mod tests {
     #[allow(clippy::unwrap_used)]
     async fn test_write_existing_file() {
         let dir = setup_test_dir();
-        let backend = FilesystemBackend::new(dir.path());
+        let backend = FilesystemBackend::new(dir.path(), Arc::new(NoopLogger));
 
         backend
             .write_raw("ZkStack.yaml", "name: updated_ecosystem\n")
@@ -464,7 +506,7 @@ mod tests {
     #[allow(clippy::unwrap_used)]
     async fn test_write_nonexistent_file_fails() {
         let dir = setup_test_dir();
-        let backend = FilesystemBackend::new(dir.path());
+        let backend = FilesystemBackend::new(dir.path(), Arc::new(NoopLogger));
 
         let result = backend.write_raw("nonexistent.yaml", "content").await;
         assert!(matches!(result, Err(StateError::NotFound(_))));
@@ -474,7 +516,7 @@ mod tests {
     #[allow(clippy::unwrap_used)]
     async fn test_exists() {
         let dir = setup_test_dir();
-        let backend = FilesystemBackend::new(dir.path());
+        let backend = FilesystemBackend::new(dir.path(), Arc::new(NoopLogger));
 
         assert!(backend.exists("ZkStack.yaml").await.unwrap());
         assert!(!backend.exists("nonexistent.yaml").await.unwrap());
@@ -484,7 +526,7 @@ mod tests {
     #[allow(clippy::unwrap_used)]
     async fn test_list_chains() {
         let dir = setup_test_dir();
-        let backend = FilesystemBackend::new(dir.path());
+        let backend = FilesystemBackend::new(dir.path(), Arc::new(NoopLogger));
 
         let chains = backend.list("chains").await.unwrap();
         assert_eq!(chains, vec!["test_chain"]);
@@ -494,7 +536,7 @@ mod tests {
     #[allow(clippy::unwrap_used)]
     async fn test_list_nonexistent_dir() {
         let dir = setup_test_dir();
-        let backend = FilesystemBackend::new(dir.path());
+        let backend = FilesystemBackend::new(dir.path(), Arc::new(NoopLogger));
 
         let entries = backend.list("nonexistent").await.unwrap();
         assert!(entries.is_empty());
@@ -504,7 +546,7 @@ mod tests {
     #[allow(clippy::unwrap_used)]
     async fn test_create_new_file() {
         let dir = setup_test_dir();
-        let backend = FilesystemBackend::new(dir.path());
+        let backend = FilesystemBackend::new(dir.path(), Arc::new(NoopLogger));
 
         backend
             .create_raw("new_file.yaml", "content: test\n")
@@ -519,7 +561,7 @@ mod tests {
     #[allow(clippy::unwrap_used)]
     async fn test_create_with_parent_dirs() {
         let dir = setup_test_dir();
-        let backend = FilesystemBackend::new(dir.path());
+        let backend = FilesystemBackend::new(dir.path(), Arc::new(NoopLogger));
 
         backend
             .create_raw("new_dir/nested/file.yaml", "content: nested\n")
@@ -534,7 +576,7 @@ mod tests {
     #[allow(clippy::unwrap_used)]
     async fn test_create_existing_file_fails() {
         let dir = setup_test_dir();
-        let backend = FilesystemBackend::new(dir.path());
+        let backend = FilesystemBackend::new(dir.path(), Arc::new(NoopLogger));
 
         let result = backend.create_raw("ZkStack.yaml", "new content").await;
         assert!(matches!(result, Err(StateError::AlreadyExists(_))));
@@ -544,7 +586,7 @@ mod tests {
     #[allow(clippy::unwrap_used)]
     async fn test_delete_existing_file() {
         let dir = setup_test_dir();
-        let backend = FilesystemBackend::new(dir.path());
+        let backend = FilesystemBackend::new(dir.path(), Arc::new(NoopLogger));
 
         assert!(backend.exists("ZkStack.yaml").await.unwrap());
         backend.delete("ZkStack.yaml").await.unwrap();
@@ -555,7 +597,7 @@ mod tests {
     #[allow(clippy::unwrap_used)]
     async fn test_delete_nonexistent_file_fails() {
         let dir = setup_test_dir();
-        let backend = FilesystemBackend::new(dir.path());
+        let backend = FilesystemBackend::new(dir.path(), Arc::new(NoopLogger));
 
         let result = backend.delete("nonexistent.yaml").await;
         assert!(matches!(result, Err(StateError::NotFound(_))));

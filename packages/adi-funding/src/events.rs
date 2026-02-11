@@ -2,8 +2,9 @@
 
 use crate::config::WalletRole;
 use crate::transfer::Transfer;
+use adi_types::Logger;
 use alloy_primitives::{Address, B256, U256};
-use colored::Colorize;
+use std::sync::Arc;
 
 /// Events emitted during funding operations.
 #[derive(Clone, Debug)]
@@ -101,15 +102,25 @@ impl FundingEventHandler for NoOpEventHandler {
     }
 }
 
-/// Event handler that logs events using the log crate.
-pub struct LoggingEventHandler;
+/// Event handler that logs events using the Logger trait.
+pub struct LoggingEventHandler {
+    logger: Arc<dyn Logger>,
+}
+
+impl LoggingEventHandler {
+    /// Create a new LoggingEventHandler with the given logger.
+    pub fn new(logger: Arc<dyn Logger>) -> Self {
+        Self { logger }
+    }
+}
 
 #[async_trait::async_trait]
 impl FundingEventHandler for LoggingEventHandler {
     async fn on_event(&self, event: FundingEvent) {
         match event {
             FundingEvent::CheckingBalances { wallet_count } => {
-                log::info!("Checking balances for {} wallets", wallet_count);
+                self.logger
+                    .info(&format!("Checking balances for {} wallets", wallet_count));
             }
             FundingEvent::BalanceChecked {
                 role,
@@ -118,15 +129,15 @@ impl FundingEventHandler for LoggingEventHandler {
                 token_balance,
             } => {
                 if let Some(tok) = token_balance {
-                    log::debug!(
+                    self.logger.debug(&format!(
                         "{}: {} has {} wei ETH, {} token",
-                        role,
-                        address,
-                        eth_balance,
-                        tok
-                    );
+                        role, address, eth_balance, tok
+                    ));
                 } else {
-                    log::debug!("{}: {} has {} wei ETH", role, address, eth_balance);
+                    self.logger.debug(&format!(
+                        "{}: {} has {} wei ETH",
+                        role, address, eth_balance
+                    ));
                 }
             }
             FundingEvent::PlanCreated {
@@ -135,52 +146,50 @@ impl FundingEventHandler for LoggingEventHandler {
                 total_token,
                 gas_cost,
             } => {
-                log::info!(
+                self.logger.info(&format!(
                     "Funding plan: {} transfers, {} wei ETH total ({} wei gas), {} tokens",
-                    transfer_count,
-                    total_eth,
-                    gas_cost,
-                    total_token
-                );
+                    transfer_count, total_eth, gas_cost, total_token
+                ));
             }
             FundingEvent::ExecutingTransfers { total } => {
-                log::info!("Executing {} transfers", total);
+                self.logger.info(&format!("Executing {} transfers", total));
             }
             FundingEvent::TransferStarted {
                 index,
                 total,
                 transfer,
             } => {
-                log::info!("[{}/{}] {}", index + 1, total, transfer.description());
+                self.logger.info(&format!(
+                    "[{}/{}] {}",
+                    index + 1,
+                    total,
+                    transfer.description()
+                ));
             }
             FundingEvent::TransferSubmitted { index, tx_hash } => {
-                log::debug!(
-                    "Transfer {} submitted: {}",
-                    index + 1,
-                    tx_hash.to_string().green()
-                );
+                self.logger
+                    .debug(&format!("Transfer {} submitted: {}", index + 1, tx_hash));
             }
             FundingEvent::TransferConfirmed {
                 index,
                 tx_hash,
                 gas_used,
             } => {
-                log::info!(
+                self.logger.info(&format!(
                     "Transfer {} confirmed: {} (gas: {})",
                     index + 1,
-                    tx_hash.to_string().green(),
+                    tx_hash,
                     gas_used
-                );
+                ));
             }
             FundingEvent::Complete {
                 successful,
                 total_gas_used,
             } => {
-                log::info!(
+                self.logger.info(&format!(
                     "Funding complete: {} transfers successful, {} gas used",
-                    successful,
-                    total_gas_used
-                );
+                    successful, total_gas_used
+                ));
             }
         }
     }

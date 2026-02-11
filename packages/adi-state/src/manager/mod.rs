@@ -66,7 +66,7 @@ impl StateManager {
             "Creating StateManager with filesystem backend at {}",
             ecosystem_path.display()
         ));
-        let backend = create_backend(BackendType::Filesystem, ecosystem_path);
+        let backend = create_backend(BackendType::Filesystem, ecosystem_path, Arc::clone(&logger));
         Self {
             backend: Arc::from(backend),
             base_path: ecosystem_path.to_path_buf(),
@@ -118,7 +118,7 @@ impl StateManager {
             backend_type,
             ecosystem_path.display()
         ));
-        let backend = create_backend(backend_type, ecosystem_path);
+        let backend = create_backend(backend_type, ecosystem_path, Arc::clone(&logger));
         Self {
             backend: Arc::from(backend),
             base_path: ecosystem_path.to_path_buf(),
@@ -135,7 +135,7 @@ impl StateManager {
     /// Get ecosystem-level state operations.
     #[must_use]
     pub fn ecosystem(&self) -> EcosystemStateOps {
-        EcosystemStateOps::new(Arc::clone(&self.backend))
+        EcosystemStateOps::new(Arc::clone(&self.backend), Arc::clone(&self.logger))
     }
 
     /// Get chain-level state operations.
@@ -149,7 +149,11 @@ impl StateManager {
             "Getting chain state operations for '{}'",
             chain_name
         ));
-        ChainStateOps::new(Arc::clone(&self.backend), chain_name.to_string())
+        ChainStateOps::new(
+            Arc::clone(&self.backend),
+            chain_name.to_string(),
+            Arc::clone(&self.logger),
+        )
     }
 
     /// Get the base path of this state manager.

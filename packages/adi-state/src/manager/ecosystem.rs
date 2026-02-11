@@ -4,7 +4,7 @@ use crate::backend::StateBackend;
 use crate::error::Result;
 use crate::paths;
 use adi_types::{
-    Apps, EcosystemContracts, EcosystemMetadata, Erc20Deployments, InitialDeployments,
+    Apps, EcosystemContracts, EcosystemMetadata, Erc20Deployments, InitialDeployments, Logger,
     PartialEcosystemMetadata, Wallets,
 };
 use std::sync::Arc;
@@ -14,12 +14,13 @@ use std::sync::Arc;
 /// Provides typed access to ecosystem configuration files.
 pub struct EcosystemStateOps {
     backend: Arc<dyn StateBackend>,
+    logger: Arc<dyn Logger>,
 }
 
 impl EcosystemStateOps {
     /// Create new ecosystem state operations.
-    pub(crate) fn new(backend: Arc<dyn StateBackend>) -> Self {
-        Self { backend }
+    pub(crate) fn new(backend: Arc<dyn StateBackend>, logger: Arc<dyn Logger>) -> Self {
+        Self { backend, logger }
     }
 
     // ========== METADATA ==========
@@ -42,11 +43,12 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_metadata(&self, partial: &PartialEcosystemMetadata) -> Result<()> {
-        log::debug!("Updating ecosystem metadata with partial values");
+        self.logger
+            .debug("Updating ecosystem metadata with partial values");
         let current = self.metadata().await?;
         let merged = merge_ecosystem_metadata(current, partial);
         self.backend.write_ecosystem_metadata(&merged).await?;
-        log::debug!("Ecosystem metadata updated successfully");
+        self.logger.debug("Ecosystem metadata updated successfully");
         Ok(())
     }
 
@@ -69,11 +71,11 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_wallets(&self, partial: &Wallets) -> Result<()> {
-        log::debug!("Updating ecosystem wallets");
+        self.logger.debug("Updating ecosystem wallets");
         let current = self.wallets().await?;
         let merged = merge_wallets(current, partial);
         self.backend.write_ecosystem_wallets(&merged).await?;
-        log::debug!("Ecosystem wallets updated successfully");
+        self.logger.debug("Ecosystem wallets updated successfully");
         Ok(())
     }
 
@@ -98,7 +100,8 @@ impl EcosystemStateOps {
     pub async fn contracts_exist(&self) -> Result<bool> {
         let key = paths::ecosystem_contracts_path();
         let exists = self.backend.exists(&key).await?;
-        log::debug!("Ecosystem contracts file exists: {}", exists);
+        self.logger
+            .debug(&format!("Ecosystem contracts file exists: {}", exists));
         Ok(exists)
     }
 
@@ -108,9 +111,10 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_contracts(&self, contracts: &EcosystemContracts) -> Result<()> {
-        log::debug!("Updating ecosystem contracts");
+        self.logger.debug("Updating ecosystem contracts");
         self.backend.write_ecosystem_contracts(contracts).await?;
-        log::debug!("Ecosystem contracts updated successfully");
+        self.logger
+            .debug("Ecosystem contracts updated successfully");
         Ok(())
     }
 
@@ -131,9 +135,10 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_initial_deployments(&self, deployments: &InitialDeployments) -> Result<()> {
-        log::debug!("Updating initial deployments");
+        self.logger.debug("Updating initial deployments");
         self.backend.write_initial_deployments(deployments).await?;
-        log::debug!("Initial deployments updated successfully");
+        self.logger
+            .debug("Initial deployments updated successfully");
         Ok(())
     }
 
@@ -154,9 +159,9 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_erc20_deployments(&self, deployments: &Erc20Deployments) -> Result<()> {
-        log::debug!("Updating ERC20 deployments");
+        self.logger.debug("Updating ERC20 deployments");
         self.backend.write_erc20_deployments(deployments).await?;
-        log::debug!("ERC20 deployments updated successfully");
+        self.logger.debug("ERC20 deployments updated successfully");
         Ok(())
     }
 
@@ -177,9 +182,9 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_apps(&self, apps: &Apps) -> Result<()> {
-        log::debug!("Updating apps config");
+        self.logger.debug("Updating apps config");
         self.backend.write_apps(apps).await?;
-        log::debug!("Apps config updated successfully");
+        self.logger.debug("Apps config updated successfully");
         Ok(())
     }
 
@@ -195,9 +200,9 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file already exists or creation fails.
     pub async fn create_metadata(&self, metadata: &EcosystemMetadata) -> Result<()> {
-        log::debug!("Creating ecosystem metadata");
+        self.logger.debug("Creating ecosystem metadata");
         self.backend.create_ecosystem_metadata(metadata).await?;
-        log::debug!("Ecosystem metadata created successfully");
+        self.logger.debug("Ecosystem metadata created successfully");
         Ok(())
     }
 
@@ -207,9 +212,9 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file already exists or creation fails.
     pub async fn create_wallets(&self, wallets: &Wallets) -> Result<()> {
-        log::debug!("Creating ecosystem wallets");
+        self.logger.debug("Creating ecosystem wallets");
         self.backend.create_ecosystem_wallets(wallets).await?;
-        log::debug!("Ecosystem wallets created successfully");
+        self.logger.debug("Ecosystem wallets created successfully");
         Ok(())
     }
 
@@ -219,9 +224,10 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file already exists or creation fails.
     pub async fn create_contracts(&self, contracts: &EcosystemContracts) -> Result<()> {
-        log::debug!("Creating ecosystem contracts");
+        self.logger.debug("Creating ecosystem contracts");
         self.backend.create_ecosystem_contracts(contracts).await?;
-        log::debug!("Ecosystem contracts created successfully");
+        self.logger
+            .debug("Ecosystem contracts created successfully");
         Ok(())
     }
 
@@ -231,9 +237,10 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file already exists or creation fails.
     pub async fn create_initial_deployments(&self, deployments: &InitialDeployments) -> Result<()> {
-        log::debug!("Creating initial deployments");
+        self.logger.debug("Creating initial deployments");
         self.backend.create_initial_deployments(deployments).await?;
-        log::debug!("Initial deployments created successfully");
+        self.logger
+            .debug("Initial deployments created successfully");
         Ok(())
     }
 
@@ -243,9 +250,9 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file already exists or creation fails.
     pub async fn create_erc20_deployments(&self, deployments: &Erc20Deployments) -> Result<()> {
-        log::debug!("Creating ERC20 deployments");
+        self.logger.debug("Creating ERC20 deployments");
         self.backend.create_erc20_deployments(deployments).await?;
-        log::debug!("ERC20 deployments created successfully");
+        self.logger.debug("ERC20 deployments created successfully");
         Ok(())
     }
 
@@ -255,9 +262,9 @@ impl EcosystemStateOps {
     ///
     /// Returns error if file already exists or creation fails.
     pub async fn create_apps(&self, apps: &Apps) -> Result<()> {
-        log::debug!("Creating apps config");
+        self.logger.debug("Creating apps config");
         self.backend.create_apps(apps).await?;
-        log::debug!("Apps config created successfully");
+        self.logger.debug("Apps config created successfully");
         Ok(())
     }
 }

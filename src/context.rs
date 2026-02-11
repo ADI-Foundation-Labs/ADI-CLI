@@ -30,10 +30,14 @@ impl Context {
     /// Returns an error if configuration loading fails.
     pub fn new_from_options(options: &super::Opts) -> Result<Self> {
         let cfg = Config::new(options.config.as_deref()).wrap_err("Failed to load config")?;
+
+        // CLI flag takes precedence over config file for debug mode
+        let debug_enabled = options.debug || cfg.debug;
+
         Ok(Self {
             cfg,
             image_tag_override: options.image_tag.clone(),
-            logger: ui::cli_logger(),
+            logger: ui::cli_logger_with_debug(debug_enabled),
         })
     }
 

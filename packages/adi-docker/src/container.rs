@@ -181,7 +181,7 @@ impl ContainerManager {
 
         self.logger.debug("Container started, streaming output...");
 
-        let streamer = OutputStreamer::new(self.docker.clone());
+        let streamer = OutputStreamer::new(self.docker.clone(), Arc::clone(&self.logger));
         let duration = Duration::from_secs(timeout_seconds);
 
         // Stream logs first - it will complete when container output ends

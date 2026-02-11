@@ -7,11 +7,12 @@ pub use filesystem::FilesystemBackend;
 use crate::error::Result;
 use adi_types::{
     Apps, ChainContracts, ChainMetadata, EcosystemContracts, EcosystemMetadata, Erc20Deployments,
-    InitialDeployments, Wallets,
+    InitialDeployments, Logger, Wallets,
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::sync::Arc;
 
 /// Backend type for state storage.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -236,9 +237,14 @@ pub trait StateBackend: Send + Sync {
 ///
 /// * `backend_type` - The type of backend to create.
 /// * `base_path` - Base path for the backend (interpretation depends on type).
+/// * `logger` - Logger for debug messages.
 #[must_use]
-pub fn create_backend(backend_type: BackendType, base_path: &Path) -> Box<dyn StateBackend> {
+pub fn create_backend(
+    backend_type: BackendType,
+    base_path: &Path,
+    logger: Arc<dyn Logger>,
+) -> Box<dyn StateBackend> {
     match backend_type {
-        BackendType::Filesystem => Box::new(FilesystemBackend::new(base_path)),
+        BackendType::Filesystem => Box::new(FilesystemBackend::new(base_path, logger)),
     }
 }

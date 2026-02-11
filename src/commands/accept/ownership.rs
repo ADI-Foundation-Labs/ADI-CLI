@@ -180,6 +180,7 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
         &ecosystem_contracts,
         &governor.private_key,
         args.gas_price_wei,
+        context.logger().as_ref(),
     )
     .await;
 
@@ -192,6 +193,7 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
                 &contracts,
                 &governor.private_key,
                 args.gas_price_wei,
+                context.logger().as_ref(),
             )
             .await,
         )

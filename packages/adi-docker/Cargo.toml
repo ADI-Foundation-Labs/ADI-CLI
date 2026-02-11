@@ -15,7 +15,6 @@ path = "src/lib.rs"
 tokio = { workspace = true, features = ["signal"] }
 eyre = { workspace = true }
 thiserror = { workspace = true }
-log = { workspace = true }
 futures-util = { workspace = true }
 bollard = { workspace = true }
 cliclack = { workspace = true }

@@ -6,7 +6,6 @@ use crate::provider::FundingProvider;
 use alloy_primitives::{Address, Bytes, U256};
 use alloy_rpc_types::eth::TransactionRequest;
 use alloy_sol_types::{sol, SolCall};
-use colored::Colorize;
 
 // ERC20 transfer interface
 sol! {
@@ -110,18 +109,14 @@ impl Transfer {
     pub fn description(&self) -> String {
         match &self.transfer_type {
             TransferType::Eth { amount } => {
-                format!(
-                    "{} to {} ({})",
-                    format!("{} ETH", format_eth(*amount)).green(),
-                    self.to.to_string().green(),
-                    self.role
-                )
+                format!("{} ETH to {} ({})", format_eth(*amount), self.to, self.role)
             }
             TransferType::Token { amount, symbol, .. } => {
                 format!(
-                    "{} to {} ({})",
-                    format!("{} {}", format_token(*amount), symbol).green(),
-                    self.to.to_string().green(),
+                    "{} {} to {} ({})",
+                    format_token(*amount),
+                    symbol,
+                    self.to,
                     self.role
                 )
             }

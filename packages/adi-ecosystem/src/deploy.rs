@@ -6,13 +6,12 @@
 
 use crate::error::{EcosystemError, Result};
 use crate::validator::{build_add_validator_roles_calldata, ValidatorRoles};
-use adi_types::{ChainContracts, Wallets};
+use adi_types::{ChainContracts, Logger, Wallets};
 use alloy_network::{EthereumWallet, TransactionBuilder};
 use alloy_primitives::{Address, B256};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
 use alloy_signer_local::PrivateKeySigner;
-use colored::Colorize;
 use secrecy::{ExposeSecret, SecretString};
 
 /// Contract addresses required for validator role configuration.
@@ -82,6 +81,7 @@ struct ValidatorRoleAssignment {
 /// * `chain_wallets` - Chain wallets containing operator addresses.
 /// * `governor_key` - Chain governor private key for signing transactions.
 /// * `gas_price_wei` - Optional gas price in wei (estimated if not provided).
+/// * `logger` - Logger for debug/info/warning output.
 ///
 /// # Returns
 ///
@@ -96,16 +96,17 @@ pub async fn add_validator_roles(
     chain_wallets: &Wallets,
     governor_key: &SecretString,
     gas_price_wei: Option<u128>,
+    logger: &dyn Logger,
 ) -> Result<Vec<B256>> {
-    log::debug!(
+    logger.debug(&format!(
         "Adding validator roles via chain_admin: {}",
-        contracts.chain_admin.to_string().green()
-    );
+        contracts.chain_admin
+    ));
 
     // Create signer from governor key
     let signer = create_signer(governor_key)?;
     let governor_address = signer.address();
-    log::debug!("Governor address: {}", governor_address.to_string().green());
+    logger.debug(&format!("Governor address: {}", governor_address));
 
     // Create signing provider
     let wallet = EthereumWallet::from(signer);
@@ -140,7 +141,7 @@ pub async fn add_validator_roles(
                 reason: format!("Failed to get gas price: {}", e),
             })?,
     };
-    log::debug!("Using gas price: {} wei", gas_price.to_string().green());
+    logger.debug(&format!("Using gas price: {} wei", gas_price));
 
     // Build list of role assignments
     let mut assignments: Vec<ValidatorRoleAssignment> = Vec::new();
@@ -170,7 +171,7 @@ pub async fn add_validator_roles(
     }
 
     if assignments.is_empty() {
-        log::warn!("No operator wallets found - skipping validator role assignment");
+        logger.warning("No operator wallets found - skipping validator role assignment");
         return Ok(Vec::new());
     }
 
@@ -178,11 +179,10 @@ pub async fn add_validator_roles(
     let mut tx_hashes = Vec::with_capacity(assignments.len());
 
     for assignment in assignments {
-        log::info!(
+        logger.info(&format!(
             "Adding validator roles for {} ({})",
-            assignment.name,
-            assignment.operator.to_string().green()
-        );
+            assignment.name, assignment.operator
+        ));
 
         let calldata = build_add_validator_roles_calldata(
             contracts.validator_timelock,
@@ -214,7 +214,7 @@ pub async fn add_validator_roles(
                 })?;
 
         let tx_hash = *pending.tx_hash();
-        log::info!("  Transaction submitted: {}", tx_hash.to_string().green());
+        logger.info(&format!("  Transaction submitted: {}", tx_hash));
 
         // Wait for confirmation
         let receipt =
@@ -234,11 +234,11 @@ pub async fn add_validator_roles(
             });
         }
 
-        log::info!(
+        logger.info(&format!(
             "  Confirmed in block {} (gas used: {})",
-            receipt.block_number.unwrap_or_default().to_string().green(),
-            receipt.gas_used.to_string().green()
-        );
+            receipt.block_number.unwrap_or_default(),
+            receipt.gas_used
+        ));
 
         tx_hashes.push(tx_hash);
         nonce += 1;

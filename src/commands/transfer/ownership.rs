@@ -191,6 +191,7 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
         &ecosystem_contracts,
         &governor.private_key,
         args.gas_price_wei,
+        context.logger().as_ref(),
     )
     .await;
 
@@ -201,6 +202,7 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
         &chain_contracts,
         &governor.private_key,
         args.gas_price_wei,
+        context.logger().as_ref(),
     )
     .await;
 
@@ -224,6 +226,7 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
         &governor.private_key,
         new_owner,
         args.gas_price_wei,
+        context.logger().as_ref(),
     )
     .await;
 
@@ -235,6 +238,7 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
         &governor.private_key,
         new_owner,
         args.gas_price_wei,
+        context.logger().as_ref(),
     )
     .await;
 

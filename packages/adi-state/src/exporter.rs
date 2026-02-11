@@ -39,7 +39,10 @@ use tokio::fs;
 ///
 /// Returns error if reading from backend or writing files fails.
 pub async fn export_ecosystem_state(state_manager: &StateManager, target_dir: &Path) -> Result<()> {
-    log::info!("Exporting ecosystem state to {}", target_dir.display());
+    state_manager.logger().info(&format!(
+        "Exporting ecosystem state to {}",
+        target_dir.display()
+    ));
 
     // Create target directory structure
     let configs_dir = target_dir.join("configs");
@@ -53,18 +56,18 @@ pub async fn export_ecosystem_state(state_manager: &StateManager, target_dir: &P
     // Export ecosystem metadata
     let metadata = state_manager.ecosystem().metadata().await?;
     write_yaml(&target_dir.join("ZkStack.yaml"), &metadata).await?;
-    log::debug!("Exported ecosystem metadata");
+    state_manager.logger().debug("Exported ecosystem metadata");
 
     // Export ecosystem wallets
     let wallets = state_manager.ecosystem().wallets().await?;
     write_yaml(&configs_dir.join("wallets.yaml"), &wallets).await?;
-    log::debug!("Exported ecosystem wallets");
+    state_manager.logger().debug("Exported ecosystem wallets");
 
     // Export contracts if they exist
     if state_manager.ecosystem().contracts_exist().await? {
         let contracts = state_manager.ecosystem().contracts().await?;
         write_yaml(&configs_dir.join("contracts.yaml"), &contracts).await?;
-        log::debug!("Exported ecosystem contracts");
+        state_manager.logger().debug("Exported ecosystem contracts");
     }
 
     // Export all chains
@@ -72,7 +75,9 @@ pub async fn export_ecosystem_state(state_manager: &StateManager, target_dir: &P
         export_chain_state(state_manager, target_dir, &chain_name).await?;
     }
 
-    log::info!("Ecosystem state exported successfully");
+    state_manager
+        .logger()
+        .info("Ecosystem state exported successfully");
     Ok(())
 }
 
@@ -92,7 +97,9 @@ pub async fn export_chain_state(
     target_dir: &Path,
     chain_name: &str,
 ) -> Result<()> {
-    log::debug!("Exporting chain '{}' state", chain_name);
+    state_manager
+        .logger()
+        .debug(&format!("Exporting chain '{}' state", chain_name));
 
     let chain_dir = target_dir.join("chains").join(chain_name);
     let configs_dir = chain_dir.join("configs");
@@ -108,21 +115,30 @@ pub async fn export_chain_state(
     // Export chain metadata
     let metadata = chain_ops.metadata().await?;
     write_yaml(&chain_dir.join("ZkStack.yaml"), &metadata).await?;
-    log::debug!("Exported chain '{}' metadata", chain_name);
+    state_manager
+        .logger()
+        .debug(&format!("Exported chain '{}' metadata", chain_name));
 
     // Export chain wallets
     let wallets = chain_ops.wallets().await?;
     write_yaml(&configs_dir.join("wallets.yaml"), &wallets).await?;
-    log::debug!("Exported chain '{}' wallets", chain_name);
+    state_manager
+        .logger()
+        .debug(&format!("Exported chain '{}' wallets", chain_name));
 
     // Export contracts if they exist
     if chain_ops.contracts_exist().await? {
         let contracts = chain_ops.contracts().await?;
         write_yaml(&configs_dir.join("contracts.yaml"), &contracts).await?;
-        log::debug!("Exported chain '{}' contracts", chain_name);
+        state_manager
+            .logger()
+            .debug(&format!("Exported chain '{}' contracts", chain_name));
     }
 
-    log::debug!("Chain '{}' state exported successfully", chain_name);
+    state_manager.logger().debug(&format!(
+        "Chain '{}' state exported successfully",
+        chain_name
+    ));
     Ok(())
 }
 

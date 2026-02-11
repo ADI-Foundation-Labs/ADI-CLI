@@ -1,21 +1,24 @@
 //! Real-time output streaming from containers.
 
 use crate::error::{DockerError, Result};
+use adi_types::Logger;
 use bollard::container::LogsOptions;
 use bollard::Docker;
 use futures_util::StreamExt;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Instant;
 
 /// Streams container output with progress spinner.
 pub(crate) struct OutputStreamer {
     docker: Docker,
+    logger: Arc<dyn Logger>,
 }
 
 impl OutputStreamer {
     /// Create a new OutputStreamer.
-    pub fn new(docker: Docker) -> Self {
-        Self { docker }
+    pub fn new(docker: Docker, logger: Arc<dyn Logger>) -> Self {
+        Self { docker, logger }
     }
 
     /// Stream container logs with spinner progress.
@@ -64,7 +67,7 @@ impl OutputStreamer {
                             spinner.set_message(format!("[{}s]", start.elapsed().as_secs()));
                         }
                         Some(Err(e)) => {
-                            log::debug!("Log stream ended: {}", e);
+                            self.logger.debug(&format!("Log stream ended: {}", e));
                             break Ok(());
                         }
                         None => {

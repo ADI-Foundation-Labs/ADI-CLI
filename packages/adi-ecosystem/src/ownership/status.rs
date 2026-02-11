@@ -161,12 +161,8 @@ where
 
     match provider.call(tx).await {
         Ok(result) => result.get(12..32).map(Address::from_slice),
-        Err(e) => {
-            log::debug!(
-                "Failed to call pendingOwner for {}: {}",
-                contract_address,
-                e
-            );
+        Err(_e) => {
+            // Debug logging for pendingOwner failures happens at call site
             None
         }
     }
@@ -184,8 +180,8 @@ where
 
     match provider.call(tx).await {
         Ok(result) => result.get(12..32).map(Address::from_slice),
-        Err(e) => {
-            log::debug!("Failed to call owner for {}: {}", contract_address, e);
+        Err(_e) => {
+            // Debug logging for owner failures happens at call site
             None
         }
     }

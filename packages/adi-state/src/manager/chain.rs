@@ -4,7 +4,7 @@ use crate::backend::StateBackend;
 use crate::error::Result;
 use crate::manager::ecosystem::merge_wallets;
 use crate::paths;
-use adi_types::{ChainContracts, ChainMetadata, PartialChainMetadata, Wallets};
+use adi_types::{ChainContracts, ChainMetadata, Logger, PartialChainMetadata, Wallets};
 use std::sync::Arc;
 
 /// Chain-level state operations.
@@ -13,14 +13,20 @@ use std::sync::Arc;
 pub struct ChainStateOps {
     backend: Arc<dyn StateBackend>,
     chain_name: String,
+    logger: Arc<dyn Logger>,
 }
 
 impl ChainStateOps {
     /// Create new chain state operations.
-    pub(crate) fn new(backend: Arc<dyn StateBackend>, chain_name: String) -> Self {
+    pub(crate) fn new(
+        backend: Arc<dyn StateBackend>,
+        chain_name: String,
+        logger: Arc<dyn Logger>,
+    ) -> Self {
         Self {
             backend,
             chain_name,
+            logger,
         }
     }
 
@@ -49,16 +55,19 @@ impl ChainStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_metadata(&self, partial: &PartialChainMetadata) -> Result<()> {
-        log::debug!(
+        self.logger.debug(&format!(
             "Updating chain '{}' metadata with partial values",
             self.chain_name
-        );
+        ));
         let current = self.metadata().await?;
         let merged = merge_chain_metadata(current, partial);
         self.backend
             .write_chain_metadata(&self.chain_name, &merged)
             .await?;
-        log::debug!("Chain '{}' metadata updated successfully", self.chain_name);
+        self.logger.debug(&format!(
+            "Chain '{}' metadata updated successfully",
+            self.chain_name
+        ));
         Ok(())
     }
 
@@ -81,13 +90,17 @@ impl ChainStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_wallets(&self, partial: &Wallets) -> Result<()> {
-        log::debug!("Updating chain '{}' wallets", self.chain_name);
+        self.logger
+            .debug(&format!("Updating chain '{}' wallets", self.chain_name));
         let current = self.wallets().await?;
         let merged = merge_wallets(current, partial);
         self.backend
             .write_chain_wallets(&self.chain_name, &merged)
             .await?;
-        log::debug!("Chain '{}' wallets updated successfully", self.chain_name);
+        self.logger.debug(&format!(
+            "Chain '{}' wallets updated successfully",
+            self.chain_name
+        ));
         Ok(())
     }
 
@@ -112,11 +125,10 @@ impl ChainStateOps {
     pub async fn contracts_exist(&self) -> Result<bool> {
         let key = paths::chain_contracts_path(&self.chain_name);
         let exists = self.backend.exists(&key).await?;
-        log::debug!(
+        self.logger.debug(&format!(
             "Chain '{}' contracts file exists: {}",
-            self.chain_name,
-            exists
-        );
+            self.chain_name, exists
+        ));
         Ok(exists)
     }
 
@@ -126,11 +138,15 @@ impl ChainStateOps {
     ///
     /// Returns error if file doesn't exist.
     pub async fn update_contracts(&self, contracts: &ChainContracts) -> Result<()> {
-        log::debug!("Updating chain '{}' contracts", self.chain_name);
+        self.logger
+            .debug(&format!("Updating chain '{}' contracts", self.chain_name));
         self.backend
             .write_chain_contracts(&self.chain_name, contracts)
             .await?;
-        log::debug!("Chain '{}' contracts updated successfully", self.chain_name);
+        self.logger.debug(&format!(
+            "Chain '{}' contracts updated successfully",
+            self.chain_name
+        ));
         Ok(())
     }
 
@@ -142,7 +158,8 @@ impl ChainStateOps {
     pub async fn exists(&self) -> Result<bool> {
         let key = paths::chain_metadata_path(&self.chain_name);
         let exists = self.backend.exists(&key).await?;
-        log::debug!("Chain '{}' exists: {}", self.chain_name, exists);
+        self.logger
+            .debug(&format!("Chain '{}' exists: {}", self.chain_name, exists));
         Ok(exists)
     }
 
@@ -158,11 +175,15 @@ impl ChainStateOps {
     ///
     /// Returns error if file already exists or creation fails.
     pub async fn create_metadata(&self, metadata: &ChainMetadata) -> Result<()> {
-        log::debug!("Creating chain '{}' metadata", self.chain_name);
+        self.logger
+            .debug(&format!("Creating chain '{}' metadata", self.chain_name));
         self.backend
             .create_chain_metadata(&self.chain_name, metadata)
             .await?;
-        log::debug!("Chain '{}' metadata created successfully", self.chain_name);
+        self.logger.debug(&format!(
+            "Chain '{}' metadata created successfully",
+            self.chain_name
+        ));
         Ok(())
     }
 
@@ -172,11 +193,15 @@ impl ChainStateOps {
     ///
     /// Returns error if file already exists or creation fails.
     pub async fn create_wallets(&self, wallets: &Wallets) -> Result<()> {
-        log::debug!("Creating chain '{}' wallets", self.chain_name);
+        self.logger
+            .debug(&format!("Creating chain '{}' wallets", self.chain_name));
         self.backend
             .create_chain_wallets(&self.chain_name, wallets)
             .await?;
-        log::debug!("Chain '{}' wallets created successfully", self.chain_name);
+        self.logger.debug(&format!(
+            "Chain '{}' wallets created successfully",
+            self.chain_name
+        ));
         Ok(())
     }
 
@@ -186,11 +211,15 @@ impl ChainStateOps {
     ///
     /// Returns error if file already exists or creation fails.
     pub async fn create_contracts(&self, contracts: &ChainContracts) -> Result<()> {
-        log::debug!("Creating chain '{}' contracts", self.chain_name);
+        self.logger
+            .debug(&format!("Creating chain '{}' contracts", self.chain_name));
         self.backend
             .create_chain_contracts(&self.chain_name, contracts)
             .await?;
-        log::debug!("Chain '{}' contracts created successfully", self.chain_name);
+        self.logger.debug(&format!(
+            "Chain '{}' contracts created successfully",
+            self.chain_name
+        ));
         Ok(())
     }
 }

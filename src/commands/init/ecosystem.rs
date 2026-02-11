@@ -26,7 +26,7 @@ use crate::ui;
 /// 10. TempDir is automatically cleaned up on drop
 pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     ui::intro("ADI Init")?;
-    log::debug!("Starting ecosystem initialization");
+    context.logger().debug("Starting ecosystem initialization");
 
     // 1. Parse and validate protocol version
     let version =
@@ -48,7 +48,9 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
         config.chain_id,
         config.prover_mode
     ))?;
-    log::debug!("Full ecosystem config: {:?}", config);
+    context
+        .logger()
+        .debug(&format!("Full ecosystem config: {:?}", config));
 
     // 3. Check if ecosystem state already exists
     let state_dir = &context.config().state_dir;
@@ -106,7 +108,9 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
 
     // 4. Build zkstack command arguments (domain logic - no Docker knowledge)
     let zkstack_args = build_ecosystem_create_args(&config);
-    log::debug!("zkstack args: {:?}", zkstack_args);
+    context
+        .logger()
+        .debug(&format!("zkstack args: {:?}", zkstack_args));
 
     // 5. Create temp directory for zkstack output
     let temp_dir = TempDir::new().wrap_err("Failed to create temporary directory")?;
@@ -114,7 +118,9 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
         .path()
         .canonicalize()
         .wrap_err("Failed to resolve temp directory to absolute path")?;
-    log::debug!("Using temp directory: {}", temp_path.display());
+    context
+        .logger()
+        .debug(&format!("Using temp directory: {}", temp_path.display()));
 
     // 6. Check genesis.json exists in state directory and copy to temp
     std::fs::create_dir_all(state_dir).wrap_err("Failed to create state directory")?;
@@ -161,7 +167,8 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
 
     // 8. Verify ecosystem was created in temp dir
     ui::info("Verifying ecosystem files...")?;
-    verify_ecosystem_created(&temp_path, &config).wrap_err("Ecosystem verification failed")?;
+    verify_ecosystem_created(&temp_path, &config, context.logger().as_ref())
+        .wrap_err("Ecosystem verification failed")?;
 
     // 9. Import state from temp dir through StateManager
     ui::info(format!("State directory: {}", state_dir.display()))?;
@@ -178,7 +185,9 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
         .await
         .wrap_err("Failed to read ecosystem metadata")?;
 
-    log::debug!("Ecosystem metadata: name={}", metadata.name);
+    context
+        .logger()
+        .debug(&format!("Ecosystem metadata: name={}", metadata.name));
 
     let chain_metadata = state_manager
         .chain(&config.chain_name)
@@ -186,11 +195,10 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
         .await
         .wrap_err("Failed to read chain metadata")?;
 
-    log::debug!(
+    context.logger().debug(&format!(
         "Chain '{}' validated: chain_id={}",
-        config.chain_name,
-        chain_metadata.chain_id
-    );
+        config.chain_name, chain_metadata.chain_id
+    ));
 
     let chains = state_manager
         .list_chains()

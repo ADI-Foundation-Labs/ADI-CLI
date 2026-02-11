@@ -33,11 +33,10 @@ pub use types::{
     OwnershipStatusSummary, OwnershipSummary,
 };
 
-use adi_types::{ChainContracts, EcosystemContracts};
+use adi_types::{ChainContracts, EcosystemContracts, Logger};
 use alloy_network::EthereumWallet;
 use alloy_primitives::Address;
 use alloy_provider::{Provider, ProviderBuilder};
-use colored::Colorize;
 use secrecy::SecretString;
 
 use contracts::{
@@ -65,6 +64,7 @@ use transfer::{
 /// * `contracts` - Ecosystem contracts containing addresses.
 /// * `governor_key` - Governor private key for signing transactions.
 /// * `gas_price_wei` - Optional gas price in wei (estimated if not provided).
+/// * `logger` - Logger for info/error/warning output.
 ///
 /// # Returns
 ///
@@ -74,6 +74,7 @@ pub async fn accept_all_ownership(
     contracts: &EcosystemContracts,
     governor_key: &SecretString,
     gas_price_wei: Option<u128>,
+    logger: &dyn Logger,
 ) -> OwnershipSummary {
     let mut results = Vec::new();
 
@@ -81,7 +82,7 @@ pub async fn accept_all_ownership(
     let signer = match create_signer(governor_key) {
         Ok(s) => s,
         Err(e) => {
-            log::error!("Failed to create signer: {}", e);
+            logger.error(&format!("Failed to create signer: {}", e));
             results.push(OwnershipResult::failure(
                 "all",
                 format!("Failed to create signer: {}", e),
@@ -96,7 +97,7 @@ pub async fn accept_all_ownership(
     let url: url::Url = match rpc_url.parse() {
         Ok(u) => u,
         Err(e) => {
-            log::error!("Invalid RPC URL: {}", e);
+            logger.error(&format!("Invalid RPC URL: {}", e));
             results.push(OwnershipResult::failure(
                 "all",
                 format!("Invalid RPC URL: {}", e),
@@ -110,7 +111,7 @@ pub async fn accept_all_ownership(
     let chain_id = match provider.get_chain_id().await {
         Ok(id) => id,
         Err(e) => {
-            log::error!("Failed to get chain ID: {}", e);
+            logger.error(&format!("Failed to get chain ID: {}", e));
             results.push(OwnershipResult::failure(
                 "all",
                 format!("Failed to get chain ID: {}", e),
@@ -123,7 +124,7 @@ pub async fn accept_all_ownership(
     let mut nonce = match provider.get_transaction_count(governor_address).await {
         Ok(n) => n,
         Err(e) => {
-            log::error!("Failed to get nonce: {}", e);
+            logger.error(&format!("Failed to get nonce: {}", e));
             results.push(OwnershipResult::failure(
                 "all",
                 format!("Failed to get nonce: {}", e),
@@ -138,7 +139,7 @@ pub async fn accept_all_ownership(
         None => match provider.get_gas_price().await {
             Ok(p) => p,
             Err(e) => {
-                log::error!("Failed to get gas price: {}", e);
+                logger.error(&format!("Failed to get gas price: {}", e));
                 results.push(OwnershipResult::failure(
                     "all",
                     format!("Failed to get gas price: {}", e),
@@ -152,7 +153,7 @@ pub async fn accept_all_ownership(
     let chain_admin = contracts.chain_admin_addr();
 
     // 1. Server Notifier (via multicall)
-    log::info!("{}", "Processing Server Notifier...".cyan());
+    logger.info("Processing Server Notifier...");
     let result = accept_server_notifier(
         &provider,
         contracts,
@@ -161,12 +162,13 @@ pub async fn accept_all_ownership(
         chain_id,
         &mut nonce,
         gas_price,
+        logger,
     )
     .await;
     results.push(result);
 
     // 2. Validator Timelock (direct)
-    log::info!("{}", "Processing Validator Timelock...".cyan());
+    logger.info("Processing Validator Timelock...");
     let result = accept_validator_timelock(
         &provider,
         contracts,
@@ -174,12 +176,13 @@ pub async fn accept_all_ownership(
         chain_id,
         &mut nonce,
         gas_price,
+        logger,
     )
     .await;
     results.push(result);
 
     // 3. Verifier (direct)
-    log::info!("{}", "Processing Verifier...".cyan());
+    logger.info("Processing Verifier...");
     let result = accept_verifier(
         &provider,
         contracts,
@@ -187,12 +190,13 @@ pub async fn accept_all_ownership(
         chain_id,
         &mut nonce,
         gas_price,
+        logger,
     )
     .await;
     results.push(result);
 
     // 4. Governance (direct)
-    log::info!("{}", "Processing Governance...".cyan());
+    logger.info("Processing Governance...");
     let result = accept_governance(
         &provider,
         contracts,
@@ -200,12 +204,13 @@ pub async fn accept_all_ownership(
         chain_id,
         &mut nonce,
         gas_price,
+        logger,
     )
     .await;
     results.push(result);
 
     // 5. Rollup DA Manager (via governance acceptOwner)
-    log::info!("{}", "Processing Rollup DA Manager...".cyan());
+    logger.info("Processing Rollup DA Manager...");
     let result = accept_rollup_da_manager(
         &provider,
         contracts,
@@ -213,6 +218,7 @@ pub async fn accept_all_ownership(
         chain_id,
         &mut nonce,
         gas_price,
+        logger,
     )
     .await;
     results.push(result);
@@ -231,6 +237,7 @@ pub async fn accept_all_ownership(
 /// * `contracts` - Chain contracts containing addresses.
 /// * `governor_key` - Governor private key for signing transactions.
 /// * `gas_price_wei` - Optional gas price in wei (estimated if not provided).
+/// * `logger` - Logger for info/error/warning output.
 ///
 /// # Returns
 ///
@@ -240,6 +247,7 @@ pub async fn accept_chain_ownership(
     contracts: &ChainContracts,
     governor_key: &SecretString,
     gas_price_wei: Option<u128>,
+    logger: &dyn Logger,
 ) -> OwnershipSummary {
     let mut results = Vec::new();
 
@@ -247,7 +255,7 @@ pub async fn accept_chain_ownership(
     let signer = match create_signer(governor_key) {
         Ok(s) => s,
         Err(e) => {
-            log::error!("Failed to create signer: {}", e);
+            logger.error(&format!("Failed to create signer: {}", e));
             results.push(OwnershipResult::failure(
                 "all",
                 format!("Failed to create signer: {}", e),
@@ -262,7 +270,7 @@ pub async fn accept_chain_ownership(
     let url: url::Url = match rpc_url.parse() {
         Ok(u) => u,
         Err(e) => {
-            log::error!("Invalid RPC URL: {}", e);
+            logger.error(&format!("Invalid RPC URL: {}", e));
             results.push(OwnershipResult::failure(
                 "all",
                 format!("Invalid RPC URL: {}", e),
@@ -276,7 +284,7 @@ pub async fn accept_chain_ownership(
     let chain_id = match provider.get_chain_id().await {
         Ok(id) => id,
         Err(e) => {
-            log::error!("Failed to get chain ID: {}", e);
+            logger.error(&format!("Failed to get chain ID: {}", e));
             results.push(OwnershipResult::failure(
                 "all",
                 format!("Failed to get chain ID: {}", e),
@@ -289,7 +297,7 @@ pub async fn accept_chain_ownership(
     let mut nonce = match provider.get_transaction_count(governor_address).await {
         Ok(n) => n,
         Err(e) => {
-            log::error!("Failed to get nonce: {}", e);
+            logger.error(&format!("Failed to get nonce: {}", e));
             results.push(OwnershipResult::failure(
                 "all",
                 format!("Failed to get nonce: {}", e),
@@ -304,7 +312,7 @@ pub async fn accept_chain_ownership(
         None => match provider.get_gas_price().await {
             Ok(p) => p,
             Err(e) => {
-                log::error!("Failed to get gas price: {}", e);
+                logger.error(&format!("Failed to get gas price: {}", e));
                 results.push(OwnershipResult::failure(
                     "all",
                     format!("Failed to get gas price: {}", e),
@@ -315,7 +323,7 @@ pub async fn accept_chain_ownership(
     };
 
     // 1. Chain Admin (direct)
-    log::info!("{}", "Processing Chain Admin...".cyan());
+    logger.info("Processing Chain Admin...");
     let result = accept_chain_admin(
         &provider,
         contracts,
@@ -323,6 +331,7 @@ pub async fn accept_chain_ownership(
         chain_id,
         &mut nonce,
         gas_price,
+        logger,
     )
     .await;
     results.push(result);
@@ -349,6 +358,7 @@ pub async fn accept_chain_ownership(
 /// * `governor_key` - Governor private key for signing transactions.
 /// * `new_owner` - Address to transfer ownership to.
 /// * `gas_price_wei` - Optional gas price in wei (estimated if not provided).
+/// * `logger` - Logger for info/error/warning output.
 ///
 /// # Returns
 ///
@@ -359,6 +369,7 @@ pub async fn transfer_all_ownership(
     governor_key: &SecretString,
     new_owner: Address,
     gas_price_wei: Option<u128>,
+    logger: &dyn Logger,
 ) -> OwnershipSummary {
     let mut results = Vec::new();
 
@@ -366,7 +377,7 @@ pub async fn transfer_all_ownership(
     let signer = match create_signer(governor_key) {
         Ok(s) => s,
         Err(e) => {
-            log::error!("Failed to create signer: {}", e);
+            logger.error(&format!("Failed to create signer: {}", e));
             results.push(OwnershipResult::failure(
                 "all",
                 format!("Failed to create signer: {}", e),
@@ -381,7 +392,7 @@ pub async fn transfer_all_ownership(
     let url: url::Url = match rpc_url.parse() {
         Ok(u) => u,
         Err(e) => {
-            log::error!("Invalid RPC URL: {}", e);
+            logger.error(&format!("Invalid RPC URL: {}", e));
             results.push(OwnershipResult::failure(
                 "all",
                 format!("Invalid RPC URL: {}", e),
@@ -395,7 +406,7 @@ pub async fn transfer_all_ownership(
     let chain_id = match provider.get_chain_id().await {
         Ok(id) => id,
         Err(e) => {
-            log::error!("Failed to get chain ID: {}", e);
+            logger.error(&format!("Failed to get chain ID: {}", e));
             results.push(OwnershipResult::failure(
                 "all",
                 format!("Failed to get chain ID: {}", e),
@@ -408,7 +419,7 @@ pub async fn transfer_all_ownership(
     let mut nonce = match provider.get_transaction_count(governor_address).await {
         Ok(n) => n,
         Err(e) => {
-            log::error!("Failed to get nonce: {}", e);
+            logger.error(&format!("Failed to get nonce: {}", e));
             results.push(OwnershipResult::failure(
                 "all",
                 format!("Failed to get nonce: {}", e),
@@ -423,7 +434,7 @@ pub async fn transfer_all_ownership(
         None => match provider.get_gas_price().await {
             Ok(p) => p,
             Err(e) => {
-                log::error!("Failed to get gas price: {}", e);
+                logger.error(&format!("Failed to get gas price: {}", e));
                 results.push(OwnershipResult::failure(
                     "all",
                     format!("Failed to get gas price: {}", e),
@@ -433,13 +444,10 @@ pub async fn transfer_all_ownership(
         },
     };
 
-    log::info!(
-        "Transferring ownership to: {}",
-        new_owner.to_string().green()
-    );
+    logger.info(&format!("Transferring ownership to: {}", new_owner));
 
     // 1. Transfer Governance
-    log::info!("{}", "Transferring Governance ownership...".cyan());
+    logger.info("Transferring Governance ownership...");
     let result = transfer_governance(
         &provider,
         contracts,
@@ -448,15 +456,13 @@ pub async fn transfer_all_ownership(
         chain_id,
         &mut nonce,
         gas_price,
+        logger,
     )
     .await;
     results.push(result);
 
     // 2. Transfer Ecosystem Chain Admin
-    log::info!(
-        "{}",
-        "Transferring Ecosystem Chain Admin ownership...".cyan()
-    );
+    logger.info("Transferring Ecosystem Chain Admin ownership...");
     let result = transfer_ecosystem_chain_admin(
         &provider,
         contracts,
@@ -465,15 +471,13 @@ pub async fn transfer_all_ownership(
         chain_id,
         &mut nonce,
         gas_price,
+        logger,
     )
     .await;
     results.push(result);
 
     // 3. Transfer Bridged Token Beacon (Ownable - immediate transfer)
-    log::info!(
-        "{}",
-        "Transferring Bridged Token Beacon ownership...".cyan()
-    );
+    logger.info("Transferring Bridged Token Beacon ownership...");
     let result = transfer_bridged_token_beacon(
         &provider,
         contracts,
@@ -482,12 +486,13 @@ pub async fn transfer_all_ownership(
         chain_id,
         &mut nonce,
         gas_price,
+        logger,
     )
     .await;
     results.push(result);
 
     // 4. Transfer Validator Timelock
-    log::info!("{}", "Transferring Validator Timelock ownership...".cyan());
+    logger.info("Transferring Validator Timelock ownership...");
     let result = transfer_validator_timelock(
         &provider,
         contracts,
@@ -496,6 +501,7 @@ pub async fn transfer_all_ownership(
         chain_id,
         &mut nonce,
         gas_price,
+        logger,
     )
     .await;
     results.push(result);
@@ -519,6 +525,7 @@ pub async fn transfer_all_ownership(
 /// * `governor_key` - Governor private key for signing transactions.
 /// * `new_owner` - Address to transfer ownership to.
 /// * `gas_price_wei` - Optional gas price in wei (estimated if not provided).
+/// * `logger` - Logger for info/error/warning output.
 ///
 /// # Returns
 ///
@@ -529,6 +536,7 @@ pub async fn transfer_chain_ownership(
     governor_key: &SecretString,
     new_owner: Address,
     gas_price_wei: Option<u128>,
+    logger: &dyn Logger,
 ) -> OwnershipSummary {
     let mut results = Vec::new();
 
@@ -536,7 +544,7 @@ pub async fn transfer_chain_ownership(
     let signer = match create_signer(governor_key) {
         Ok(s) => s,
         Err(e) => {
-            log::error!("Failed to create signer: {}", e);
+            logger.error(&format!("Failed to create signer: {}", e));
             results.push(OwnershipResult::failure(
                 "all",
                 format!("Failed to create signer: {}", e),
@@ -551,7 +559,7 @@ pub async fn transfer_chain_ownership(
     let url: url::Url = match rpc_url.parse() {
         Ok(u) => u,
         Err(e) => {
-            log::error!("Invalid RPC URL: {}", e);
+            logger.error(&format!("Invalid RPC URL: {}", e));
             results.push(OwnershipResult::failure(
                 "all",
                 format!("Invalid RPC URL: {}", e),
@@ -565,7 +573,7 @@ pub async fn transfer_chain_ownership(
     let chain_id = match provider.get_chain_id().await {
         Ok(id) => id,
         Err(e) => {
-            log::error!("Failed to get chain ID: {}", e);
+            logger.error(&format!("Failed to get chain ID: {}", e));
             results.push(OwnershipResult::failure(
                 "all",
                 format!("Failed to get chain ID: {}", e),
@@ -578,7 +586,7 @@ pub async fn transfer_chain_ownership(
     let mut nonce = match provider.get_transaction_count(governor_address).await {
         Ok(n) => n,
         Err(e) => {
-            log::error!("Failed to get nonce: {}", e);
+            logger.error(&format!("Failed to get nonce: {}", e));
             results.push(OwnershipResult::failure(
                 "all",
                 format!("Failed to get nonce: {}", e),
@@ -593,7 +601,7 @@ pub async fn transfer_chain_ownership(
         None => match provider.get_gas_price().await {
             Ok(p) => p,
             Err(e) => {
-                log::error!("Failed to get gas price: {}", e);
+                logger.error(&format!("Failed to get gas price: {}", e));
                 results.push(OwnershipResult::failure(
                     "all",
                     format!("Failed to get gas price: {}", e),
@@ -603,13 +611,10 @@ pub async fn transfer_chain_ownership(
         },
     };
 
-    log::info!(
-        "Transferring chain ownership to: {}",
-        new_owner.to_string().green()
-    );
+    logger.info(&format!("Transferring chain ownership to: {}", new_owner));
 
     // 1. Transfer Chain Governance
-    log::info!("{}", "Transferring Chain Governance ownership...".cyan());
+    logger.info("Transferring Chain Governance ownership...");
     let result = transfer_chain_governance(
         &provider,
         contracts,
@@ -618,12 +623,13 @@ pub async fn transfer_chain_ownership(
         chain_id,
         &mut nonce,
         gas_price,
+        logger,
     )
     .await;
     results.push(result);
 
     // 2. Transfer Chain Chain Admin
-    log::info!("{}", "Transferring Chain Chain Admin ownership...".cyan());
+    logger.info("Transferring Chain Chain Admin ownership...");
     let result = transfer_chain_chain_admin(
         &provider,
         contracts,
@@ -632,6 +638,7 @@ pub async fn transfer_chain_ownership(
         chain_id,
         &mut nonce,
         gas_price,
+        logger,
     )
     .await;
     results.push(result);

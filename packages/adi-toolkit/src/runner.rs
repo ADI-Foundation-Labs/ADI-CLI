@@ -94,7 +94,9 @@ impl ToolkitRunner {
         log_command: &str,
         log_label: &str,
     ) -> Result<i64> {
-        let image_ref = self.config.image_reference(protocol_version);
+        let image_ref = self
+            .config
+            .image_reference(protocol_version, self.logger.as_ref());
         let image_uri = image_ref.full_uri();
 
         self.logger
@@ -153,7 +155,7 @@ impl ToolkitRunner {
                     }
                 }
             }
-            cleanup_tmp_dir(&tmp_dir);
+            cleanup_tmp_dir(&tmp_dir, self.logger.as_ref());
         }
 
         let exit_code = result?;
@@ -284,7 +286,7 @@ impl ToolkitRunner {
             zkstack_args.push_str(&format!(" -a --with-gas-price -a {}", gas_price));
         }
 
-        let container_rpc_url = transform_url_for_container(l1_rpc_url);
+        let container_rpc_url = transform_url_for_container(l1_rpc_url, self.logger.as_ref());
         zkstack_args.push_str(&format!(" --l1-rpc-url {}", container_rpc_url));
 
         let shell_cmd = format!(

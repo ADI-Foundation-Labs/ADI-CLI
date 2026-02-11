@@ -1,7 +1,7 @@
 //! UI utilities for CLI output.
 //!
 //! This module provides the CLI logger implementation using cliclack
-//! for user-facing output and `log::debug!` for debug messages.
+//! for user-facing output with consistent visual styling.
 
 use adi_types::Logger;
 use std::sync::Arc;
@@ -14,17 +14,33 @@ pub use cliclack::{confirm, input, intro, note, outro, outro_cancel};
 
 /// CLI logger using cliclack for user-facing output.
 ///
-/// - `debug()` uses `log::debug!` (shown only with -d flag)
+/// - `debug()` uses `cliclack::log::remark` (shown only when debug_enabled is true)
 /// - `info()` uses `cliclack::log::info` (shows `●` symbol)
 /// - `warning()` uses `cliclack::log::warning` (shows `▲` symbol)
 /// - `success()` uses `cliclack::log::success` (shows `◆` symbol)
 /// - `error()` uses `cliclack::log::error`
-#[derive(Debug, Default, Clone, Copy)]
-pub struct CliLogger;
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CliLogger {
+    debug_enabled: bool,
+}
+
+impl CliLogger {
+    /// Create a new CLI logger.
+    ///
+    /// # Arguments
+    ///
+    /// * `debug_enabled` - Whether to show debug messages.
+    #[must_use]
+    pub fn new(debug_enabled: bool) -> Self {
+        Self { debug_enabled }
+    }
+}
 
 impl Logger for CliLogger {
     fn debug(&self, message: &str) {
-        log::debug!("{}", message);
+        if self.debug_enabled {
+            let _ = cliclack::log::remark(message);
+        }
     }
 
     fn info(&self, message: &str) {
@@ -44,7 +60,11 @@ impl Logger for CliLogger {
     }
 }
 
-/// Create a shared CLI logger instance.
-pub fn cli_logger() -> Arc<dyn Logger> {
-    Arc::new(CliLogger)
+/// Create a shared CLI logger instance with configurable debug.
+///
+/// # Arguments
+///
+/// * `debug_enabled` - Whether to show debug messages.
+pub fn cli_logger_with_debug(debug_enabled: bool) -> Arc<dyn Logger> {
+    Arc::new(CliLogger::new(debug_enabled))
 }
