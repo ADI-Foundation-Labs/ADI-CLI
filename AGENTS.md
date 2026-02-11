@@ -67,11 +67,11 @@ cargo test               # Run tests
 
 ## CLI Commands
 
-- `adi show version` - Display CLI version and build information
-- `adi show config` - Display current configuration
-- `adi init ecosystem` - Initialize new ecosystem configuration
-- `adi deploy ecosystem` - Deploy ecosystem contracts to settlement layer
-- `adi accept ownership` - Accept pending ownership transfers for deployed contracts
+- `adi version` - Display CLI version and build information
+- `adi config` - Display current configuration
+- `adi init` - Initialize new ecosystem configuration
+- `adi deploy` - Deploy ecosystem contracts to settlement layer
+- `adi accept` - Accept pending ownership transfers for deployed contracts
 
 ## Architecture
 
@@ -94,11 +94,11 @@ This is a Rust CLI application (`adi-cli`) using the command pattern with SDK-fi
 ### Adding Commands
 
 Commands live in `src/commands/`. Each command module:
-1. Defines an enum with `#[derive(Subcommand)]`
-2. Implements `async fn run(&self, context: &Context) -> Result<()>`
+1. Defines args struct with `#[derive(Args)]` (if command has arguments)
+2. Implements `pub async fn run(args, context: &Context) -> Result<()>`
 3. Gets registered in `commands/mod.rs` under the `Commands` enum
 
-See `commands/show/version.rs` for the pattern.
+See `commands/version.rs` (simple) or `commands/init/` (with args) for patterns.
 
 ### Workspace Packages
 

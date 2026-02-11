@@ -7,7 +7,7 @@ use colored::Colorize;
 use dialoguer::Input;
 use tempfile::TempDir;
 
-use super::EcosystemArgs;
+use super::InitArgs;
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
 
@@ -24,7 +24,7 @@ use crate::error::{Result, WrapErr};
 /// 8. Imports state from temp dir through StateManager to configured backend
 /// 9. Validates imported state
 /// 10. TempDir is automatically cleaned up on drop
-pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
+pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     log::debug!("Starting ecosystem initialization");
 
     // 1. Parse and validate protocol version
@@ -194,7 +194,7 @@ pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
 
 /// Build ecosystem config by merging CLI args with config defaults.
 /// CLI args take priority over config file values.
-fn build_ecosystem_config(args: &EcosystemArgs, defaults: &EcosystemConfig) -> EcosystemConfig {
+fn build_ecosystem_config(args: &InitArgs, defaults: &EcosystemConfig) -> EcosystemConfig {
     EcosystemConfig {
         name: args
             .ecosystem_name

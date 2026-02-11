@@ -1,32 +1,24 @@
-//! Initialization commands for ecosystem and chain setup.
+//! Initialization command for ecosystem and chain setup.
 
 mod ecosystem;
 
 use adi_ecosystem::{L1Network, ProverMode};
 use alloy_primitives::Address;
-use clap::{Args, Subcommand};
+use clap::Args;
 use serde::{Deserialize, Serialize};
 
-use crate::context::Context;
-use crate::error::Result;
+pub use ecosystem::run;
 
-/// Subcommands for the `init` command.
-#[derive(Clone, Subcommand, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum InitCommand {
-    /// Create ecosystem configuration with an initial chain.
-    ///
-    /// Generates ZkStack.yaml, wallet keys, and chain config in the state directory.
-    /// Requires genesis.json in state dir (download from protocol version URL).
-    Ecosystem(EcosystemArgs),
-}
-
-/// Arguments for `init ecosystem` command.
+/// Arguments for `init` command.
+///
+/// Creates ecosystem configuration with an initial chain.
+/// Generates ZkStack.yaml, wallet keys, and chain config in the state directory.
+/// Requires genesis.json in state dir (download from protocol version URL).
 ///
 /// All arguments except `protocol_version` are optional and will fall back
 /// to values from the config file (.adi.yml) if not provided.
 #[derive(Clone, Args, Debug, Serialize, Deserialize)]
-pub struct EcosystemArgs {
+pub struct InitArgs {
     /// Protocol version for the toolkit Docker image (e.g., v29.0.11).
     /// Determines which era-contracts and zkstack version to use.
     #[arg(long, short = 'p')]
@@ -93,13 +85,4 @@ pub struct EcosystemArgs {
         help = "Enable EVM bytecode emulator for running unmodified Ethereum contracts"
     )]
     pub evm_emulator: Option<bool>,
-}
-
-impl InitCommand {
-    /// Execute the init subcommand.
-    pub async fn run(self, context: &Context) -> Result<()> {
-        match self {
-            InitCommand::Ecosystem(args) => ecosystem::run(&args, context).await,
-        }
-    }
 }

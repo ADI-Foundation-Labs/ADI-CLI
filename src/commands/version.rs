@@ -1,7 +1,10 @@
+//! Version command implementation.
+
 use crate::error::Result;
 
 include!(concat!(env!("OUT_DIR"), "/built.rs"));
 
+/// Execute the version command.
 pub async fn run() -> Result<()> {
     let package_name = PKG_NAME;
     let package_version = PKG_VERSION;

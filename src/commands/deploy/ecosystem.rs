@@ -28,12 +28,12 @@ use walkdir::WalkDir;
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
 
-/// Arguments for `deploy ecosystem` command.
+/// Arguments for `deploy` command.
 ///
 /// Funds ecosystem wallets and deploys core infrastructure contracts.
-/// Requires initialized ecosystem (run `adi init ecosystem` first).
+/// Requires initialized ecosystem (run `adi init` first).
 #[derive(Clone, Args, Debug, Serialize, Deserialize)]
-pub struct EcosystemDeployArgs {
+pub struct DeployArgs {
     /// Ecosystem name (falls back to config file if not provided)
     #[arg(
         long,
@@ -151,7 +151,7 @@ pub struct EcosystemDeployArgs {
 /// 6. Prompts for confirmation (unless --yes)
 /// 7. Executes funding transfers
 /// 8. (Future) Deploys ecosystem contracts
-pub async fn run(args: EcosystemDeployArgs, context: &Context) -> Result<()> {
+pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     log::debug!("Starting ecosystem deployment");
 
     // 1. Resolve ecosystem name
@@ -381,7 +381,7 @@ pub async fn run(args: EcosystemDeployArgs, context: &Context) -> Result<()> {
 /// Uses the well-known Anvil default account (first account) to fund
 /// wallets. Checks current balances and only funds wallets that need more ETH.
 async fn run_anvil_funding(
-    args: &EcosystemDeployArgs,
+    args: &DeployArgs,
     context: &Context,
     state_manager: &StateManager,
     ecosystem_name: &str,
@@ -544,7 +544,7 @@ fn display_anvil_funding_plan(targets: &[AnvilFundingTarget]) {
 ///
 /// This is the shared deployment logic used by both Anvil and production funding paths.
 async fn run_ecosystem_deployment(
-    args: &EcosystemDeployArgs,
+    args: &DeployArgs,
     context: &Context,
     state_manager: &StateManager,
     ecosystem_name: &str,
@@ -690,7 +690,7 @@ async fn run_ecosystem_deployment(
 }
 
 /// Resolve ecosystem name from args or config.
-fn resolve_ecosystem_name(args: &EcosystemDeployArgs, context: &Context) -> Result<String> {
+fn resolve_ecosystem_name(args: &DeployArgs, context: &Context) -> Result<String> {
     args.ecosystem_name
         .clone()
         .or_else(|| Some(context.config().ecosystem.name.clone()))
@@ -701,7 +701,7 @@ fn resolve_ecosystem_name(args: &EcosystemDeployArgs, context: &Context) -> Resu
 }
 
 /// Resolve chain name from args or config.
-fn resolve_chain_name(args: &EcosystemDeployArgs, context: &Context) -> Result<String> {
+fn resolve_chain_name(args: &DeployArgs, context: &Context) -> Result<String> {
     args.chain_name
         .clone()
         .or_else(|| Some(context.config().ecosystem.chain_name.clone()))
@@ -725,7 +725,7 @@ async fn validate_ecosystem_exists(
 ) -> Result<()> {
     if !state_manager.exists().await? {
         return Err(eyre::eyre!(
-            "Ecosystem '{}' not found. Run 'adi init ecosystem' first.",
+            "Ecosystem '{}' not found. Run 'adi init' first.",
             ecosystem_name
         ));
     }
@@ -741,7 +741,7 @@ async fn validate_chain_exists(
 ) -> Result<()> {
     if !state_manager.chain(chain_name).exists().await? {
         return Err(eyre::eyre!(
-            "Chain '{}' not found in ecosystem '{}'. Run 'adi init chain' first.",
+            "Chain '{}' not found in ecosystem '{}'. Initialize chain first.",
             chain_name,
             ecosystem_name
         ));
@@ -751,7 +751,7 @@ async fn validate_chain_exists(
 }
 
 /// Resolve RPC URL from args or config.
-fn resolve_rpc_url(args: &EcosystemDeployArgs, context: &Context) -> Result<Url> {
+fn resolve_rpc_url(args: &DeployArgs, context: &Context) -> Result<Url> {
     // Try args first (CLI flag or ADI_RPC_URL env var)
     if let Some(url) = &args.rpc_url {
         return Ok(url.clone());
@@ -768,7 +768,7 @@ fn resolve_rpc_url(args: &EcosystemDeployArgs, context: &Context) -> Result<Url>
 }
 
 /// Resolve funder private key from args or config.
-fn resolve_funder_key(args: &EcosystemDeployArgs, context: &Context) -> Result<SecretString> {
+fn resolve_funder_key(args: &DeployArgs, context: &Context) -> Result<SecretString> {
     // Try args first
     if let Some(key) = &args.funder_key {
         if !key.is_empty() {
@@ -792,7 +792,7 @@ fn resolve_funder_key(args: &EcosystemDeployArgs, context: &Context) -> Result<S
 /// Token symbol is queried via RPC if not provided.
 /// Funding amounts are resolved from: CLI args > config file > library defaults.
 async fn build_funding_config(
-    args: &EcosystemDeployArgs,
+    args: &DeployArgs,
     context: &Context,
     rpc_url: &Url,
     state_manager: &StateManager,
@@ -867,7 +867,7 @@ async fn build_funding_config(
 ///
 /// Priority: CLI args > config file > library defaults
 fn build_default_amounts(
-    args: &EcosystemDeployArgs,
+    args: &DeployArgs,
     config: &crate::config::FundingDefaults,
 ) -> DefaultAmounts {
     let defaults = DefaultAmounts::default();

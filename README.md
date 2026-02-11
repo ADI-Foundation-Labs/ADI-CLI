@@ -174,7 +174,7 @@ task build:release   # Optimized release build
 Confirm the CLI is working:
 
 ```bash
-adi show version
+adi version
 ```
 
 You should see the version number and git commit hash.
@@ -313,17 +313,17 @@ Before starting, confirm the CLI can read your configuration and connect to Dock
 
 ```bash
 # Check CLI version and build info
-adi show version
+adi version
 
 # Display merged configuration from all sources
-adi show config
+adi config
 ```
 
-The `show config` command is particularly useful for debugging configuration issues. It displays the final merged configuration, showing you exactly what values the CLI will use.
+The `config` command is particularly useful for debugging configuration issues. It displays the final merged configuration, showing you exactly what values the CLI will use.
 
 ### Step 2: Initialize Your Ecosystem
 
-The `init ecosystem` command creates the foundational configuration for your ZkSync ecosystem. This includes generating wallet keys, creating metadata files, and setting up the initial chain configuration.
+The `init` command creates the foundational configuration for your ZkSync ecosystem. This includes generating wallet keys, creating metadata files, and setting up the initial chain configuration.
 
 **What this command does:**
 1. Validates the protocol version
@@ -348,7 +348,7 @@ The `init ecosystem` command creates the foundational configuration for your ZkS
 **Example: Local development ecosystem**
 
 ```bash
-adi init ecosystem \
+adi init \
   --protocol-version v30.0.2 \
   --ecosystem-name dev-ecosystem \
   --l1-network localhost \
@@ -360,7 +360,7 @@ adi init ecosystem \
 **Example: Testnet ecosystem**
 
 ```bash
-adi init ecosystem \
+adi init \
   --protocol-version v30.0.2 \
   --ecosystem-name testnet-ecosystem \
   --l1-network sepolia \
@@ -372,7 +372,7 @@ After initialization, check `~/.adi_cli/state/<ecosystem-name>/` to see the gene
 
 ### Step 3: Deploy Ecosystem Contracts
 
-The `deploy ecosystem` command funds your ecosystem wallets and deploys the smart contracts to the settlement layer. This is a two-phase process: funding and deployment.
+The `deploy` command funds your ecosystem wallets and deploys the smart contracts to the settlement layer. This is a two-phase process: funding and deployment.
 
 **Funding phase:**
 The CLI calculates how much ETH each wallet needs, checks current balances, and transfers funds from your funder wallet. Before any transfers occur, you'll see a summary of the funding plan.
@@ -396,7 +396,7 @@ Always start with a dry-run to see what will happen:
 
 ```bash
 # Preview the funding plan without executing
-adi deploy ecosystem -p v30.0.2 --dry-run
+adi deploy -p v30.0.2 --dry-run
 ```
 
 Once you've verified the plan looks correct:
@@ -406,7 +406,7 @@ Once you've verified the plan looks correct:
 export ADI_FUNDER_KEY="0x..."
 
 # Execute deployment (will prompt for confirmation)
-adi deploy ecosystem -p v30.0.2
+adi deploy -p v30.0.2
 ```
 
 **Local development with Anvil:**
@@ -445,7 +445,7 @@ funding:
 Then deploy:
 
 ```bash
-adi deploy ecosystem -p v30.0.2
+adi deploy -p v30.0.2
 ```
 
 > **Note:** We use `l1_network: sepolia` even for local Anvil because Docker containers cannot access `localhost` directly. The `host.docker.internal` hostname routes traffic from the container to your host machine where Anvil is running.
@@ -454,17 +454,17 @@ adi deploy ecosystem -p v30.0.2
 
 ```bash
 # Only fund wallets, don't deploy contracts
-adi deploy ecosystem -p v30.0.2 --skip-deployment
+adi deploy -p v30.0.2 --skip-deployment
 
 # Only deploy contracts (wallets already funded)
-adi deploy ecosystem -p v30.0.2 --skip-funding
+adi deploy -p v30.0.2 --skip-funding
 ```
 
 ### Step 4: Accept Ownership Transfers
 
 After deployment, some contracts have pending ownership transfers that must be accepted. ZkSync contracts use the Ownable2Step pattern: ownership isn't transferred in one transaction—instead, new ownership is proposed, then the new owner must accept.
 
-The `accept ownership` command handles this for all ecosystem contracts, using the appropriate method for each:
+The `accept` command handles this for all ecosystem contracts, using the appropriate method for each:
 - **Direct acceptance** — Calls `acceptOwnership()` directly
 - **Multicall** — Batches multiple acceptances via ChainAdmin
 - **Governance scheduling** — Uses the governance contract for time-locked operations
@@ -473,13 +473,13 @@ The `accept ownership` command handles this for all ecosystem contracts, using t
 
 ```bash
 # First, see which contracts have pending ownership
-adi accept ownership --dry-run
+adi accept --dry-run
 
 # Accept ecosystem-level ownership
-adi accept ownership --yes
+adi accept --yes
 
 # Also accept chain-level ownership
-adi accept ownership --chain my-chain --yes
+adi accept --chain my-chain --yes
 ```
 
 The output shows the status of each contract:
@@ -575,14 +575,14 @@ By default, the CLI determines the Docker image tag from the protocol version (e
 
 **CLI flag (highest priority):**
 ```bash
-adi --image-tag custom-tag init ecosystem -p v30.0.2
-adi --image-tag latest deploy ecosystem -p v30.0.2
+adi --image-tag custom-tag init -p v30.0.2
+adi --image-tag latest deploy -p v30.0.2
 ```
 
 **Environment variable:**
 ```bash
 export ADI__TOOLKIT__IMAGE_TAG=custom-tag
-adi deploy ecosystem -p v30.0.2
+adi deploy -p v30.0.2
 ```
 
 **Config file (`~/.adi.yml`):**
@@ -623,7 +623,7 @@ cargo build
 cargo build --release
 
 # Run without building separately
-cargo run -- show version
+cargo run -- version
 ```
 
 ### Testing

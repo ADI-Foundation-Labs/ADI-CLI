@@ -18,9 +18,12 @@ use url::Url;
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
 
-/// Arguments for `accept ownership` command.
+/// Arguments for `accept` command.
+///
+/// Accepts pending ownership transfers for contracts deployed during
+/// ecosystem initialization.
 #[derive(Clone, Args, Debug, Serialize, Deserialize)]
-pub struct OwnershipAcceptArgs {
+pub struct AcceptArgs {
     /// Ecosystem name (falls back to config file if not provided).
     #[arg(
         long,
@@ -54,7 +57,7 @@ pub struct OwnershipAcceptArgs {
 }
 
 /// Execute the accept ownership command.
-pub async fn run(args: OwnershipAcceptArgs, context: &Context) -> Result<()> {
+pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
     log::info!("{}", "Accepting pending ownership transfers...".cyan());
 
     // Resolve ecosystem name
@@ -296,7 +299,7 @@ fn display_summary(summary: &OwnershipSummary) {
 }
 
 /// Resolve ecosystem name from args or config.
-fn resolve_ecosystem_name(args: &OwnershipAcceptArgs, context: &Context) -> Result<String> {
+fn resolve_ecosystem_name(args: &AcceptArgs, context: &Context) -> Result<String> {
     args.ecosystem_name
         .clone()
         .or_else(|| Some(context.config().ecosystem.name.clone()))
@@ -307,7 +310,7 @@ fn resolve_ecosystem_name(args: &OwnershipAcceptArgs, context: &Context) -> Resu
 }
 
 /// Resolve RPC URL from args or config.
-fn resolve_rpc_url(args: &OwnershipAcceptArgs, context: &Context) -> Result<Url> {
+fn resolve_rpc_url(args: &AcceptArgs, context: &Context) -> Result<Url> {
     args.rpc_url
         .clone()
         .or_else(|| context.config().funding.rpc_url.clone())
