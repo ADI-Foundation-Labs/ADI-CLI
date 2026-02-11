@@ -467,16 +467,14 @@ async fn run_anvil_funding(
             .await
             .wrap_err("Anvil funding failed")?;
 
-        ui::info("============================================================")?;
-        ui::success("Anvil Funding Complete!")?;
-        ui::info("============================================================")?;
-        ui::info(format!("  Wallets funded: {}", result.successful))?;
-        ui::info(format!(
-            "  Wallets skipped (already funded): {}",
-            already_funded
+        ui::success(format!(
+            "Anvil Funding Complete!\n\
+             ============================================================\n\
+             Wallets funded: {}\n\
+             Wallets skipped (already funded): {}\n\
+             Total gas used: {}",
+            result.successful, already_funded, result.total_gas_used
         ))?;
-        ui::info(format!("  Total gas used: {}", result.total_gas_used))?;
-        ui::info("============================================================")?;
     }
 
     // Skip deployment if requested
@@ -555,12 +553,14 @@ async fn run_ecosystem_deployment(
     })?;
     let protocol_version = ProtocolVersion::parse(protocol_version_str)
         .map_err(|e| eyre::eyre!("Invalid protocol version '{}': {}", protocol_version_str, e))?;
-    ui::info(format!("Protocol version: {}", protocol_version))?;
-
     // Run zkstack ecosystem init
-    ui::info("============================================================")?;
-    ui::info("Deploying Ecosystem Contracts")?;
-    ui::info("============================================================")?;
+    ui::info(format!(
+        "Protocol version: {}\n\
+         ============================================================\n\
+         Deploying Ecosystem Contracts\n\
+         ============================================================",
+        protocol_version
+    ))?;
 
     let runner = ToolkitRunner::with_config_and_logger(
         context.toolkit_config(),
