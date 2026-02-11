@@ -24,6 +24,7 @@ dependencies = [
  "eyre",
  "hex",
  "log",
+ "reqwest",
  "secrecy",
  "serde",
  "serde_yaml",

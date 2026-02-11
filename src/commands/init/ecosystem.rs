@@ -122,18 +122,23 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
         .logger()
         .debug(&format!("Using temp directory: {}", temp_path.display()));
 
-    // 6. Check genesis.json exists in state directory and copy to temp
+    // 6. Check genesis.json exists in state directory, download if missing
     std::fs::create_dir_all(state_dir).wrap_err("Failed to create state directory")?;
 
     let genesis_src = state_dir.join(GENESIS_FILENAME);
     if !genesis_src.exists() {
-        return Err(eyre::eyre!(
-            "genesis.json not found in state directory.\n\
-             Please place the genesis.json file at: {}\n\
-             You can download it from: {}",
-            genesis_src.display(),
-            version.genesis_url()
-        ));
+        let genesis_url = version.genesis_url();
+        ui::info(format!("Downloading genesis.json from {genesis_url}..."))?;
+
+        download_genesis(&genesis_url, &genesis_src)
+            .await
+            .wrap_err("Failed to download genesis.json")?;
+
+        ui::success("Genesis file downloaded")?;
+    } else {
+        context
+            .logger()
+            .debug("genesis.json already exists, skipping download");
     }
 
     let genesis_dst = temp_path.join(GENESIS_FILENAME);
@@ -248,4 +253,27 @@ fn build_ecosystem_config(args: &InitArgs, defaults: &EcosystemConfig) -> Ecosys
             .unwrap_or(defaults.base_token_price_denominator),
         evm_emulator: args.evm_emulator.unwrap_or(defaults.evm_emulator),
     }
+}
+
+/// Download genesis.json from the given URL to the destination path.
+async fn download_genesis(url: &str, dest: &std::path::Path) -> Result<()> {
+    let response = reqwest::get(url)
+        .await
+        .wrap_err("Failed to fetch genesis.json")?;
+
+    if !response.status().is_success() {
+        return Err(eyre::eyre!(
+            "Failed to download genesis.json: HTTP {}",
+            response.status()
+        ));
+    }
+
+    let content = response
+        .bytes()
+        .await
+        .wrap_err("Failed to read response body")?;
+
+    std::fs::write(dest, &content).wrap_err("Failed to write genesis.json to disk")?;
+
+    Ok(())
 }
