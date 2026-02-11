@@ -40,6 +40,8 @@ target "common" {
   tags = TAGS != null ? jsondecode(TAGS) : ["${REGISTRY}/adi-toolkit:${CI_COMMIT_REF_SLUG}"]
   cache-from = CACHE_FROM
   cache-to = notequal("", CACHE_TO_REF) ? ["type=registry,ref=${CACHE_TO_REF},mode=max"] : []
+  # Disable provenance to avoid Harbor compatibility issues (blob upload invalid)
+  attests = ["type=provenance,mode=disabled"]
 }
 
 group "default" {
