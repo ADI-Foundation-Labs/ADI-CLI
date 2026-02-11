@@ -3,13 +3,12 @@
 use adi_ecosystem::{build_ecosystem_create_args, verify_ecosystem_created, EcosystemConfig};
 use adi_state::{import_ecosystem_state, StateManager};
 use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
-use colored::Colorize;
-use dialoguer::Input;
 use tempfile::TempDir;
 
 use super::InitArgs;
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
+use crate::ui;
 
 /// Execute the ecosystem initialization command.
 ///
@@ -25,25 +24,25 @@ use crate::error::{Result, WrapErr};
 /// 9. Validates imported state
 /// 10. TempDir is automatically cleaned up on drop
 pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
+    ui::intro("ADI Init")?;
     log::debug!("Starting ecosystem initialization");
 
     // 1. Parse and validate protocol version
     let version =
         ProtocolVersion::parse(&args.protocol_version).wrap_err("Invalid protocol version")?;
-    log::info!("Protocol version: {}", version.to_string().green());
+    ui::info(format!("Protocol version: {}", version))?;
 
     // 2. Merge CLI args with config defaults (CLI > Config)
     let config_defaults = &context.config().ecosystem;
     let config = build_ecosystem_config(args, config_defaults);
 
-    log::info!("Ecosystem: {}", config.name.green());
-    log::info!("  L1 network: {}", config.l1_network.to_string().green());
-    log::info!(
+    ui::info(format!("Ecosystem: {}", config.name))?;
+    ui::info(format!("  L1 network: {}", config.l1_network))?;
+    ui::info(format!(
         "  Chain: {} (ID: {})",
-        config.chain_name.green(),
-        config.chain_id.to_string().green()
-    );
-    log::info!("  Prover mode: {}", config.prover_mode.to_string().green());
+        config.chain_name, config.chain_id
+    ))?;
+    ui::info(format!("  Prover mode: {}", config.prover_mode))?;
     log::debug!("Full ecosystem config: {:?}", config);
 
     // 3. Check if ecosystem state already exists
@@ -55,44 +54,43 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     if state_manager.exists().await? {
         // Show files that will be deleted
         let files = state_manager.list_state_files();
-        log::warn!(
+        ui::warning(format!(
             "Ecosystem '{}' already exists at {}",
             config.name,
             ecosystem_path.display()
-        );
-        log::warn!("The following files will be deleted:");
+        ))?;
+        ui::warning("The following files will be deleted:")?;
         for file in &files {
-            log::warn!("  - {}", file);
+            ui::warning(format!("  - {}", file))?;
         }
 
         if args.force {
-            log::info!("Force flag set, skipping confirmation");
+            ui::info("Force flag set, skipping confirmation")?;
         } else {
             // Require typing ecosystem name to confirm deletion
             let prompt = format!(
                 "Type '{}' to confirm deletion and reinitialize",
                 config.name
             );
-            let input: String = Input::new()
-                .with_prompt(prompt)
-                .interact_text()
+            let user_input: String = ui::input(prompt)
+                .interact()
                 .wrap_err("Failed to read user input")?;
 
-            if input != config.name {
+            if user_input != config.name {
                 return Err(eyre::eyre!(
                     "Confirmation failed: expected '{}', got '{}'",
                     config.name,
-                    input
+                    user_input
                 ));
             }
         }
 
-        log::info!("Deleting existing ecosystem state...");
+        ui::info("Deleting existing ecosystem state...")?;
         state_manager
             .delete_all()
             .await
             .wrap_err("Failed to delete existing ecosystem state")?;
-        log::info!("Existing state deleted");
+        ui::success("Existing state deleted")?;
     }
 
     // 4. Build zkstack command arguments (domain logic - no Docker knowledge)
@@ -124,15 +122,15 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     let genesis_dst = temp_path.join(GENESIS_FILENAME);
     std::fs::copy(&genesis_src, &genesis_dst)
         .wrap_err("Failed to copy genesis.json to temp dir")?;
-    log::info!("Genesis file copied to temp directory");
+    ui::success("Genesis file copied to temp directory")?;
 
     // 7. Create toolkit runner and execute pointing to temp dir
-    log::info!("Connecting to Docker...");
+    ui::info("Connecting to Docker...")?;
     let runner = ToolkitRunner::with_config(context.toolkit_config())
         .await
         .wrap_err("Failed to create toolkit runner")?;
 
-    log::info!("Running zkstack ecosystem create...");
+    ui::info("Running zkstack ecosystem create...")?;
     let args_refs: Vec<&str> = zkstack_args.iter().map(String::as_str).collect();
 
     let exit_code = runner
@@ -148,21 +146,18 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     }
 
     // 8. Verify ecosystem was created in temp dir
-    log::info!("Verifying ecosystem files...");
+    ui::info("Verifying ecosystem files...")?;
     verify_ecosystem_created(&temp_path, &config).wrap_err("Ecosystem verification failed")?;
 
     // 9. Import state from temp dir through StateManager
-    log::info!(
-        "State directory: {}",
-        state_dir.display().to_string().green()
-    );
-    log::info!("Importing ecosystem state through backend...");
+    ui::info(format!("State directory: {}", state_dir.display()))?;
+    ui::info("Importing ecosystem state through backend...")?;
     import_ecosystem_state(&state_manager, &temp_path, &config.name, &config.chain_name)
         .await
         .wrap_err("Failed to import ecosystem state")?;
 
     // 10. Validate imported state
-    log::info!("Validating imported state...");
+    ui::info("Validating imported state...")?;
     let metadata = state_manager
         .ecosystem()
         .metadata()
@@ -188,9 +183,12 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
         .await
         .wrap_err("Failed to list chains")?;
 
-    log::info!("State validated: {} chain(s) found", chains.len());
-    log::info!("Ecosystem '{}' initialized successfully!", config.name);
-    log::info!("Location: {}", ecosystem_path.display().to_string().green());
+    ui::success(format!("State validated: {} chain(s) found", chains.len()))?;
+    ui::info(format!("Location: {}", ecosystem_path.display()))?;
+    ui::outro(format!(
+        "Ecosystem '{}' initialized successfully!",
+        config.name
+    ))?;
 
     // TempDir is automatically cleaned up when dropped
     Ok(())

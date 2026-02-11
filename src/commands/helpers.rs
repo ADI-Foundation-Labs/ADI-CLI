@@ -6,11 +6,11 @@
 use adi_ecosystem::{OwnershipResult, OwnershipState, OwnershipStatusSummary, OwnershipSummary};
 use adi_state::StateManager;
 use alloy_primitives::Address;
-use colored::Colorize;
 use url::Url;
 
 use crate::config::Config;
 use crate::error::{Result, WrapErr};
+use crate::ui;
 
 /// Category of ownership result for display purposes.
 pub enum ResultCategory<'a> {
@@ -43,73 +43,52 @@ pub fn categorize_result(result: &OwnershipResult) -> ResultCategory<'_> {
 }
 
 /// Display the ownership summary.
-pub fn display_summary(summary: &OwnershipSummary) {
-    log::info!(
-        "  Successful: {}",
-        summary.successful_count().to_string().green()
-    );
-    log::info!("  Skipped: {}", summary.skipped_count().to_string().cyan());
-    log::info!("  Failed: {}", summary.failed_count().to_string().yellow());
+pub fn display_summary(summary: &OwnershipSummary) -> Result<()> {
+    ui::success(format!("  Successful: {}", summary.successful_count()))?;
+    ui::info(format!("  Skipped: {}", summary.skipped_count()))?;
+    ui::warning(format!("  Failed: {}", summary.failed_count()))?;
 
     for result in &summary.results {
         match categorize_result(result) {
             ResultCategory::SuccessWithTx(tx) => {
-                log::info!("    {} {}: {}", "✓".green(), result.name, tx.green());
+                ui::success(format!("    {}: {}", result.name, tx))?;
             }
             ResultCategory::SuccessNoTx => {
-                log::info!("    {} {}", "✓".green(), result.name);
+                ui::success(format!("    {}", result.name))?;
             }
             ResultCategory::Skipped(reason) => {
-                log::info!("    {} {}: {}", "⊘".cyan(), result.name, reason.cyan());
+                ui::info(format!("    {}: {}", result.name, reason))?;
             }
             ResultCategory::Failed(error) => {
-                log::info!("    {} {}: {}", "✗".yellow(), result.name, error.yellow());
+                ui::warning(format!("    {}: {}", result.name, error))?;
             }
         }
     }
+    Ok(())
 }
 
 /// Display ownership status for contracts.
-pub fn display_ownership_status(summary: &OwnershipStatusSummary) {
+pub fn display_ownership_status(summary: &OwnershipStatusSummary) -> Result<()> {
     for status in &summary.statuses {
         match (status.address, status.state) {
             (Some(addr), OwnershipState::Pending) => {
-                log::info!(
-                    "  {} {}: {} {}",
-                    "⏳".yellow(),
-                    status.name,
-                    addr.to_string().green(),
-                    "(pending)".yellow()
-                );
+                ui::warning(format!("  {}: {} (pending)", status.name, addr))?;
             }
             (Some(addr), OwnershipState::Accepted) => {
-                log::info!(
-                    "  {} {}: {} {}",
-                    "✓".green(),
-                    status.name,
-                    addr.to_string().green(),
-                    "(accepted)".green()
-                );
+                ui::success(format!("  {}: {} (accepted)", status.name, addr))?;
             }
             (Some(addr), OwnershipState::NotTransferred) => {
-                log::info!(
-                    "  {} {}: {} {}",
-                    "⚠".red(),
-                    status.name,
-                    addr.to_string().green(),
-                    "(ownership not transferred!)".red()
-                );
+                ui::error(format!(
+                    "  {}: {} (ownership not transferred!)",
+                    status.name, addr
+                ))?;
             }
             (None, _) => {
-                log::info!(
-                    "  {} {}: {}",
-                    "⊘".cyan(),
-                    status.name,
-                    "not configured".cyan()
-                );
+                ui::info(format!("  {}: not configured", status.name))?;
             }
         }
     }
+    Ok(())
 }
 
 /// Derive address from private key.

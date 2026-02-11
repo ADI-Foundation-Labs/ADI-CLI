@@ -13,6 +13,7 @@ mod commands;
 mod config;
 mod context;
 mod error;
+mod ui;
 
 const STYLES: Styles = Styles::styled()
     .header(Ansi::Green.on_default().bold())

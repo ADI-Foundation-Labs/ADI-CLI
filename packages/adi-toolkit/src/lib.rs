@@ -35,6 +35,7 @@
 //! let exit_code = runner.run_zkstack(
 //!     &["ecosystem", "init"],
 //!     state_dir,
+//!     state_dir, // log_dir
 //!     &version.to_semver(),
 //! ).await?;
 //!

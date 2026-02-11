@@ -10,7 +10,6 @@ use adi_ecosystem::{
 use adi_types::{ChainContracts, EcosystemContracts};
 use alloy_primitives::Address;
 use clap::Args;
-use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -20,6 +19,7 @@ use crate::commands::helpers::{
 };
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
+use crate::ui;
 
 /// Arguments for `transfer` command.
 ///
@@ -68,23 +68,23 @@ pub struct TransferArgs {
 
 /// Execute the transfer ownership command.
 pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
-    log::info!("{}", "Accepting and transferring ownership...".cyan());
+    ui::intro("ADI Transfer Ownership")?;
 
     // Resolve ecosystem name
     let ecosystem_name = resolve_ecosystem_name(args.ecosystem_name.as_ref(), context.config())?;
-    log::info!("Ecosystem: {}", ecosystem_name.green());
+    ui::info(format!("Ecosystem: {}", ecosystem_name))?;
 
     // Resolve chain name
     let chain_name = resolve_chain_name(args.chain.as_ref(), context.config())?;
-    log::info!("Chain: {}", chain_name.green());
+    ui::info(format!("Chain: {}", chain_name))?;
 
     // Resolve RPC URL
     let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
-    log::info!("RPC URL: {}", rpc_url.to_string().green());
+    ui::info(format!("RPC URL: {}", rpc_url))?;
 
     // Resolve new owner
     let new_owner = resolve_new_owner(args.new_owner, context.config())?;
-    log::info!("New owner: {}", new_owner.to_string().green());
+    ui::info(format!("New owner: {}", new_owner))?;
 
     // Create state manager
     let state_manager = create_state_manager(&ecosystem_name, context.config());
@@ -112,17 +112,15 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
     let governor_address = derive_address_from_key(&governor.private_key)?;
 
     // Check ecosystem ownership status
-    log::info!("");
-    log::info!("{}", "Checking ecosystem ownership status...".cyan());
+    ui::info("Checking ecosystem ownership status...")?;
     let ecosystem_status =
         check_ecosystem_ownership_status(rpc_url.as_str(), &ecosystem_contracts, governor_address)
             .await
             .wrap_err("Failed to check ecosystem ownership status")?;
 
     // Display ecosystem contracts with pending status
-    log::info!("");
-    log::info!("{}", "Ecosystem contracts:".cyan());
-    display_ownership_status(&ecosystem_status);
+    ui::info("Ecosystem contracts:")?;
+    display_ownership_status(&ecosystem_status)?;
 
     // Load and check chain contracts
     let chain_contracts: ChainContracts = state_manager
@@ -134,60 +132,48 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
             chain_name
         ))?;
 
-    log::info!("");
-    log::info!(
-        "{}",
-        format!("Checking chain '{}' ownership status...", chain_name).cyan()
-    );
+    ui::info(format!(
+        "Checking chain '{}' ownership status...",
+        chain_name
+    ))?;
     let chain_status =
         check_chain_ownership_status(rpc_url.as_str(), &chain_contracts, governor_address)
             .await
             .wrap_err("Failed to check chain ownership status")?;
 
-    log::info!("");
-    log::info!("{}", format!("Chain '{}' contracts:", chain_name).cyan());
-    display_ownership_status(&chain_status);
+    ui::info(format!("Chain '{}' contracts:", chain_name))?;
+    display_ownership_status(&chain_status)?;
 
     // Show summary of pending contracts
-    log::info!("");
     let ecosystem_pending = ecosystem_status.pending_count();
     let chain_pending = chain_status.pending_count();
     let total_pending = ecosystem_pending + chain_pending;
 
     if total_pending > 0 {
-        log::info!(
-            "{}",
-            format!(
-                "{} contract(s) have pending ownership transfers.",
-                total_pending
-            )
-            .yellow()
-        );
+        ui::warning(format!(
+            "{} contract(s) have pending ownership transfers.",
+            total_pending
+        ))?;
     }
 
     // Dry-run mode
     if args.dry_run {
-        log::info!(
-            "{}",
-            "Dry-run mode: no transactions will be executed".yellow()
-        );
+        ui::outro("Dry-run mode: no transactions will be executed")?;
         return Ok(());
     }
 
     // Confirmation
     if !args.yes {
-        use dialoguer::Confirm;
-        let confirmed = Confirm::new()
-            .with_prompt(format!(
-                "Proceed with ownership acceptance and transfer to {}?",
-                new_owner
-            ))
-            .default(true)
-            .interact()
-            .wrap_err("Failed to get confirmation")?;
+        let confirmed = ui::confirm(format!(
+            "Proceed with ownership acceptance and transfer to {}?",
+            new_owner
+        ))
+        .initial_value(true)
+        .interact()
+        .wrap_err("Failed to get confirmation")?;
 
         if !confirmed {
-            log::info!("Aborted by user");
+            ui::outro_cancel("Aborted by user")?;
             return Ok(());
         }
     }
@@ -195,11 +181,10 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
     // ========================================================================
     // ACCEPT PHASE
     // ========================================================================
-    log::info!("");
-    log::info!("{}", "=== ACCEPT PHASE ===".cyan().bold());
+    ui::info("=== ACCEPT PHASE ===")?;
 
     // Execute ecosystem ownership acceptance
-    log::info!("{}", "Processing ecosystem contracts...".cyan());
+    ui::info("Processing ecosystem contracts...")?;
     let ecosystem_accept_summary = accept_all_ownership(
         rpc_url.as_str(),
         &ecosystem_contracts,
@@ -209,8 +194,7 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
     .await;
 
     // Execute chain ownership acceptance
-    log::info!("");
-    log::info!("{}", "Processing chain contracts...".cyan());
+    ui::info("Processing chain contracts...")?;
     let chain_accept_summary = accept_chain_ownership(
         rpc_url.as_str(),
         &chain_contracts,
@@ -220,21 +204,19 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
     .await;
 
     // Display accept summaries
-    log::info!("");
-    log::info!("{}", "=== Accept Summary ===".cyan());
-    log::info!("Ecosystem:");
-    display_summary(&ecosystem_accept_summary);
-    log::info!("Chain:");
-    display_summary(&chain_accept_summary);
+    ui::info("=== Accept Summary ===")?;
+    ui::info("Ecosystem:")?;
+    display_summary(&ecosystem_accept_summary)?;
+    ui::info("Chain:")?;
+    display_summary(&chain_accept_summary)?;
 
     // ========================================================================
     // TRANSFER PHASE
     // ========================================================================
-    log::info!("");
-    log::info!("{}", "=== TRANSFER PHASE ===".cyan().bold());
+    ui::info("=== TRANSFER PHASE ===")?;
 
     // Execute ecosystem ownership transfer
-    log::info!("{}", "Transferring ecosystem contracts...".cyan());
+    ui::info("Transferring ecosystem contracts...")?;
     let ecosystem_transfer_summary = transfer_all_ownership(
         rpc_url.as_str(),
         &ecosystem_contracts,
@@ -245,8 +227,7 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
     .await;
 
     // Execute chain ownership transfer
-    log::info!("");
-    log::info!("{}", "Transferring chain contracts...".cyan());
+    ui::info("Transferring chain contracts...")?;
     let chain_transfer_summary = transfer_chain_ownership(
         rpc_url.as_str(),
         &chain_contracts,
@@ -257,12 +238,11 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
     .await;
 
     // Display transfer summaries
-    log::info!("");
-    log::info!("{}", "=== Transfer Summary ===".cyan());
-    log::info!("Ecosystem:");
-    display_summary(&ecosystem_transfer_summary);
-    log::info!("Chain:");
-    display_summary(&chain_transfer_summary);
+    ui::info("=== Transfer Summary ===")?;
+    ui::info("Ecosystem:")?;
+    display_summary(&ecosystem_transfer_summary)?;
+    ui::info("Chain:")?;
+    display_summary(&chain_transfer_summary)?;
 
     // Return appropriate status
     let total_accept_successes =
@@ -277,19 +257,14 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
         + chain_transfer_summary.results.len();
 
     if total_successes > 0 {
-        log::info!("");
-        log::info!(
-            "{}",
-            format!(
-                "Successfully processed {} operation(s). New owner {} must call acceptOwnership() on Ownable2Step contracts.",
-                total_successes,
-                new_owner
-            )
-            .green()
-        );
+        ui::outro(format!(
+            "Successfully processed {} operation(s). New owner {} must call acceptOwnership() on Ownable2Step contracts.",
+            total_successes,
+            new_owner
+        ))?;
         Ok(())
     } else if total_results == 0 {
-        log::warn!("No contracts were processed");
+        ui::outro("No contracts were processed")?;
         Ok(())
     } else {
         Err(eyre::eyre!("All ownership operations failed"))

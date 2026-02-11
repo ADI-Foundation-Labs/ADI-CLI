@@ -107,29 +107,35 @@ impl ToolkitRunner {
         );
 
         let manager = ContainerManager::new(self.client.inner().clone());
-        let exit_code = manager.run(&image_uri, &container_config).await?;
+        let result = manager.run(&image_uri, &container_config).await;
 
-        log::debug!("Command completed with exit code: {}", exit_code);
-
-        // Check for crash reports on failure
-        if exit_code != 0 {
-            let tmp_dir = state_dir.join(".tmp");
-            if let Ok(entries) = std::fs::read_dir(&tmp_dir) {
-                for entry in entries.flatten() {
-                    let filename = entry.file_name();
-                    let filename_str = filename.to_string_lossy();
-                    if filename_str.starts_with("report-") && filename_str.ends_with(".toml") {
-                        log::error!("Crash report available at: {}", entry.path().display());
+        // Always clean up tmp directory (keep only *.md files), even on error/interrupt
+        let tmp_dir = state_dir.join(".tmp");
+        if tmp_dir.exists() {
+            // Check for crash reports before cleanup (only on failure)
+            if let Ok(ref exit_code) = result {
+                if *exit_code != 0 {
+                    if let Ok(entries) = std::fs::read_dir(&tmp_dir) {
+                        for entry in entries.flatten() {
+                            let filename = entry.file_name();
+                            let filename_str = filename.to_string_lossy();
+                            if filename_str.starts_with("report-")
+                                && filename_str.ends_with(".toml")
+                            {
+                                log::error!(
+                                    "Crash report available at: {}",
+                                    entry.path().display()
+                                );
+                            }
+                        }
                     }
                 }
             }
-        }
-
-        // Clean up tmp directory (keep only *.md files)
-        let tmp_dir = state_dir.join(".tmp");
-        if tmp_dir.exists() {
             cleanup_tmp_dir(&tmp_dir);
         }
+
+        let exit_code = result?;
+        log::debug!("Command completed with exit code: {}", exit_code);
 
         Ok(exit_code)
     }

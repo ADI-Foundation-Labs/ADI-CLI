@@ -16,8 +16,6 @@ use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
 use adi_types::Wallets;
 use alloy_primitives::{Address, U256};
 use clap::Args;
-use colored::Colorize;
-use dialoguer::Confirm;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -27,6 +25,7 @@ use walkdir::WalkDir;
 
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
+use crate::ui;
 
 /// Arguments for `deploy` command.
 ///
@@ -152,15 +151,16 @@ pub struct DeployArgs {
 /// 7. Executes funding transfers
 /// 8. (Future) Deploys ecosystem contracts
 pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
+    ui::intro("ADI Deploy")?;
     log::debug!("Starting ecosystem deployment");
 
     // 1. Resolve ecosystem name
     let ecosystem_name = resolve_ecosystem_name(&args, context)?;
-    log::info!("Deploying ecosystem: {}", ecosystem_name.green());
+    ui::info(format!("Deploying ecosystem: {}", ecosystem_name))?;
 
     // 2. Resolve chain name
     let chain_name = resolve_chain_name(&args, context)?;
-    log::info!("Chain: {}", chain_name.green());
+    ui::info(format!("Chain: {}", chain_name))?;
 
     // 3. Create state manager and validate ecosystem exists
     let state_manager = create_state_manager(&ecosystem_name, context)?;
@@ -171,15 +171,14 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
 
     // 5. Skip funding if requested
     if args.skip_funding {
-        log::info!("Skipping wallet funding (--skip-funding)");
-        log::info!("Ecosystem deployment complete (funding skipped)");
-        log::info!("Note: Contract deployment not yet implemented");
+        ui::info("Skipping wallet funding (--skip-funding)")?;
+        ui::outro("Ecosystem deployment complete (funding skipped)")?;
         return Ok(());
     }
 
     // 6. Resolve RPC URL (args > config)
     let rpc_url = resolve_rpc_url(&args, context)?;
-    log::info!("Settlement layer RPC: {}", rpc_url.to_string().green());
+    ui::info(format!("Settlement layer RPC: {}", rpc_url))?;
 
     // 7. Check for Anvil mode (localhost RPC + no custom funder key)
     let is_anvil = is_localhost_rpc(rpc_url.as_str()) && args.funder_key.is_none();
@@ -212,11 +211,11 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
         .await
         .wrap_err_with(|| format!("Failed to load chain '{}' wallets", chain_name))?;
 
-    log::info!(
+    ui::info(format!(
         "Loaded wallets: ecosystem={}, chain={}",
         count_wallets(&ecosystem_wallets),
         count_wallets(&chain_wallets)
-    );
+    ))?;
 
     // 9. Create executor with logging handler (needed for provider)
     let executor = FundingExecutor::new(rpc_url.as_str(), &funder_key)
@@ -224,7 +223,7 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
         .with_event_handler(Arc::new(LoggingEventHandler));
 
     let funder_address = executor.funder_address();
-    log::info!("Funder address: {}", green_address(funder_address));
+    ui::info(format!("Funder address: {}", funder_address))?;
 
     // 10. Build funding config (reads base_token from chain metadata)
     let funding_config = build_funding_config(
@@ -249,7 +248,7 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     .await?;
 
     // 12. Build funding plan
-    log::info!("Building funding plan...");
+    ui::info("Building funding plan...")?;
     let plan_result = FundingPlanBuilder::new(executor.provider(), &funding_config, funder_address)
         .with_ecosystem_wallets(&ecosystem_wallets)
         .with_chain_wallets(&chain_wallets)
@@ -259,7 +258,7 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     let plan = match plan_result {
         Ok(p) => Some(p),
         Err(FundingError::NoFundingRequired) => {
-            log::info!("All wallets already funded - no funding required!");
+            ui::success("All wallets already funded - no funding required!")?;
             None
         }
         Err(e) => return Err(e).wrap_err("Failed to build funding plan"),
@@ -267,37 +266,43 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
 
     // 13-16. Funding plan display, confirmation, and execution (if needed)
     if let Some(plan) = plan {
-        log::info!("");
-        log::info!("============================================================");
-        log::info!("Funding Plan Summary");
-        log::info!("============================================================");
-        log::info!("  Transfers needed: {}", plan.transfer_count());
-        log::info!(
-            "  Total ETH to transfer: {}",
-            green_eth(plan.total_eth_transfers())
-        );
+        ui::info("============================================================")?;
+        ui::info("Funding Plan Summary")?;
+        ui::info("============================================================")?;
+        ui::info(format!("  Transfers needed: {}", plan.transfer_count()))?;
+        ui::info(format!(
+            "  Total ETH to transfer: {} ETH",
+            format_eth(plan.total_eth_transfers())
+        ))?;
         if !plan.total_token_required.is_zero() {
             let symbol = funding_config.token_symbol.as_deref().unwrap_or("tokens");
-            log::info!(
-                "  Total {} to transfer: {}",
+            ui::info(format!(
+                "  Total {} to transfer: {} {}",
                 symbol,
-                green_token(plan.total_token_required, symbol)
-            );
+                format_token(plan.total_token_required),
+                symbol
+            ))?;
         }
-        log::info!("  Estimated gas cost: {}", green_eth(plan.total_gas_cost));
-        log::info!(
-            "  Total ETH required: {}",
-            green_eth(plan.total_eth_required)
-        );
-        log::info!("");
-        log::info!("  Funder balance: {}", green_eth(plan.funder_eth_balance));
+        ui::info(format!(
+            "  Estimated gas cost: {} ETH",
+            format_eth(plan.total_gas_cost)
+        ))?;
+        ui::info(format!(
+            "  Total ETH required: {} ETH",
+            format_eth(plan.total_eth_required)
+        ))?;
+        ui::info(format!(
+            "  Funder balance: {} ETH",
+            format_eth(plan.funder_eth_balance)
+        ))?;
         if let Some(token_balance) = plan.funder_token_balance {
             let symbol = funding_config.token_symbol.as_deref().unwrap_or("tokens");
-            log::info!(
-                "  Funder {} balance: {}",
+            ui::info(format!(
+                "  Funder {} balance: {} {}",
                 symbol,
-                green_token(token_balance, symbol)
-            );
+                format_token(token_balance),
+                symbol
+            ))?;
         }
 
         if !plan.is_valid() {
@@ -311,55 +316,49 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
                 format_eth(needed - have)
             ));
         }
-        log::info!("  Status: Sufficient balance");
-        log::info!("============================================================");
+        ui::success("  Status: Sufficient balance")?;
+        ui::info("============================================================")?;
 
         // Dry-run mode - show plan without executing
         if args.dry_run {
-            log::info!("");
-            log::info!("Dry-run mode: funding plan created but not executed");
-            display_plan_details(&plan);
+            display_plan_details(&plan)?;
+            ui::outro("Dry-run mode: funding plan created but not executed")?;
             return Ok(());
         }
 
         // Confirmation prompt (unless --yes)
         if !args.yes {
-            log::info!("");
-            let confirmed = Confirm::new()
-                .with_prompt("Proceed with funding?")
-                .default(false)
+            let confirmed = ui::confirm("Proceed with funding?")
+                .initial_value(false)
                 .interact()
                 .wrap_err("Failed to read confirmation")?;
 
             if !confirmed {
-                log::info!("Funding cancelled by user");
+                ui::outro_cancel("Funding cancelled by user")?;
                 return Ok(());
             }
         }
 
         // Execute funding
-        log::info!("");
-        log::info!("Executing funding transfers...");
+        ui::info("Executing funding transfers...")?;
         let result = executor
             .execute(&plan)
             .await
             .wrap_err("Funding execution failed")?;
 
-        log::info!("");
-        log::info!("============================================================");
-        log::info!("Funding Complete!");
-        log::info!("============================================================");
-        log::info!("  Successful transfers: {}", result.successful);
-        log::info!("  Total gas used: {}", result.total_gas_used);
-        log::info!("============================================================");
+        ui::info("============================================================")?;
+        ui::success("Funding Complete!")?;
+        ui::info("============================================================")?;
+        ui::info(format!("  Successful transfers: {}", result.successful))?;
+        ui::info(format!("  Total gas used: {}", result.total_gas_used))?;
+        ui::info("============================================================")?;
 
-        log::info!("");
-        log::info!("Ecosystem wallets funded successfully!");
+        ui::success("Ecosystem wallets funded successfully!")?;
     }
 
     // 17. Skip deployment if requested
     if args.skip_deployment {
-        log::info!("Skipping contract deployment (--skip-deployment)");
+        ui::outro("Skipping contract deployment (--skip-deployment)")?;
         return Ok(());
     }
 
@@ -388,10 +387,7 @@ async fn run_anvil_funding(
     chain_name: &str,
     rpc_url: &Url,
 ) -> Result<()> {
-    log::info!(
-        "Using {} funding mode (localhost detected)",
-        "Anvil".green()
-    );
+    ui::info("Using Anvil funding mode (localhost detected)")?;
 
     // Load wallets from state
     let ecosystem_wallets = state_manager
@@ -406,11 +402,11 @@ async fn run_anvil_funding(
         .await
         .wrap_err_with(|| format!("Failed to load chain '{}' wallets", chain_name))?;
 
-    log::info!(
+    ui::info(format!(
         "Loaded wallets: ecosystem={}, chain={}",
         count_wallets(&ecosystem_wallets),
         count_wallets(&chain_wallets)
-    );
+    ))?;
 
     // Build funding amounts from config
     let funding_defaults = &context.config().funding;
@@ -428,63 +424,60 @@ async fn run_anvil_funding(
         .wrap_err("Failed to check wallet balances")?;
 
     // Display current balances and funding plan
-    display_anvil_funding_plan(&targets);
+    display_anvil_funding_plan(&targets)?;
 
     let needs_funding = targets.iter().filter(|t| t.needs_funding).count();
     let already_funded = targets.len() - needs_funding;
 
     // Dry-run mode
     if args.dry_run {
-        log::info!("");
-        log::info!("Dry-run mode: funding plan created but not executed");
+        ui::outro("Dry-run mode: funding plan created but not executed")?;
         return Ok(());
     }
 
     // If all wallets are already funded, skip confirmation and funding
     if needs_funding == 0 {
-        log::info!("");
-        log::info!("All wallets already funded, skipping funding step.");
+        ui::success("All wallets already funded, skipping funding step.")?;
     } else {
         // Confirmation (default to yes for local dev)
         if !args.yes {
-            log::info!("");
-            let confirmed = Confirm::new()
-                .with_prompt(format!(
-                    "Proceed with Anvil funding ({} wallets)?",
-                    needs_funding
-                ))
-                .default(true)
-                .interact()
-                .wrap_err("Failed to read confirmation")?;
+            let confirmed = ui::confirm(format!(
+                "Proceed with Anvil funding ({} wallets)?",
+                needs_funding
+            ))
+            .initial_value(true)
+            .interact()
+            .wrap_err("Failed to read confirmation")?;
 
             if !confirmed {
-                log::info!("Funding cancelled by user");
+                ui::outro_cancel("Funding cancelled by user")?;
                 return Ok(());
             }
         }
 
         // Execute Anvil funding
-        log::info!("");
-        log::info!("Funding wallets from Anvil default account...");
+        ui::info("Funding wallets from Anvil default account...")?;
 
         let result = funder
             .fund_wallets(&ecosystem_wallets, &chain_wallets)
             .await
             .wrap_err("Anvil funding failed")?;
 
-        log::info!("");
-        log::info!("============================================================");
-        log::info!("Anvil Funding Complete!");
-        log::info!("============================================================");
-        log::info!("  Wallets funded: {}", result.successful);
-        log::info!("  Wallets skipped (already funded): {}", already_funded);
-        log::info!("  Total gas used: {}", result.total_gas_used);
-        log::info!("============================================================");
+        ui::info("============================================================")?;
+        ui::success("Anvil Funding Complete!")?;
+        ui::info("============================================================")?;
+        ui::info(format!("  Wallets funded: {}", result.successful))?;
+        ui::info(format!(
+            "  Wallets skipped (already funded): {}",
+            already_funded
+        ))?;
+        ui::info(format!("  Total gas used: {}", result.total_gas_used))?;
+        ui::info("============================================================")?;
     }
 
     // Skip deployment if requested
     if args.skip_deployment {
-        log::info!("Skipping contract deployment (--skip-deployment)");
+        ui::outro("Skipping contract deployment (--skip-deployment)")?;
         return Ok(());
     }
 
@@ -502,42 +495,39 @@ async fn run_anvil_funding(
 }
 
 /// Display Anvil funding plan with current balances and status.
-fn display_anvil_funding_plan(targets: &[AnvilFundingTarget]) {
-    log::info!("");
-    log::info!("============================================================");
-    log::info!("Anvil Funding Plan");
-    log::info!("============================================================");
-    log::info!("  Using Anvil default account (account 0)");
-    log::info!("");
+fn display_anvil_funding_plan(targets: &[AnvilFundingTarget]) -> Result<()> {
+    ui::info("============================================================")?;
+    ui::info("Anvil Funding Plan")?;
+    ui::info("============================================================")?;
+    ui::info("  Using Anvil default account (account 0)")?;
 
     for target in targets {
         let current = format_eth(target.current_balance);
         let required = format_eth(target.amount);
         let status = if target.needs_funding {
-            "→ Will fund".yellow()
+            "-> Will fund"
         } else {
-            "✓ Already funded".green()
+            "Already funded"
         };
 
-        log::info!(
+        ui::info(format!(
             "  {:20} {} ETH (current: {} ETH) {}",
             target.role.to_string(),
             required,
             current,
             status
-        );
+        ))?;
     }
 
     let needs_funding = targets.iter().filter(|t| t.needs_funding).count();
     let already_funded = targets.len() - needs_funding;
 
-    log::info!("");
-    log::info!(
+    ui::info(format!(
         "  Summary: {} need funding, {} already funded",
-        needs_funding,
-        already_funded
-    );
-    log::info!("============================================================");
+        needs_funding, already_funded
+    ))?;
+    ui::info("============================================================")?;
+    Ok(())
 }
 
 /// Run ecosystem contract deployment and validator role configuration.
@@ -560,13 +550,12 @@ async fn run_ecosystem_deployment(
     })?;
     let protocol_version = ProtocolVersion::parse(protocol_version_str)
         .map_err(|e| eyre::eyre!("Invalid protocol version '{}': {}", protocol_version_str, e))?;
-    log::info!("Protocol version: {}", protocol_version.to_string().green());
+    ui::info(format!("Protocol version: {}", protocol_version))?;
 
     // Run zkstack ecosystem init
-    log::info!("");
-    log::info!("============================================================");
-    log::info!("Deploying Ecosystem Contracts");
-    log::info!("============================================================");
+    ui::info("============================================================")?;
+    ui::info("Deploying Ecosystem Contracts")?;
+    ui::info("============================================================")?;
 
     let runner = ToolkitRunner::with_config(context.toolkit_config())
         .await
@@ -587,10 +576,10 @@ async fn run_ecosystem_deployment(
         }
         std::fs::copy(&genesis_src, &genesis_dst)
             .wrap_err("Failed to copy genesis.json to ecosystem directory")?;
-        log::info!("Copied genesis.json to ecosystem directory");
+        ui::info("Copied genesis.json to ecosystem directory")?;
     }
 
-    log::info!("Running zkstack ecosystem init...");
+    ui::info("Running zkstack ecosystem init...")?;
 
     let exit_code = runner
         .run_zkstack_ecosystem_init(
@@ -609,10 +598,10 @@ async fn run_ecosystem_deployment(
         ));
     }
 
-    log::info!("Ecosystem contracts deployed successfully!");
+    ui::success("Ecosystem contracts deployed successfully!")?;
 
     // Log all deployment files (with warnings for unhandled ones)
-    log_deployment_files(&ecosystem_path, chain_name);
+    log_deployment_files(&ecosystem_path, chain_name)?;
 
     // Re-read chain contracts from state (now populated after deployment)
     let chain_contracts = state_manager
@@ -624,20 +613,13 @@ async fn run_ecosystem_deployment(
     let deployed = DeployedContracts::try_from_chain_contracts(&chain_contracts)
         .wrap_err("Missing required contract addresses after deployment")?;
 
-    log::info!("");
-    log::info!("Deployed contract addresses:");
-    log::info!(
-        "  Diamond proxy: {}",
-        deployed.diamond_proxy.to_string().green()
-    );
-    log::info!(
-        "  Validator timelock: {}",
-        deployed.validator_timelock.to_string().green()
-    );
-    log::info!(
-        "  Chain admin: {}",
-        deployed.chain_admin.to_string().green()
-    );
+    ui::note(
+        "Deployed Contracts",
+        format!(
+            "Diamond proxy: {}\nValidator timelock: {}\nChain admin: {}",
+            deployed.diamond_proxy, deployed.validator_timelock, deployed.chain_admin
+        ),
+    )?;
 
     // Get chain governor private key for signing validator role txs
     let governor_key = chain_wallets
@@ -648,10 +630,9 @@ async fn run_ecosystem_deployment(
         .clone();
 
     // Add validator roles
-    log::info!("");
-    log::info!("============================================================");
-    log::info!("Configuring Validator Roles");
-    log::info!("============================================================");
+    ui::info("============================================================")?;
+    ui::info("Configuring Validator Roles")?;
+    ui::info("============================================================")?;
 
     // Normalize URL for host-side connection (host.docker.internal -> localhost)
     let normalized_rpc = normalize_rpc_url(rpc_url.as_str());
@@ -665,26 +646,20 @@ async fn run_ecosystem_deployment(
     .await
     .wrap_err("Failed to add validator roles")?;
 
-    log::info!("");
-    log::info!(
+    ui::success(format!(
         "Validator roles configured: {} transactions confirmed",
-        tx_hashes.len().to_string().green()
-    );
+        tx_hashes.len()
+    ))?;
 
     // Final success message
-    log::info!("");
-    log::info!("============================================================");
-    log::info!("Ecosystem Deployment Complete!");
-    log::info!("============================================================");
-    log::info!("  Ecosystem: {}", ecosystem_name.green());
-    log::info!("  Chain: {}", chain_name.green());
-    log::info!(
-        "  Diamond proxy: {}",
-        deployed.diamond_proxy.to_string().green()
-    );
-    log::info!("============================================================");
-    log::info!("");
-    log::info!("You can now start containers and operate the rollup.");
+    ui::note(
+        "Deployment Summary",
+        format!(
+            "Ecosystem: {}\nChain: {}\nDiamond proxy: {}",
+            ecosystem_name, chain_name, deployed.diamond_proxy
+        ),
+    )?;
+    ui::outro("Deployment complete! You can now start containers and operate the rollup.")?;
 
     Ok(())
 }
@@ -848,16 +823,16 @@ async fn build_funding_config(
         let symbol = match adi_funding::get_token_symbol(provider, address).await {
             Ok(s) => Some(s),
             Err(e) => {
-                log::warn!("Failed to query token symbol: {}", e);
+                ui::warning(format!("Failed to query token symbol: {}", e))?;
                 None
             }
         };
         config = config.with_token(address, symbol.clone());
-        log::info!(
+        ui::info(format!(
             "Custom gas token: {} ({})",
-            green_address(address),
-            symbol.as_deref().unwrap_or("unknown").green()
-        );
+            address,
+            symbol.as_deref().unwrap_or("unknown")
+        ))?;
     }
 
     Ok(config)
@@ -949,13 +924,12 @@ async fn display_wallet_balances(
     token_address: Option<Address>,
     token_symbol: Option<&str>,
 ) -> Result<()> {
-    log::info!("");
-    log::info!("============================================================");
-    log::info!("Current Wallet Balances");
-    log::info!("============================================================");
+    ui::info("============================================================")?;
+    ui::info("Current Wallet Balances")?;
+    ui::info("============================================================")?;
 
     // Ecosystem wallets
-    log::info!("Ecosystem Wallets:");
+    ui::info("Ecosystem Wallets:")?;
     display_wallet_balance(
         provider,
         "deployer",
@@ -974,8 +948,7 @@ async fn display_wallet_balances(
     .await?;
 
     // Chain wallets (only those that will be funded)
-    log::info!("");
-    log::info!("Chain Wallets ({}):", chain_name);
+    ui::info(format!("Chain Wallets ({}):", chain_name))?;
     display_wallet_balance(
         provider,
         "governor",
@@ -1009,7 +982,7 @@ async fn display_wallet_balances(
     )
     .await?;
 
-    log::info!("============================================================");
+    ui::info("============================================================")?;
 
     Ok(())
 }
@@ -1030,42 +1003,40 @@ async fn display_wallet_balance(
         .await
         .wrap_err_with(|| format!("Failed to get balance for {}", role))?;
 
-    let eth_str = format_eth(balance.eth_balance).green();
+    let eth_str = format_eth(balance.eth_balance);
     let symbol = token_symbol.unwrap_or("tokens");
     let token_str = balance
         .token_balance
-        .map(|t| format!(" + {} {}", format_token(t).green(), symbol.green()))
+        .map(|t| format!(" + {} {}", format_token(t), symbol))
         .unwrap_or_default();
 
-    log::info!(
-        "  {:24} ({}): {} {}{}",
-        role,
-        green_address(w.address),
-        eth_str,
-        "ETH".green(),
-        token_str
-    );
+    ui::info(format!(
+        "  {:24} ({}): {} ETH{}",
+        role, w.address, eth_str, token_str
+    ))?;
 
     Ok(())
 }
 
 /// Display detailed funding plan (for dry-run mode).
-fn display_plan_details(plan: &adi_funding::FundingPlan) {
-    log::info!("");
-    log::info!("Planned Transfers:");
+fn display_plan_details(plan: &adi_funding::FundingPlan) -> Result<()> {
+    ui::info("Planned Transfers:")?;
     for (i, transfer) in plan.transfers.iter().enumerate() {
         let amount_str = match &transfer.transfer_type {
-            adi_funding::TransferType::Eth { amount } => green_eth(*amount),
-            adi_funding::TransferType::Token { amount, symbol, .. } => green_token(*amount, symbol),
+            adi_funding::TransferType::Eth { amount } => format!("{} ETH", format_eth(*amount)),
+            adi_funding::TransferType::Token { amount, symbol, .. } => {
+                format!("{} {}", format_token(*amount), symbol)
+            }
         };
-        log::info!(
+        ui::info(format!(
             "  [{}] {:24} -> {}  ({})",
             i + 1,
             transfer.role,
-            green_address(transfer.to),
+            transfer.to,
             amount_str
-        );
+        ))?;
     }
+    Ok(())
 }
 
 /// Format U256 as ETH (with 4 decimal places).
@@ -1093,21 +1064,6 @@ fn format_eth(wei: U256) -> String {
 /// Format U256 as token amount (assuming 18 decimals).
 fn format_token(amount: U256) -> String {
     format_eth(amount) // Same format for now
-}
-
-/// Format ETH amount with green color.
-fn green_eth(wei: U256) -> String {
-    format!("{} {}", format_eth(wei).green(), "ETH".green())
-}
-
-/// Format token amount with green color.
-fn green_token(amount: U256, symbol: &str) -> String {
-    format!("{} {}", format_token(amount).green(), symbol.green())
-}
-
-/// Format address with green color.
-fn green_address(address: Address) -> String {
-    address.to_string().green().to_string()
 }
 
 /// Convert ETH amount (f64) to wei (U256).
@@ -1151,11 +1107,10 @@ const KNOWN_CHAIN_FILES: &[&str] = &[
 /// Log all deployment files and warn about unhandled ones.
 ///
 /// Scans the state directory for config files (yaml, yml, json) and logs:
-/// - ✓ for files that CLI actively parses
-/// - ⚠ for files that are saved but not processed by CLI
-fn log_deployment_files(state_path: &Path, chain_name: &str) {
-    log::info!("");
-    log::info!("Deployment files:");
+/// - files that CLI actively parses as success
+/// - files that are saved but not processed by CLI as warning
+fn log_deployment_files(state_path: &Path, chain_name: &str) -> Result<()> {
+    ui::info("Deployment files:")?;
 
     for entry in WalkDir::new(state_path)
         .into_iter()
@@ -1177,15 +1132,12 @@ fn log_deployment_files(state_path: &Path, chain_name: &str) {
         };
 
         if is_known {
-            log::info!("  {} {}", "✓".green(), relative.display());
+            ui::success(format!("  {}", relative.display()))?;
         } else {
-            log::warn!(
-                "  {} {} (not processed by CLI)",
-                "⚠".yellow(),
-                relative.display()
-            );
+            ui::warning(format!("  {} (not processed by CLI)", relative.display()))?;
         }
     }
+    Ok(())
 }
 
 /// Check if file is a config file (yaml, yml, json).

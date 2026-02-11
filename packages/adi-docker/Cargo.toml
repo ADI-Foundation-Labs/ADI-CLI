@@ -18,7 +18,6 @@ thiserror = { workspace = true }
 log = { workspace = true }
 futures-util = { workspace = true }
 bollard = { workspace = true }
-crossterm = { workspace = true }
+cliclack = { workspace = true }
 url = { workspace = true }
-colored = { workspace = true }
 chrono = { workspace = true }
