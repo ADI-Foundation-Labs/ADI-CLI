@@ -26,6 +26,9 @@ serde = { workspace = true }
 # Domain types
 adi-types = { workspace = true }
 
+# Terminal styling
+console = { workspace = true }
+
 # Alloy EVM stack
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }

@@ -156,11 +156,9 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
 
     // 1. Resolve ecosystem name
     let ecosystem_name = resolve_ecosystem_name(&args, context)?;
-    ui::info(format!("Deploying ecosystem: {}", ecosystem_name))?;
 
     // 2. Resolve chain name
     let chain_name = resolve_chain_name(&args, context)?;
-    ui::info(format!("Chain: {}", chain_name))?;
 
     // 3. Create state manager and validate ecosystem exists
     let state_manager = create_state_manager(&ecosystem_name, context)?;
@@ -178,7 +176,16 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
 
     // 6. Resolve RPC URL (args > config)
     let rpc_url = resolve_rpc_url(&args, context)?;
-    ui::info(format!("Settlement layer RPC: {}", rpc_url))?;
+
+    // Display deployment info
+    ui::info(format!(
+        "Ecosystem: {}\n\
+         Chain: {}\n\
+         Settlement layer RPC: {}",
+        ui::green(&ecosystem_name),
+        ui::green(&chain_name),
+        ui::green(&rpc_url)
+    ))?;
 
     // 7. Check for Anvil mode (localhost RPC + no custom funder key)
     let is_anvil = is_localhost_rpc(rpc_url.as_str()) && args.funder_key.is_none();
@@ -213,8 +220,8 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
 
     ui::info(format!(
         "Loaded wallets: ecosystem={}, chain={}",
-        count_wallets(&ecosystem_wallets),
-        count_wallets(&chain_wallets)
+        ui::green(count_wallets(&ecosystem_wallets)),
+        ui::green(count_wallets(&chain_wallets))
     ))?;
 
     // 9. Create executor with logging handler (needed for provider)
@@ -225,7 +232,7 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
         ))));
 
     let funder_address = executor.funder_address();
-    ui::info(format!("Funder address: {}", funder_address))?;
+    ui::info(format!("Funder address: {}", ui::green(funder_address)))?;
 
     // 10. Build funding config (reads base_token from chain metadata)
     let funding_config = build_funding_config(
@@ -271,39 +278,46 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
         ui::info("============================================================")?;
         ui::info("Funding Plan Summary")?;
         ui::info("============================================================")?;
-        ui::info(format!("  Transfers needed: {}", plan.transfer_count()))?;
         ui::info(format!(
-            "  Total ETH to transfer: {} ETH",
-            format_eth(plan.total_eth_transfers())
+            "  Transfers needed: {}",
+            ui::green(plan.transfer_count())
+        ))?;
+        ui::info(format!(
+            "  Total ETH to transfer: {} {}",
+            ui::green(format_eth(plan.total_eth_transfers())),
+            ui::green("ETH")
         ))?;
         if !plan.total_token_required.is_zero() {
             let symbol = funding_config.token_symbol.as_deref().unwrap_or("tokens");
             ui::info(format!(
                 "  Total {} to transfer: {} {}",
                 symbol,
-                format_token(plan.total_token_required),
-                symbol
+                ui::green(format_token(plan.total_token_required)),
+                ui::green(symbol)
             ))?;
         }
         ui::info(format!(
-            "  Estimated gas cost: {} ETH",
-            format_eth(plan.total_gas_cost)
+            "  Estimated gas cost: {} {}",
+            ui::green(format_eth(plan.total_gas_cost)),
+            ui::green("ETH")
         ))?;
         ui::info(format!(
-            "  Total ETH required: {} ETH",
-            format_eth(plan.total_eth_required)
+            "  Total ETH required: {} {}",
+            ui::green(format_eth(plan.total_eth_required)),
+            ui::green("ETH")
         ))?;
         ui::info(format!(
-            "  Funder balance: {} ETH",
-            format_eth(plan.funder_eth_balance)
+            "  Funder balance: {} {}",
+            ui::green(format_eth(plan.funder_eth_balance)),
+            ui::green("ETH")
         ))?;
         if let Some(token_balance) = plan.funder_token_balance {
             let symbol = funding_config.token_symbol.as_deref().unwrap_or("tokens");
             ui::info(format!(
                 "  Funder {} balance: {} {}",
                 symbol,
-                format_token(token_balance),
-                symbol
+                ui::green(format_token(token_balance)),
+                ui::green(symbol)
             ))?;
         }
 
@@ -351,8 +365,14 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
         ui::info("============================================================")?;
         ui::success("Funding Complete!")?;
         ui::info("============================================================")?;
-        ui::info(format!("  Successful transfers: {}", result.successful))?;
-        ui::info(format!("  Total gas used: {}", result.total_gas_used))?;
+        ui::info(format!(
+            "  Successful transfers: {}",
+            ui::green(result.successful)
+        ))?;
+        ui::info(format!(
+            "  Total gas used: {}",
+            ui::green(result.total_gas_used)
+        ))?;
         ui::info("============================================================")?;
 
         ui::success("Ecosystem wallets funded successfully!")?;
@@ -406,8 +426,8 @@ async fn run_anvil_funding(
 
     ui::info(format!(
         "Loaded wallets: ecosystem={}, chain={}",
-        count_wallets(&ecosystem_wallets),
-        count_wallets(&chain_wallets)
+        ui::green(count_wallets(&ecosystem_wallets)),
+        ui::green(count_wallets(&chain_wallets))
     ))?;
 
     // Build funding amounts from config
@@ -473,7 +493,9 @@ async fn run_anvil_funding(
              Wallets funded: {}\n\
              Wallets skipped (already funded): {}\n\
              Total gas used: {}",
-            result.successful, already_funded, result.total_gas_used
+            ui::green(result.successful),
+            already_funded,
+            ui::green(result.total_gas_used)
         ))?;
     }
 
@@ -508,14 +530,14 @@ fn display_anvil_funding_plan(targets: &[AnvilFundingTarget]) -> Result<()> {
         let current = format_eth(target.current_balance);
         let required = format_eth(target.amount);
         let status = if target.needs_funding {
-            "-> Will fund"
+            format!("{}", ui::yellow("→ Will fund"))
         } else {
-            "Already funded"
+            format!("{}", ui::green("✓ Already funded"))
         };
         lines.push(format!(
             "{:20} {} ETH (current: {} ETH) {}",
             target.role.to_string(),
-            required,
+            ui::green(&required),
             current,
             status
         ));
@@ -526,7 +548,8 @@ fn display_anvil_funding_plan(targets: &[AnvilFundingTarget]) -> Result<()> {
     lines.push("============================================================".to_string());
     lines.push(format!(
         "Summary: {} need funding, {} already funded",
-        needs_funding, already_funded
+        ui::green(needs_funding),
+        already_funded
     ));
 
     ui::info(lines.join("\n"))?;
@@ -559,7 +582,7 @@ async fn run_ecosystem_deployment(
          ============================================================\n\
          Deploying Ecosystem Contracts\n\
          ============================================================",
-        protocol_version
+        ui::green(&protocol_version)
     ))?;
 
     let runner = ToolkitRunner::with_config_and_logger(
@@ -625,7 +648,9 @@ async fn run_ecosystem_deployment(
         "Deployed Contracts",
         format!(
             "Diamond proxy: {}\nValidator timelock: {}\nChain admin: {}",
-            deployed.diamond_proxy, deployed.validator_timelock, deployed.chain_admin
+            ui::green(deployed.diamond_proxy),
+            ui::green(deployed.validator_timelock),
+            ui::green(deployed.chain_admin)
         ),
     )?;
 
@@ -657,7 +682,7 @@ async fn run_ecosystem_deployment(
 
     ui::success(format!(
         "Validator roles configured: {} transactions confirmed",
-        tx_hashes.len()
+        ui::green(tx_hashes.len())
     ))?;
 
     // Final success message
@@ -665,7 +690,9 @@ async fn run_ecosystem_deployment(
         "Deployment Summary",
         format!(
             "Ecosystem: {}\nChain: {}\nDiamond proxy: {}",
-            ecosystem_name, chain_name, deployed.diamond_proxy
+            ui::green(ecosystem_name),
+            ui::green(chain_name),
+            ui::green(deployed.diamond_proxy)
         ),
     )?;
     ui::outro("Deployment complete! You can now start containers and operate the rollup.")?;
@@ -840,8 +867,8 @@ async fn build_funding_config(
         config = config.with_token(address, symbol.clone());
         ui::info(format!(
             "Custom gas token: {} ({})",
-            address,
-            symbol.as_deref().unwrap_or("unknown")
+            ui::green(address),
+            ui::green(symbol.as_deref().unwrap_or("unknown"))
         ))?;
     }
 
@@ -1013,16 +1040,20 @@ async fn display_wallet_balance(
         .await
         .wrap_err_with(|| format!("Failed to get balance for {}", role))?;
 
-    let eth_str = format_eth(balance.eth_balance);
+    let eth_str = ui::green(format_eth(balance.eth_balance));
     let symbol = token_symbol.unwrap_or("tokens");
     let token_str = balance
         .token_balance
-        .map(|t| format!(" + {} {}", format_token(t), symbol))
+        .map(|t| format!(" + {} {}", ui::green(format_token(t)), ui::green(symbol)))
         .unwrap_or_default();
 
     ui::info(format!(
-        "  {:24} ({}): {} ETH{}",
-        role, w.address, eth_str, token_str
+        "  {:24} ({}): {} {}{}",
+        role,
+        ui::green(w.address),
+        eth_str,
+        ui::green("ETH"),
+        token_str
     ))?;
 
     Ok(())
@@ -1033,16 +1064,18 @@ fn display_plan_details(plan: &adi_funding::FundingPlan) -> Result<()> {
     ui::info("Planned Transfers:")?;
     for (i, transfer) in plan.transfers.iter().enumerate() {
         let amount_str = match &transfer.transfer_type {
-            adi_funding::TransferType::Eth { amount } => format!("{} ETH", format_eth(*amount)),
+            adi_funding::TransferType::Eth { amount } => {
+                format!("{} {}", ui::green(format_eth(*amount)), ui::green("ETH"))
+            }
             adi_funding::TransferType::Token { amount, symbol, .. } => {
-                format!("{} {}", format_token(*amount), symbol)
+                format!("{} {}", ui::green(format_token(*amount)), ui::green(symbol))
             }
         };
         ui::info(format!(
             "  [{}] {:24} -> {}  ({})",
             i + 1,
             transfer.role,
-            transfer.to,
+            ui::green(transfer.to),
             amount_str
         ))?;
     }

@@ -4,6 +4,7 @@ use crate::config::WalletRole;
 use crate::transfer::Transfer;
 use adi_types::Logger;
 use alloy_primitives::{Address, B256, U256};
+use console::style;
 use std::sync::Arc;
 
 /// Events emitted during funding operations.
@@ -152,7 +153,8 @@ impl FundingEventHandler for LoggingEventHandler {
                 ));
             }
             FundingEvent::ExecutingTransfers { total } => {
-                self.logger.info(&format!("Executing {} transfers", total));
+                self.logger
+                    .info(&format!("Executing {} transfers", style(total).green()));
             }
             FundingEvent::TransferStarted {
                 index,
@@ -178,8 +180,8 @@ impl FundingEventHandler for LoggingEventHandler {
                 self.logger.info(&format!(
                     "Transfer {} confirmed: {} (gas: {})",
                     index + 1,
-                    tx_hash,
-                    gas_used
+                    style(tx_hash).green(),
+                    style(gas_used).green()
                 ));
             }
             FundingEvent::Complete {
@@ -188,7 +190,8 @@ impl FundingEventHandler for LoggingEventHandler {
             } => {
                 self.logger.info(&format!(
                     "Funding complete: {} transfers successful, {} gas used",
-                    successful, total_gas_used
+                    style(successful).green(),
+                    style(total_gas_used).green()
                 ));
             }
         }

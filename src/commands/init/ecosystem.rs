@@ -41,12 +41,12 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
            L1 network: {}\n\
            Chain: {} (ID: {})\n\
            Prover mode: {}",
-        version,
-        config.name,
-        config.l1_network,
-        config.chain_name,
-        config.chain_id,
-        config.prover_mode
+        ui::green(&version),
+        ui::green(&config.name),
+        ui::green(&config.l1_network),
+        ui::green(&config.chain_name),
+        ui::green(config.chain_id),
+        ui::green(&config.prover_mode)
     ))?;
     context
         .logger()
@@ -66,14 +66,14 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
         let files = state_manager.list_state_files();
         let file_list: String = files
             .iter()
-            .map(|f| format!("  - {}", f))
+            .map(|f| format!("  - {}", ui::yellow(f)))
             .collect::<Vec<_>>()
             .join("\n");
         ui::warning(format!(
             "Ecosystem '{}' already exists at {}\n\
              The following files will be deleted:\n{}",
-            config.name,
-            ecosystem_path.display(),
+            ui::yellow(&config.name),
+            ui::yellow(ecosystem_path.display()),
             file_list
         ))?;
 

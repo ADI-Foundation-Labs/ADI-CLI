@@ -4,10 +4,118 @@ use crate::error::{DockerError, Result};
 use adi_types::Logger;
 use bollard::container::LogsOptions;
 use bollard::Docker;
+use crossterm::{cursor, style, terminal, ExecutableCommand};
 use futures_util::StreamExt;
+use std::collections::VecDeque;
+use std::io::{stderr, Write};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
+
+/// Maximum number of log lines to display in the terminal.
+const MAX_DISPLAY_LINES: usize = 10;
+
+/// Maximum width for truncating long lines (excluding the bar prefix).
+const LINE_MAX_WIDTH: usize = 76;
+
+/// Cliclack-style bar prefix for log lines.
+const BAR_PREFIX: &str = "│  ";
+
+/// Strip ANSI escape sequences from a string.
+/// This prevents cursor manipulation codes in container output from breaking our display.
+fn strip_ansi(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            // Skip ESC and the following sequence
+            if chars.peek() == Some(&'[') {
+                chars.next(); // consume '['
+                              // Skip until we hit a letter (end of sequence)
+                while let Some(&next) = chars.peek() {
+                    chars.next();
+                    if next.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+/// Manages rolling buffer of log lines and terminal rendering.
+struct LogDisplay {
+    lines: VecDeque<String>,
+    rendered_count: usize,
+}
+
+impl LogDisplay {
+    fn new() -> Self {
+        Self {
+            lines: VecDeque::new(),
+            rendered_count: 0,
+        }
+    }
+
+    fn push_line(&mut self, line: &str) {
+        // Strip ANSI codes to prevent cursor manipulation conflicts
+        let clean = strip_ansi(line);
+        let char_count = clean.chars().count();
+        let truncated = if char_count > LINE_MAX_WIDTH {
+            let prefix: String = clean.chars().take(LINE_MAX_WIDTH - 3).collect();
+            format!("{}...", prefix)
+        } else {
+            clean
+        };
+        self.lines.push_back(truncated);
+        if self.lines.len() > MAX_DISPLAY_LINES {
+            self.lines.pop_front();
+        }
+    }
+
+    fn render(&mut self) -> std::io::Result<()> {
+        let mut stderr = stderr();
+
+        // Move cursor up to overwrite previous output
+        if self.rendered_count > 0 {
+            let count = u16::try_from(self.rendered_count).unwrap_or(u16::MAX);
+            stderr.execute(cursor::MoveUp(count))?;
+        }
+
+        // Clear from cursor down and print fresh
+        stderr.execute(terminal::Clear(terminal::ClearType::FromCursorDown))?;
+
+        // Print current lines with cliclack-style bar prefix (grey bar, dim text)
+        for line in &self.lines {
+            stderr.execute(style::SetForegroundColor(style::Color::Grey))?;
+            write!(stderr, "{}", BAR_PREFIX)?;
+            stderr.execute(style::SetAttribute(style::Attribute::Dim))?;
+            write!(stderr, "{}", line)?;
+            stderr.execute(style::ResetColor)?;
+            stderr.execute(style::SetAttribute(style::Attribute::Reset))?;
+            writeln!(stderr)?;
+        }
+
+        self.rendered_count = self.lines.len();
+        stderr.flush()?;
+        Ok(())
+    }
+
+    fn clear(&mut self) -> std::io::Result<()> {
+        let mut stderr = stderr();
+        if self.rendered_count > 0 {
+            let count = u16::try_from(self.rendered_count).unwrap_or(u16::MAX);
+            stderr.execute(cursor::MoveUp(count))?;
+            stderr.execute(terminal::Clear(terminal::ClearType::FromCursorDown))?;
+        }
+        self.rendered_count = 0;
+        Ok(())
+    }
+}
 
 /// Streams container output with progress spinner.
 pub(crate) struct OutputStreamer {
@@ -21,9 +129,9 @@ impl OutputStreamer {
         Self { docker, logger }
     }
 
-    /// Stream container logs with spinner progress.
+    /// Stream container logs with real-time display.
     ///
-    /// Shows a spinner with elapsed time while streaming.
+    /// Shows the last 10 lines of output, updating in real-time.
     /// Full output is saved to a log file.
     pub async fn stream_logs(
         &self,
@@ -49,13 +157,15 @@ impl OutputStreamer {
             .join("logs")
             .join(format!("{}_{}.log", command, timestamp));
 
-        let spinner = cliclack::spinner();
-        spinner.start(label);
+        cliclack::log::step(label)
+            .map_err(|e| DockerError::StreamError(format!("Failed to log step: {}", e)))?;
+
+        let mut display = LogDisplay::new();
 
         let stream_result: Result<()> = loop {
             tokio::select! {
                 _ = tokio::signal::ctrl_c() => {
-                    spinner.stop("Interrupted");
+                    display.clear().ok();
                     Self::save_log(&buffer, &log_path)?;
                     break Err(DockerError::StreamError("Interrupted by CTRL+C".to_string()));
                 }
@@ -63,8 +173,16 @@ impl OutputStreamer {
                 result = stream.next() => {
                     match result {
                         Some(Ok(output)) => {
-                            buffer.extend(output.into_bytes());
-                            spinner.set_message(format!("[{}s]", start.elapsed().as_secs()));
+                            let bytes = output.into_bytes();
+                            if let Ok(text) = std::str::from_utf8(&bytes) {
+                                for line in text.lines() {
+                                    if !line.is_empty() {
+                                        display.push_line(line);
+                                    }
+                                }
+                                display.render().ok();
+                            }
+                            buffer.extend(bytes);
                         }
                         Some(Err(e)) => {
                             self.logger.debug(&format!("Log stream ended: {}", e));
@@ -78,9 +196,11 @@ impl OutputStreamer {
             }
         };
 
-        // Normal completion - save log
+        // Normal completion - clear display and show completion message
         if stream_result.is_ok() {
-            spinner.stop(format!("Completed in {}s", start.elapsed().as_secs()));
+            display.clear().ok();
+            cliclack::log::success(format!("Completed in {}s", start.elapsed().as_secs()))
+                .map_err(|e| DockerError::StreamError(format!("Failed to log success: {}", e)))?;
             Self::save_log(&buffer, &log_path)?;
         }
 

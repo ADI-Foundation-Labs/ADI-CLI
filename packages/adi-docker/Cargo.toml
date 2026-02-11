@@ -18,6 +18,7 @@ thiserror = { workspace = true }
 futures-util = { workspace = true }
 bollard = { workspace = true }
 cliclack = { workspace = true }
+crossterm = { workspace = true }
 url = { workspace = true }
 chrono = { workspace = true }
 adi-types = { workspace = true }
