@@ -4,7 +4,8 @@ use crate::error::{DockerError, Result};
 use adi_types::Logger;
 use bollard::container::LogsOptions;
 use bollard::Docker;
-use crossterm::{cursor, style, terminal, ExecutableCommand};
+use console::Style;
+use crossterm::{cursor, terminal, ExecutableCommand};
 use futures_util::StreamExt;
 use std::collections::VecDeque;
 use std::io::{stderr, Write};
@@ -89,15 +90,14 @@ impl LogDisplay {
         // Clear from cursor down and print fresh
         stderr.execute(terminal::Clear(terminal::ClearType::FromCursorDown))?;
 
-        // Print current lines with cliclack-style bar prefix (grey bar, dim text)
+        // Print current lines with cliclack-style bar prefix (blue dim)
+        let bar_style = Style::new().blue().dim();
         for line in &self.lines {
-            stderr.execute(style::SetForegroundColor(style::Color::Grey))?;
-            write!(stderr, "{}", BAR_PREFIX)?;
-            stderr.execute(style::SetAttribute(style::Attribute::Dim))?;
-            write!(stderr, "{}", line)?;
-            stderr.execute(style::ResetColor)?;
-            stderr.execute(style::SetAttribute(style::Attribute::Reset))?;
-            writeln!(stderr)?;
+            writeln!(
+                stderr,
+                "{}",
+                bar_style.apply_to(format!("{}{}", BAR_PREFIX, line))
+            )?;
         }
 
         self.rendered_count = self.lines.len();
@@ -215,7 +215,8 @@ impl OutputStreamer {
         }
         std::fs::write(log_path, buffer)
             .map_err(|e| DockerError::StreamError(format!("Failed to write log: {}", e)))?;
-        cliclack::log::info(format!("Full output saved to: {}", log_path.display()))
+        let path_styled = Style::new().green().apply_to(log_path.display());
+        cliclack::log::info(format!("Full output saved to: {}", path_styled))
             .map_err(|e| DockerError::StreamError(format!("Failed to log: {}", e)))?;
         Ok(())
     }

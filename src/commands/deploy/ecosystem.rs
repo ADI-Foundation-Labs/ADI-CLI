@@ -178,14 +178,15 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     let rpc_url = resolve_rpc_url(&args, context)?;
 
     // Display deployment info
-    ui::info(format!(
-        "Ecosystem: {}\n\
-         Chain: {}\n\
-         Settlement layer RPC: {}",
-        ui::green(&ecosystem_name),
-        ui::green(&chain_name),
-        ui::green(&rpc_url)
-    ))?;
+    ui::note(
+        "Deployment target",
+        format!(
+            "Ecosystem: {}\nChain: {}\nSettlement layer RPC: {}",
+            ui::green(&ecosystem_name),
+            ui::green(&chain_name),
+            ui::green(&rpc_url)
+        ),
+    )?;
 
     // 7. Check for Anvil mode (localhost RPC + no custom funder key)
     let is_anvil = is_localhost_rpc(rpc_url.as_str()) && args.funder_key.is_none();
@@ -275,9 +276,7 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
 
     // 13-16. Funding plan display, confirmation, and execution (if needed)
     if let Some(plan) = plan {
-        ui::info("============================================================")?;
-        ui::info("Funding Plan Summary")?;
-        ui::info("============================================================")?;
+        ui::section("Funding Plan Summary")?;
         ui::info(format!(
             "  Transfers needed: {}",
             ui::green(plan.transfer_count())
@@ -333,7 +332,6 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
             ));
         }
         ui::success("  Status: Sufficient balance")?;
-        ui::info("============================================================")?;
 
         // Dry-run mode - show plan without executing
         if args.dry_run {
@@ -362,19 +360,14 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
             .await
             .wrap_err("Funding execution failed")?;
 
-        ui::info("============================================================")?;
-        ui::success("Funding Complete!")?;
-        ui::info("============================================================")?;
-        ui::info(format!(
-            "  Successful transfers: {}",
-            ui::green(result.successful)
-        ))?;
-        ui::info(format!(
-            "  Total gas used: {}",
-            ui::green(result.total_gas_used)
-        ))?;
-        ui::info("============================================================")?;
-
+        ui::note(
+            "Funding Complete",
+            format!(
+                "Successful transfers: {}\nTotal gas used: {}",
+                ui::green(result.successful),
+                ui::green(result.total_gas_used)
+            ),
+        )?;
         ui::success("Ecosystem wallets funded successfully!")?;
     }
 
@@ -487,16 +480,15 @@ async fn run_anvil_funding(
             .await
             .wrap_err("Anvil funding failed")?;
 
-        ui::success(format!(
-            "Anvil Funding Complete!\n\
-             ============================================================\n\
-             Wallets funded: {}\n\
-             Wallets skipped (already funded): {}\n\
-             Total gas used: {}",
-            ui::green(result.successful),
-            already_funded,
-            ui::green(result.total_gas_used)
-        ))?;
+        ui::note(
+            "Anvil Funding Complete",
+            format!(
+                "Wallets funded: {}\nWallets skipped (already funded): {}\nTotal gas used: {}",
+                ui::green(result.successful),
+                already_funded,
+                ui::green(result.total_gas_used)
+            ),
+        )?;
     }
 
     // Skip deployment if requested
@@ -520,11 +512,7 @@ async fn run_anvil_funding(
 
 /// Display Anvil funding plan with current balances and status.
 fn display_anvil_funding_plan(targets: &[AnvilFundingTarget]) -> Result<()> {
-    let mut lines = vec![
-        "Anvil Funding Plan".to_string(),
-        "============================================================".to_string(),
-        "Using Anvil default account (account 0)".to_string(),
-    ];
+    let mut lines = vec!["Using Anvil default account (account 0)".to_string()];
 
     for target in targets {
         let current = format_eth(target.current_balance);
@@ -545,14 +533,13 @@ fn display_anvil_funding_plan(targets: &[AnvilFundingTarget]) -> Result<()> {
 
     let needs_funding = targets.iter().filter(|t| t.needs_funding).count();
     let already_funded = targets.len() - needs_funding;
-    lines.push("============================================================".to_string());
     lines.push(format!(
-        "Summary: {} need funding, {} already funded",
+        "\nSummary: {} need funding, {} already funded",
         ui::green(needs_funding),
         already_funded
     ));
 
-    ui::info(lines.join("\n"))?;
+    ui::note("Anvil Funding Plan", lines.join("\n"))?;
     Ok(())
 }
 
@@ -578,12 +565,10 @@ async fn run_ecosystem_deployment(
         .map_err(|e| eyre::eyre!("Invalid protocol version '{}': {}", protocol_version_str, e))?;
     // Run zkstack ecosystem init
     ui::info(format!(
-        "Protocol version: {}\n\
-         ============================================================\n\
-         Deploying Ecosystem Contracts\n\
-         ============================================================",
+        "Protocol version: {}",
         ui::green(&protocol_version)
     ))?;
+    ui::section("Deploying Ecosystem Contracts")?;
 
     let runner = ToolkitRunner::with_config_and_logger(
         context.toolkit_config(),
@@ -663,9 +648,7 @@ async fn run_ecosystem_deployment(
         .clone();
 
     // Add validator roles
-    ui::info("============================================================")?;
-    ui::info("Configuring Validator Roles")?;
-    ui::info("============================================================")?;
+    ui::section("Configuring Validator Roles")?;
 
     // Normalize URL for host-side connection (host.docker.internal -> localhost)
     let normalized_rpc = normalize_rpc_url(rpc_url.as_str());
@@ -961,9 +944,7 @@ async fn display_wallet_balances(
     token_address: Option<Address>,
     token_symbol: Option<&str>,
 ) -> Result<()> {
-    ui::info("============================================================")?;
-    ui::info("Current Wallet Balances")?;
-    ui::info("============================================================")?;
+    ui::section("Current Wallet Balances")?;
 
     // Ecosystem wallets
     ui::info("Ecosystem Wallets:")?;
@@ -1018,8 +999,6 @@ async fn display_wallet_balances(
         token_symbol,
     )
     .await?;
-
-    ui::info("============================================================")?;
 
     Ok(())
 }
@@ -1153,7 +1132,8 @@ const KNOWN_CHAIN_FILES: &[&str] = &[
 /// - files that CLI actively parses as success
 /// - files that are saved but not processed by CLI as warning
 fn log_deployment_files(state_path: &Path, chain_name: &str) -> Result<()> {
-    ui::info("Deployment files:")?;
+    let mut known_files = Vec::new();
+    let mut unknown_files = Vec::new();
 
     for entry in WalkDir::new(state_path)
         .into_iter()
@@ -1175,11 +1155,22 @@ fn log_deployment_files(state_path: &Path, chain_name: &str) -> Result<()> {
         };
 
         if is_known {
-            ui::success(format!("  {}", relative.display()))?;
+            known_files.push(relative.display().to_string());
         } else {
-            ui::warning(format!("  {} (not processed by CLI)", relative.display()))?;
+            unknown_files.push(relative.display().to_string());
         }
     }
+
+    // Format all files as a single note
+    let mut content = known_files.join("\n");
+    if !unknown_files.is_empty() {
+        if !content.is_empty() {
+            content.push_str("\n\nNot processed by CLI:\n");
+        }
+        content.push_str(&unknown_files.join("\n"));
+    }
+
+    ui::note("Deployment files", content)?;
     Ok(())
 }
 

@@ -35,19 +35,17 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     let config_defaults = &context.config().ecosystem;
     let config = build_ecosystem_config(args, config_defaults);
 
-    ui::info(format!(
-        "Protocol version: {}\n\
-         Ecosystem: {}\n\
-           L1 network: {}\n\
-           Chain: {} (ID: {})\n\
-           Prover mode: {}",
-        ui::green(&version),
-        ui::green(&config.name),
-        ui::green(&config.l1_network),
-        ui::green(&config.chain_name),
-        ui::green(config.chain_id),
-        ui::green(&config.prover_mode)
-    ))?;
+    ui::note(
+        format!("Protocol version: {}", ui::green(&version)),
+        format!(
+            "Ecosystem: {}\nL1 network: {}\nChain: {} (ID: {})\nProver mode: {}",
+            ui::green(&config.name),
+            ui::green(&config.l1_network),
+            ui::green(&config.chain_name),
+            ui::green(config.chain_id),
+            ui::green(&config.prover_mode)
+        ),
+    )?;
     context
         .logger()
         .debug(&format!("Full ecosystem config: {:?}", config));
@@ -66,16 +64,15 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
         let files = state_manager.list_state_files();
         let file_list: String = files
             .iter()
-            .map(|f| format!("  - {}", ui::yellow(f)))
+            .map(|f| format!("  - {}", f))
             .collect::<Vec<_>>()
             .join("\n");
         ui::warning(format!(
-            "Ecosystem '{}' already exists at {}\n\
-             The following files will be deleted:\n{}",
+            "Ecosystem '{}' already exists at {}",
             ui::yellow(&config.name),
-            ui::yellow(ecosystem_path.display()),
-            file_list
+            ui::yellow(ecosystem_path.display())
         ))?;
+        ui::note("Files to be deleted", file_list)?;
 
         if args.force {
             ui::info("Force flag set, skipping confirmation")?;
@@ -83,7 +80,7 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
             // Require typing ecosystem name to confirm deletion
             let prompt = format!(
                 "Type '{}' to confirm deletion and reinitialize",
-                config.name
+                ui::green(&config.name)
             );
             let user_input: String = ui::input(prompt)
                 .interact()

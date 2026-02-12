@@ -12,6 +12,7 @@ use alloy_primitives::{Address, B256};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
 use alloy_signer_local::PrivateKeySigner;
+use console::Style;
 use secrecy::{ExposeSecret, SecretString};
 
 /// Contract addresses required for validator role configuration.
@@ -177,11 +178,13 @@ pub async fn add_validator_roles(
 
     // Execute role assignments
     let mut tx_hashes = Vec::with_capacity(assignments.len());
+    let green = Style::new().green();
 
     for assignment in assignments {
         logger.info(&format!(
             "Adding validator roles for {} ({})",
-            assignment.name, assignment.operator
+            assignment.name,
+            green.apply_to(assignment.operator)
         ));
 
         let calldata = build_add_validator_roles_calldata(
@@ -214,7 +217,10 @@ pub async fn add_validator_roles(
                 })?;
 
         let tx_hash = *pending.tx_hash();
-        logger.info(&format!("  Transaction submitted: {}", tx_hash));
+        logger.info(&format!(
+            "  Transaction submitted: {}",
+            green.apply_to(tx_hash)
+        ));
 
         // Wait for confirmation
         let receipt =
@@ -236,8 +242,8 @@ pub async fn add_validator_roles(
 
         logger.info(&format!(
             "  Confirmed in block {} (gas used: {})",
-            receipt.block_number.unwrap_or_default(),
-            receipt.gas_used
+            green.apply_to(receipt.block_number.unwrap_or_default()),
+            green.apply_to(receipt.gas_used)
         ));
 
         tx_hashes.push(tx_hash);

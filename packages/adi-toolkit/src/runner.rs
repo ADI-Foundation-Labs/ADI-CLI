@@ -5,6 +5,7 @@ use crate::config::ToolkitConfig;
 use crate::error::Result;
 use adi_docker::{transform_url_for_container, ContainerConfig, ContainerManager, DockerClient};
 use adi_types::{LogCrateLogger, Logger};
+use colored::Colorize;
 use semver::Version;
 use std::path::Path;
 use std::sync::Arc;
@@ -100,7 +101,7 @@ impl ToolkitRunner {
         let image_uri = image_ref.full_uri();
 
         self.logger
-            .info(&format!("Using toolkit image: {}", image_uri));
+            .info(&format!("Using toolkit image: {}", image_uri.green()));
         self.logger.debug(&format!(
             "Running command: {:?} (state_dir: {}, log_dir: {})",
             command,

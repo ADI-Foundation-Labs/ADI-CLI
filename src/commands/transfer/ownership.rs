@@ -179,10 +179,8 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
         }
     }
 
-    // ========================================================================
-    // ACCEPT PHASE
-    // ========================================================================
-    ui::info("=== ACCEPT PHASE ===")?;
+    // Accept phase
+    ui::section("Accept Phase")?;
 
     // Execute ecosystem ownership acceptance
     ui::info("Processing ecosystem contracts...")?;
@@ -207,16 +205,14 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
     .await;
 
     // Display accept summaries
-    ui::info("=== Accept Summary ===")?;
+    ui::section("Accept Summary")?;
     ui::info("Ecosystem:")?;
     display_summary(&ecosystem_accept_summary)?;
     ui::info("Chain:")?;
     display_summary(&chain_accept_summary)?;
 
-    // ========================================================================
-    // TRANSFER PHASE
-    // ========================================================================
-    ui::info("=== TRANSFER PHASE ===")?;
+    // Transfer phase
+    ui::section("Transfer Phase")?;
 
     // Execute ecosystem ownership transfer
     ui::info("Transferring ecosystem contracts...")?;
@@ -243,7 +239,7 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
     .await;
 
     // Display transfer summaries
-    ui::info("=== Transfer Summary ===")?;
+    ui::section("Transfer Summary")?;
     ui::info("Ecosystem:")?;
     display_summary(&ecosystem_transfer_summary)?;
     ui::info("Chain:")?;

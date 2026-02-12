@@ -10,6 +10,7 @@ mod commands;
 mod config;
 mod context;
 mod error;
+mod theme;
 mod ui;
 
 const STYLES: Styles = Styles::styled()
@@ -44,6 +45,7 @@ pub struct Opts {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    cliclack::set_theme(theme::AdiTheme);
     let opts: Opts = Opts::parse();
 
     let ctx = context::Context::new_from_options(&opts)?;

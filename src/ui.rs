@@ -13,6 +13,11 @@ pub use cliclack::log::{error, info, success, warning};
 // Re-export interactive components
 pub use cliclack::{confirm, input, intro, note, outro, outro_cancel};
 
+/// Print a section header (uses step styling).
+pub fn section<S: std::fmt::Display>(title: S) -> std::io::Result<()> {
+    cliclack::log::step(title)
+}
+
 /// Style a value in green for visual emphasis.
 pub fn green<D: std::fmt::Display>(val: D) -> console::StyledObject<D> {
     style(val).green()
@@ -50,7 +55,8 @@ impl CliLogger {
 impl Logger for CliLogger {
     fn debug(&self, message: &str) {
         if self.debug_enabled {
-            let _ = cliclack::log::remark(message);
+            let styled = style(message).blue().dim();
+            let _ = cliclack::log::remark(styled);
         }
     }
 
