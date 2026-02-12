@@ -73,19 +73,26 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
 
     // Resolve ecosystem name
     let ecosystem_name = resolve_ecosystem_name(args.ecosystem_name.as_ref(), context.config())?;
-    ui::info(format!("Ecosystem: {}", ecosystem_name))?;
 
     // Resolve chain name
     let chain_name = resolve_chain_name(args.chain.as_ref(), context.config())?;
-    ui::info(format!("Chain: {}", chain_name))?;
 
     // Resolve RPC URL
     let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
-    ui::info(format!("RPC URL: {}", rpc_url))?;
 
     // Resolve new owner
     let new_owner = resolve_new_owner(args.new_owner, context.config())?;
-    ui::info(format!("New owner: {}", new_owner))?;
+
+    ui::note(
+        "Transfer configuration",
+        format!(
+            "Ecosystem: {}\nChain: {}\nRPC URL: {}\nNew owner: {}",
+            ui::green(&ecosystem_name),
+            ui::green(&chain_name),
+            ui::green(&rpc_url),
+            ui::green(new_owner)
+        ),
+    )?;
 
     // Create state manager
     let state_manager = create_state_manager_with_context(&ecosystem_name, context);

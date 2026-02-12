@@ -64,11 +64,18 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
 
     // Resolve ecosystem name
     let ecosystem_name = resolve_ecosystem_name(args.ecosystem_name.as_ref(), context.config())?;
-    ui::info(format!("Ecosystem: {}", ecosystem_name))?;
 
     // Resolve RPC URL
     let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
-    ui::info(format!("RPC URL: {}", rpc_url))?;
+
+    ui::note(
+        "Accept configuration",
+        format!(
+            "Ecosystem: {}\nRPC URL: {}",
+            ui::green(&ecosystem_name),
+            ui::green(&rpc_url)
+        ),
+    )?;
 
     // Create state manager
     let state_manager = create_state_manager_with_context(&ecosystem_name, context);
