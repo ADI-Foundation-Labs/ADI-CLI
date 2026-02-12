@@ -174,33 +174,20 @@ impl ContainerManager {
             container_id, timeout_seconds
         ));
 
-        // Show spinner during container startup
-        let spinner = cliclack::spinner();
-        spinner.start(log_label);
-
         self.docker
             .start_container(container_id, None::<StartContainerOptions<String>>)
             .await
-            .map_err(|e| {
-                spinner.error("Container failed to start");
-                DockerError::ContainerCreateFailed(e.to_string())
-            })?;
+            .map_err(|e| DockerError::ContainerCreateFailed(e.to_string()))?;
 
         self.logger.debug("Container started, streaming output...");
 
         let streamer = OutputStreamer::new(self.docker.clone(), Arc::clone(&self.logger));
         let duration = Duration::from_secs(timeout_seconds);
 
-        // Stream logs - pass the spinner so it can transition to log display
+        // Stream logs with static header and updating log lines
         let stream_result = timeout(
             duration,
-            streamer.stream_logs_with_spinner(
-                container_id,
-                log_dir,
-                log_command,
-                log_label,
-                spinner,
-            ),
+            streamer.stream_logs(container_id, log_dir, log_command, log_label),
         )
         .await;
 

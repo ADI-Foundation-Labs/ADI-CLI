@@ -117,7 +117,7 @@ impl LogDisplay {
     }
 }
 
-/// Streams container output with progress spinner.
+/// Streams container output with real-time display.
 pub(crate) struct OutputStreamer {
     docker: Docker,
     logger: Arc<dyn Logger>,
@@ -129,18 +129,16 @@ impl OutputStreamer {
         Self { docker, logger }
     }
 
-    /// Stream container logs with real-time display using an existing spinner.
+    /// Stream container logs with real-time display.
     ///
-    /// The spinner is transitioned to a step header when first output arrives.
-    /// Shows the last 10 lines of output, updating in real-time.
-    /// Full output is saved to a log file.
-    pub async fn stream_logs_with_spinner(
+    /// Prints a static header immediately, then shows the last 10 lines of output
+    /// updating in real-time. Full output is saved to a log file.
+    pub async fn stream_logs(
         &self,
         container_id: &str,
         log_dir: &Path,
         command: &str,
         label: &str,
-        spinner: cliclack::ProgressBar,
     ) -> Result<()> {
         let options = LogsOptions::<String> {
             follow: true,
@@ -159,17 +157,16 @@ impl OutputStreamer {
             .join("logs")
             .join(format!("{}_{}.log", command, timestamp));
 
+        // Print header immediately (static, never redrawn)
+        cliclack::log::step(label)
+            .map_err(|e| DockerError::StreamError(format!("Failed to log step: {}", e)))?;
+
         let mut display = LogDisplay::new();
-        let mut first_output_received = false;
 
         let stream_result: Result<()> = loop {
             tokio::select! {
                 _ = tokio::signal::ctrl_c() => {
-                    if first_output_received {
-                        display.clear().ok();
-                    } else {
-                        spinner.cancel("Interrupted");
-                    }
+                    display.clear().ok();
                     Self::save_log(&buffer, &log_path)?;
                     break Err(DockerError::StreamError("Interrupted by CTRL+C".to_string()));
                 }
@@ -181,23 +178,10 @@ impl OutputStreamer {
                             if let Ok(text) = std::str::from_utf8(&bytes) {
                                 for line in text.lines() {
                                     if !line.is_empty() {
-                                        // On first output, stop spinner and switch to log display
-                                        if !first_output_received {
-                                            first_output_received = true;
-                                            spinner.stop("");
-                                            cliclack::log::step(label).map_err(|e| {
-                                                DockerError::StreamError(format!(
-                                                    "Failed to log step: {}",
-                                                    e
-                                                ))
-                                            })?;
-                                        }
                                         display.push_line(line);
                                     }
                                 }
-                                if first_output_received {
-                                    display.render().ok();
-                                }
+                                display.render().ok();
                             }
                             buffer.extend(bytes);
                         }
@@ -215,11 +199,7 @@ impl OutputStreamer {
 
         // Normal completion - clear display and show completion message
         if stream_result.is_ok() {
-            if first_output_received {
-                display.clear().ok();
-            } else {
-                spinner.stop("");
-            }
+            display.clear().ok();
             cliclack::log::success(format!("Completed in {}s", start.elapsed().as_secs()))
                 .map_err(|e| DockerError::StreamError(format!("Failed to log success: {}", e)))?;
             Self::save_log(&buffer, &log_path)?;
