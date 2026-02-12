@@ -33,7 +33,7 @@ pub use types::{
     OwnershipStatusSummary, OwnershipSummary,
 };
 
-use adi_types::{ChainContracts, EcosystemContracts, Logger};
+use adi_types::{normalize_rpc_url, ChainContracts, EcosystemContracts, Logger};
 use alloy_network::EthereumWallet;
 use alloy_primitives::Address;
 use alloy_provider::{Provider, ProviderBuilder};
@@ -94,7 +94,8 @@ pub async fn accept_all_ownership(
 
     // Create signing provider
     let wallet = EthereumWallet::from(signer);
-    let url: url::Url = match rpc_url.parse() {
+    let normalized_rpc = normalize_rpc_url(rpc_url);
+    let url: url::Url = match normalized_rpc.parse() {
         Ok(u) => u,
         Err(e) => {
             logger.error(&format!("Invalid RPC URL: {}", e));
@@ -267,7 +268,8 @@ pub async fn accept_chain_ownership(
 
     // Create signing provider
     let wallet = EthereumWallet::from(signer);
-    let url: url::Url = match rpc_url.parse() {
+    let normalized_rpc = normalize_rpc_url(rpc_url);
+    let url: url::Url = match normalized_rpc.parse() {
         Ok(u) => u,
         Err(e) => {
             logger.error(&format!("Invalid RPC URL: {}", e));
@@ -389,7 +391,8 @@ pub async fn transfer_all_ownership(
 
     // Create signing provider
     let wallet = EthereumWallet::from(signer);
-    let url: url::Url = match rpc_url.parse() {
+    let normalized_rpc = normalize_rpc_url(rpc_url);
+    let url: url::Url = match normalized_rpc.parse() {
         Ok(u) => u,
         Err(e) => {
             logger.error(&format!("Invalid RPC URL: {}", e));
@@ -556,7 +559,8 @@ pub async fn transfer_chain_ownership(
 
     // Create signing provider
     let wallet = EthereumWallet::from(signer);
-    let url: url::Url = match rpc_url.parse() {
+    let normalized_rpc = normalize_rpc_url(rpc_url);
+    let url: url::Url = match normalized_rpc.parse() {
         Ok(u) => u,
         Err(e) => {
             logger.error(&format!("Invalid RPC URL: {}", e));

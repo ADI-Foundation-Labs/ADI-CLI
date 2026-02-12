@@ -42,21 +42,30 @@ where
             })?;
 
     let tx_hash = *pending.tx_hash();
+    let tx_hash_short = &tx_hash.to_string()[..12];
 
-    // Wait for confirmation
-    let receipt = pending
-        .get_receipt()
-        .await
-        .map_err(|e| EcosystemError::TransactionFailed {
+    // Show spinner while waiting for confirmation
+    let spinner = cliclack::spinner();
+    spinner.start(format!("Confirming tx {}...", tx_hash_short));
+
+    let receipt = pending.get_receipt().await.map_err(|e| {
+        spinner.error("Confirmation failed");
+        EcosystemError::TransactionFailed {
             reason: format!("Failed to get receipt: {}", e),
-        })?;
+        }
+    })?;
 
     if !receipt.status() {
+        spinner.error("Transaction reverted");
         return Err(EcosystemError::TransactionFailed {
             reason: format!("Transaction {} reverted", tx_hash),
         });
     }
 
+    spinner.stop(format!(
+        "Confirmed in block {}",
+        receipt.block_number.unwrap_or_default()
+    ));
     Ok(tx_hash)
 }
 

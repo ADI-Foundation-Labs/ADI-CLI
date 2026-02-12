@@ -215,12 +215,10 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
     };
 
     // Display summaries
-    ui::info("=== Ecosystem Summary ===")?;
-    display_summary(&ecosystem_summary)?;
+    display_summary("Ecosystem Summary", &ecosystem_summary)?;
 
     if let Some(ref summary) = chain_summary {
-        ui::info("=== Chain Summary ===")?;
-        display_summary(summary)?;
+        display_summary("Chain Summary", summary)?;
     }
 
     // Return appropriate status

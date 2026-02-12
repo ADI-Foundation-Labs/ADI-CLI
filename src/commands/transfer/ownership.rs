@@ -218,11 +218,8 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
     .await;
 
     // Display accept summaries
-    ui::section("Accept Summary")?;
-    ui::info("Ecosystem:")?;
-    display_summary(&ecosystem_accept_summary)?;
-    ui::info("Chain:")?;
-    display_summary(&chain_accept_summary)?;
+    display_summary("Ecosystem Accept Summary", &ecosystem_accept_summary)?;
+    display_summary("Chain Accept Summary", &chain_accept_summary)?;
 
     // Transfer phase
     ui::section("Transfer Phase")?;
@@ -252,11 +249,8 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
     .await;
 
     // Display transfer summaries
-    ui::section("Transfer Summary")?;
-    ui::info("Ecosystem:")?;
-    display_summary(&ecosystem_transfer_summary)?;
-    ui::info("Chain:")?;
-    display_summary(&chain_transfer_summary)?;
+    display_summary("Ecosystem Transfer Summary", &ecosystem_transfer_summary)?;
+    display_summary("Chain Transfer Summary", &chain_transfer_summary)?;
 
     // Return appropriate status
     let total_accept_successes =

@@ -42,6 +42,7 @@ mod metadata;
 mod network;
 mod partial;
 mod prover;
+mod url;
 mod wallet;
 
 // Re-export apps types
@@ -76,3 +77,6 @@ pub use wallet::{Wallet, Wallets};
 
 // Re-export logger types
 pub use logger::{LogCrateLogger, Logger, NoopLogger};
+
+// Re-export URL utilities
+pub use url::{is_localhost_rpc, normalize_rpc_url};

@@ -63,6 +63,8 @@ dependencies = [
  "alloy-signer-local",
  "alloy-sol-types",
  "clap",
+ "cliclack",
+ "colored",
  "console 0.15.11",
  "eyre",
  "hex",

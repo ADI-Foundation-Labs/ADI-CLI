@@ -43,7 +43,8 @@ impl ImageManager {
 
     /// Pull an image from registry.
     async fn pull(&self, image_uri: &str) -> Result<()> {
-        self.logger.info(&format!("Pulling image: {}", image_uri));
+        let spinner = cliclack::spinner();
+        spinner.start(format!("Pulling image: {}", image_uri));
 
         let options = CreateImageOptions {
             from_image: image_uri.to_string(),
@@ -59,6 +60,7 @@ impl ImageManager {
                         self.logger.debug(&format!("Pull status: {}", status));
                     }
                     if let Some(error) = info.error {
+                        spinner.error(format!("Failed: {}", &error));
                         return Err(DockerError::PullFailed {
                             image: image_uri.to_string(),
                             reason: error,
@@ -66,6 +68,7 @@ impl ImageManager {
                     }
                 }
                 Err(e) => {
+                    spinner.error(format!("Failed: {}", e));
                     return Err(DockerError::PullFailed {
                         image: image_uri.to_string(),
                         reason: e.to_string(),
@@ -74,7 +77,7 @@ impl ImageManager {
             }
         }
 
-        self.logger.success(&format!("Pulled image: {}", image_uri));
+        spinner.stop(format!("Pulled image: {}", image_uri));
         Ok(())
     }
 }

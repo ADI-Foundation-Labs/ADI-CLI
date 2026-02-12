@@ -6,7 +6,7 @@
 
 use crate::error::{EcosystemError, Result};
 use crate::validator::{build_add_validator_roles_calldata, ValidatorRoles};
-use adi_types::{ChainContracts, Logger, Wallets};
+use adi_types::{normalize_rpc_url, ChainContracts, Logger, Wallets};
 use alloy_network::{EthereumWallet, TransactionBuilder};
 use alloy_primitives::{Address, B256};
 use alloy_provider::{Provider, ProviderBuilder};
@@ -111,7 +111,8 @@ pub async fn add_validator_roles(
 
     // Create signing provider
     let wallet = EthereumWallet::from(signer);
-    let url: url::Url = rpc_url.parse().map_err(|e| {
+    let normalized_rpc = normalize_rpc_url(rpc_url);
+    let url: url::Url = normalized_rpc.parse().map_err(|e| {
         EcosystemError::InvalidConfig(format!("Invalid RPC URL '{}': {}", rpc_url, e))
     })?;
     let provider = ProviderBuilder::new().wallet(wallet).connect_http(url);

@@ -18,6 +18,7 @@ use super::types::{OwnershipResult, OwnershipState};
 use adi_types::{ChainContracts, EcosystemContracts, Logger};
 use alloy_primitives::{Address, B256, U256};
 use alloy_provider::Provider;
+use colored::Colorize;
 
 /// Accept ownership for Chain Admin contract.
 pub(crate) async fn accept_chain_admin<P>(
@@ -66,7 +67,10 @@ where
     .await
     {
         Ok(tx_hash) => {
-            logger.info(&format!("  ✓ Chain Admin ownership accepted: {}", tx_hash));
+            logger.info(&format!(
+                "  ✓ Chain Admin ownership accepted: {}",
+                tx_hash.to_string().green()
+            ));
             *nonce += 1;
             OwnershipResult::success("Chain Admin", tx_hash)
         }
@@ -147,7 +151,7 @@ where
         Ok(tx_hash) => {
             logger.info(&format!(
                 "  ✓ Server Notifier ownership accepted: {}",
-                tx_hash
+                tx_hash.to_string().green()
             ));
             *nonce += 1;
             OwnershipResult::success("Server Notifier", tx_hash)
@@ -205,7 +209,7 @@ where
         Ok(tx_hash) => {
             logger.info(&format!(
                 "  ✓ Validator Timelock ownership accepted: {}",
-                tx_hash
+                tx_hash.to_string().green()
             ));
             *nonce += 1;
             OwnershipResult::success("Validator Timelock", tx_hash)
@@ -258,7 +262,10 @@ where
     .await
     {
         Ok(tx_hash) => {
-            logger.info(&format!("  ✓ Verifier ownership accepted: {}", tx_hash));
+            logger.info(&format!(
+                "  ✓ Verifier ownership accepted: {}",
+                tx_hash.to_string().green()
+            ));
             *nonce += 1;
             OwnershipResult::success("Verifier", tx_hash)
         }
@@ -310,7 +317,10 @@ where
     .await
     {
         Ok(tx_hash) => {
-            logger.info(&format!("  ✓ Governance ownership accepted: {}", tx_hash));
+            logger.info(&format!(
+                "  ✓ Governance ownership accepted: {}",
+                tx_hash.to_string().green()
+            ));
             *nonce += 1;
             OwnershipResult::success("Governance", tx_hash)
         }
@@ -401,7 +411,7 @@ where
     .await
     {
         Ok(tx_hash) => {
-            logger.info(&format!("    ✓ Scheduled: {}", tx_hash));
+            logger.info(&format!("    ✓ Scheduled: {}", tx_hash.to_string().green()));
             *nonce += 1;
         }
         Err(e) => {
@@ -431,7 +441,7 @@ where
         Ok(tx_hash) => {
             logger.info(&format!(
                 "  ✓ Rollup DA Manager ownership accepted: {}",
-                tx_hash
+                tx_hash.to_string().green()
             ));
             *nonce += 1;
             OwnershipResult::success("Rollup DA Manager", tx_hash)

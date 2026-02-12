@@ -82,7 +82,8 @@ impl Logger for CliLogger {
     }
 
     fn warning(&self, message: &str) {
-        let _ = cliclack::log::warning(message);
+        let styled = style(message).yellow();
+        let _ = cliclack::log::warning(styled);
     }
 
     fn success(&self, message: &str) {

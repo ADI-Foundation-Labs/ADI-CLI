@@ -6,7 +6,7 @@
 use super::types::OwnershipStatusSummary;
 use super::types::{ownerCall, pendingOwnerCall, OwnershipState, OwnershipStatus};
 use crate::error::{EcosystemError, Result};
-use adi_types::{ChainContracts, EcosystemContracts, Logger};
+use adi_types::{normalize_rpc_url, ChainContracts, EcosystemContracts, Logger};
 use alloy_primitives::Address;
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_sol_types::SolCall;
@@ -32,7 +32,9 @@ pub async fn check_ecosystem_ownership_status(
     governor_address: Address,
     logger: &dyn Logger,
 ) -> Result<OwnershipStatusSummary> {
-    let url: url::Url = rpc_url
+    // Normalize URL for host-side connections (host.docker.internal -> localhost)
+    let normalized_url = normalize_rpc_url(rpc_url);
+    let url: url::Url = normalized_url
         .parse()
         .map_err(|e| EcosystemError::InvalidConfig(format!("Invalid RPC URL: {}", e)))?;
     let provider = ProviderBuilder::new().connect_http(url);
@@ -141,7 +143,9 @@ pub async fn check_chain_ownership_status(
     governor_address: Address,
     logger: &dyn Logger,
 ) -> Result<OwnershipStatusSummary> {
-    let url: url::Url = rpc_url
+    // Normalize URL for host-side connections (host.docker.internal -> localhost)
+    let normalized_url = normalize_rpc_url(rpc_url);
+    let url: url::Url = normalized_url
         .parse()
         .map_err(|e| EcosystemError::InvalidConfig(format!("Invalid RPC URL: {}", e)))?;
     let provider = ProviderBuilder::new().connect_http(url);

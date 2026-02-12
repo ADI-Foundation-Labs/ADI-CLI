@@ -44,28 +44,37 @@ pub fn categorize_result(result: &OwnershipResult) -> ResultCategory<'_> {
     }
 }
 
-/// Display the ownership summary.
-pub fn display_summary(summary: &OwnershipSummary) -> Result<()> {
-    ui::success(format!("  Successful: {}", summary.successful_count()))?;
-    ui::info(format!("  Skipped: {}", summary.skipped_count()))?;
-    ui::warning(format!("  Failed: {}", summary.failed_count()))?;
+/// Display the ownership summary in a note box.
+pub fn display_summary(title: &str, summary: &OwnershipSummary) -> Result<()> {
+    let mut lines = vec![
+        format!(
+            "Successful: {}  Skipped: {}  Failed: {}",
+            ui::green(summary.successful_count()),
+            ui::cyan(summary.skipped_count()),
+            ui::yellow(summary.failed_count())
+        ),
+        String::new(),
+    ];
 
     for result in &summary.results {
-        match categorize_result(result) {
+        let line = match categorize_result(result) {
             ResultCategory::SuccessWithTx(tx) => {
-                ui::success(format!("    {}: {}", result.name, tx))?;
+                format!("{}: {}", result.name, ui::green(tx))
             }
             ResultCategory::SuccessNoTx => {
-                ui::success(format!("    {}", result.name))?;
+                format!("{}: {}", result.name, ui::green("success"))
             }
             ResultCategory::Skipped(reason) => {
-                ui::info(format!("    {}: {}", result.name, reason))?;
+                format!("{}: {}", result.name, ui::cyan(reason))
             }
             ResultCategory::Failed(error) => {
-                ui::warning(format!("    {}: {}", result.name, error))?;
+                format!("{}: {}", result.name, ui::yellow(error))
             }
-        }
+        };
+        lines.push(line);
     }
+
+    ui::note(title, lines.join("\n"))?;
     Ok(())
 }
 
