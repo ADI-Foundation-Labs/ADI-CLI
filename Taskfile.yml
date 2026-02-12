@@ -19,27 +19,84 @@ tasks:
     cmds:
       - curl https://sh.rustup.rs -sSf | sh
 
-  fmt:
-    desc: Format Rust code
-    cmds:
-      - cargo fmt
-
-  lint:
-    desc: Lint Rust code
-    cmds:
-      - cargo clippy -- -D warnings
-
-  test:
-    desc: Run Rust tests
-    cmds:
-      - cargo test
-
   build:
-    desc: Build Rust binary
+    desc: Build the CLI in development mode
     deps:
       - _install_rust
     cmds:
       - cargo build
+
+  build:release:
+    desc: Build the CLI in release mode
+    deps:
+      - _install_rust
+    cmds:
+      - cargo build --release
+
+  install:
+    desc: Install the adi CLI to ~/.cargo/bin (requires ~/.cargo/bin in PATH)
+    deps:
+      - _install_rust
+    cmds:
+      - cargo install --path .
+
+  # ====================
+  # Testing
+  # ====================
+
+  test:
+    desc: Run all tests
+    deps:
+      - _install_rust
+    cmds:
+      - cargo test --workspace
+
+  test:unit:
+    desc: Run unit tests only (library crates)
+    deps:
+      - _install_rust
+    cmds:
+      - cargo test --workspace --lib
+
+  test:integration:
+    desc: Run integration tests only
+    deps:
+      - _install_rust
+    preconditions:
+      - sh: 'find . -path ./target -prune -o -type f -path "*/tests/*.rs" -print -quit | grep -q .'
+        msg: "No integration tests found (no */tests/*.rs files)"
+    cmds:
+      - cargo test --workspace --test '*'
+
+  lint:
+    desc: Run clippy linter with strict rules
+    deps:
+      - _install_rust
+    cmds:
+      - cargo clippy --workspace -- -D warnings
+
+  fmt:
+    desc: Format code with rustfmt
+    deps:
+      - _install_rust
+    cmds:
+      - cargo fmt
+
+  fmt:check:
+    desc: Check code formatting
+    deps:
+      - _install_rust
+    cmds:
+      - cargo fmt -- --check
+
+  check:
+    desc: Run all checks (fmt, lint, test)
+    deps:
+      - _install_rust
+    cmds:
+      - task: fmt:check
+      - task: lint
+      - task: test
 
   # Internal task to build and push docker image for a specific architecture
   build:docker:internal:

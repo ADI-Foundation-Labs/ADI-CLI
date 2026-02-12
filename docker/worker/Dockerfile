@@ -17,6 +17,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   nodejs \
   npm \
   python3-pip \
+  docker.io \
+  docker-compose \
+  expect \
   && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies for upgrade scripts
@@ -43,12 +46,7 @@ RUN git submodule update --init --recursive
 RUN echo "[patch.crates-io]" >> Cargo.toml && \
   echo "parity-scale-codec = { version = \"3.6.12\" }" >> Cargo.toml
 
-# example:
-#  RUN --mount=type=cache,target=/app/target/ \
-#     --mount=type=cache,target=/usr/local/cargo/git/db \
-#     --mount=type=cache,target=/usr/local/cargo/registry/ \
-#     cargo build
-
+# Build zkstack CLI
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
   --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
   --mount=type=cache,target=/cargo-target \

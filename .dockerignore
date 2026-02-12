@@ -1,6 +1,48 @@
-.git
-.task
-target
-node_modules
-dist
-build
+# Build artifacts
+target/
+debug/
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+docker
+
+# Environment files
+.env*
+
+# Logs
+*.log
+
+# IDE/Editor directories
+.vscode/
+.idea/
+
+# Claude Code
+.claude/
+
+# Task runner
+.task/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+
+# Specification files
+specs/
+
+# Tests (not needed in production image)
+tests/
+
+scripts
+state
+docs
+.specify
+.gitlab-cli.yml
+.pre-commit-config.yaml
+Taskfile.yml
+.editorconfig
