@@ -2,6 +2,15 @@
 
 version: "3"
 
+vars:
+  REGISTRY: harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli
+  CACHE_REF_SLUG: '{{default "main" .CI_COMMIT_REF_SLUG}}'
+  # Default platform to linux/arm64 for local dev (Apple Silicon friendly)
+  PLATFORM: '{{default "linux/arm64" .PLATFORM}}'
+  TARGETS: '{{default "default" .TARGETS}}'
+  CI_COMMIT_SHORT_SHA:
+    sh: git rev-parse --short HEAD || echo "unknown"
+
 tasks:
   _install_rust:
     internal: true
@@ -10,138 +19,98 @@ tasks:
     cmds:
       - curl https://sh.rustup.rs -sSf | sh
 
+  fmt:
+    desc: Format Rust code
+    cmds:
+      - cargo fmt
+
+  lint:
+    desc: Lint Rust code
+    cmds:
+      - cargo clippy -- -D warnings
+
+  test:
+    desc: Run Rust tests
+    cmds:
+      - cargo test
+
   build:
-    desc: Build the CLI in development mode
+    desc: Build Rust binary
     deps:
       - _install_rust
     cmds:
       - cargo build
 
-  build:release:
-    desc: Build the CLI in release mode
-    deps:
-      - _install_rust
-    cmds:
-      - cargo build --release
-
-  # ====================
-  # Testing
-  # ====================
-
-  test:
-    desc: Run all tests
-    deps:
-      - _install_rust
-    cmds:
-      - cargo test --workspace
-
-  test:unit:
-    desc: Run unit tests only (library crates)
-    deps:
-      - _install_rust
-    cmds:
-      - cargo test --workspace --lib
-
-  test:integration:
-    desc: Run integration tests only
-    deps:
-      - _install_rust
-    preconditions:
-      - sh: 'find . -path ./target -prune -o -type f -path "*/tests/*.rs" -print -quit | grep -q .'
-        msg: "No integration tests found (no */tests/*.rs files)"
-    cmds:
-      - cargo test --workspace --test '*'
-
-  lint:
-    desc: Run clippy linter with strict rules
-    deps:
-      - _install_rust
-    cmds:
-      - cargo clippy --workspace -- -D warnings
-
-  fmt:
-    desc: Format code with rustfmt
-    deps:
-      - _install_rust
-    cmds:
-      - cargo fmt
-
-  fmt:check:
-    desc: Check code formatting
-    deps:
-      - _install_rust
-    cmds:
-      - cargo fmt -- --check
-
-  check:
-    desc: Run all checks (fmt, lint, test)
-    deps:
-      - _install_rust
-    cmds:
-      - task: fmt:check
-      - task: lint
-      - task: test
-
-  # ====================
-  # Docker / Toolkit
-  # ====================
-
-  build:docker:
-    desc: Build Docker images using Docker Bake
+  # Internal task to build and push docker image for a specific architecture
+  build:docker:internal:
+    internal: true
     vars:
-      TARGETS: '{{default "default" .TARGETS}}'
-    sources:
-      - docker/worker/Dockerfile
-      - docker/docker-bake.hcl
-    generates:
-      - .task/build_docker_{{.TARGETS}}
-    preconditions:
-      - docker ps
-      - docker buildx version
-      - docker buildx bake --help
+      ARCH_SLUG: '{{default "arm64" .ARCH_SLUG}}'
+      REF_SLUG: '{{default "main" .CI_COMMIT_REF_SLUG}}'
+      CACHE_TO_REF: '{{.REGISTRY}}/adi-toolkit:cache-{{.ARCH_SLUG}}-{{.REF_SLUG}}'
+      LOAD: '{{default "true" .LOAD}}'
+      PUSH: '{{default "false" .PUSH}}'
     cmds:
-      - docker buildx bake -f docker/docker-bake.hcl {{.TARGETS}}
-      - mkdir -p .task && touch .task/build_docker_{{.TARGETS}}
+      - |
+        # Calculate TAG_SUFFIX
+        # Local (LOAD=true): Empty suffix (clean version tag)
+        # Remote (PUSH=true): -branch-arch-sha (unique tracking tag)
+        if [ "{{.LOAD}}" = "true" ]; then
+          TAG_SUFFIX=""
+        else
+          TAG_SUFFIX="-{{.REF_SLUG}}-{{.ARCH_SLUG}}-{{.CI_COMMIT_SHORT_SHA}}"
+        fi
 
-  build:toolkit:
-    desc: Build toolkit image (v30.0.2)
+        PLATFORM={{.PLATFORM}} \
+        CACHE_TO_REF={{.CACHE_TO_REF}} \
+        TAG_SUFFIX="$TAG_SUFFIX" \
+        docker buildx bake -f docker/docker-bake.hcl \
+        {{if eq .LOAD "true"}}--load{{end}} \
+        {{if eq .PUSH "true"}}--push{{end}} \
+        {{.TARGETS}}
+
+  build:docker:amd64:
+    desc: Build and push Docker image for linux/amd64
     cmds:
-      - task: build:docker
-        vars:
-          TARGETS: default
+      - task: build:docker:internal
+        vars: { PLATFORM: "linux/amd64", ARCH_SLUG: "amd64" }
 
-  build:toolkit:v30.0.2:
-    desc: Build toolkit image for protocol v30.0.2
+  build:docker:arm64:
+    desc: Build and push Docker image for linux/arm64
     cmds:
-      - task: build:docker
-        vars:
-          TARGETS: toolkit-v30-0-2
+      - task: build:docker:internal
+        vars: { PLATFORM: "linux/arm64", ARCH_SLUG: "arm64" }
 
-  build:toolkit:local:
-    desc: Build toolkit image for local testing (current platform, faster)
-    preconditions:
-      - docker ps
-      - docker buildx version
-    cmds:
-      - docker buildx bake -f docker/docker-bake.hcl toolkit-v30-0-2 --set '*.platform=linux/arm64' --load
-
-  push:docker:
-    desc: Build and push Docker images using Docker Bake
+  build:docker:manifest:
+    desc: Create and push multiarch manifest
     vars:
-      TARGETS: '{{default "default" .TARGETS}}'
+      REF_SLUG: '{{default "main" .CI_COMMIT_REF_SLUG}}'
     cmds:
-      - docker buildx bake -f docker/docker-bake.hcl --push {{.TARGETS}}
+      - |
+        # Extract base tag from HCL (e.g. registry/adi-toolkit:v30.0.2)
+        # We run bake --print with empty suffix to get the clean target tag
+        BASE_TAGS=$(TAG_SUFFIX="" docker buildx bake --print -f docker/docker-bake.hcl {{.TARGETS}} | jq -r '.target[].tags[0]')
 
-  push:toolkit:
-    desc: Build and push toolkit image
-    cmds:
-      - task: push:docker
-        vars:
-          TARGETS: default
+        if [ -z "$BASE_TAGS" ] || [ "$BASE_TAGS" = "null" ]; then
+          echo "Error: Could not extract base tags from docker-bake.hcl"
+          exit 1
+        fi
 
-  push:toolkit:v30.0.2:
-    desc: Build and push toolkit v30.0.2 image
-    cmds:
-      - task: push:docker
-        vars:
-          TARGETS: toolkit-v30-0-2
+        for BASE_TAG in $BASE_TAGS; do
+          echo "Processing Base Tag: $BASE_TAG"
+
+          # Source images (pushed by build:docker:*)
+          SRC_AMD64="${BASE_TAG}-{{.REF_SLUG}}-amd64-{{.CI_COMMIT_SHORT_SHA}}"
+          SRC_ARM64="${BASE_TAG}-{{.REF_SLUG}}-arm64-{{.CI_COMMIT_SHORT_SHA}}"
+
+          # 1. Mutable Branch Tag: v30.0.2-branch
+          docker buildx imagetools create -t "${BASE_TAG}-{{.REF_SLUG}}" $SRC_AMD64 $SRC_ARM64
+
+          # 2. Immutable Branch Tag: v30.0.2-branch-sha
+          docker buildx imagetools create -t "${BASE_TAG}-{{.REF_SLUG}}-{{.CI_COMMIT_SHORT_SHA}}" $SRC_AMD64 $SRC_ARM64
+
+          # 3. Version Tag (Main Only): v30.0.2
+          if [ "{{.REF_SLUG}}" = "main" ]; then
+            docker buildx imagetools create -t "${BASE_TAG}" $SRC_AMD64 $SRC_ARM64
+          fi
+        done
