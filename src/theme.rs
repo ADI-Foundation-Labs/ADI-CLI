@@ -85,25 +85,33 @@ impl Theme for AdiTheme {
         )
     }
 
-    /// Outro with green background badge.
+    /// Outro with green background badge (or plain bar if empty).
     fn format_outro(&self, message: &str) -> String {
-        let badge = Style::new().on_green().black().bold();
         let bar = Style::new().blue().dim();
-        format!(
-            "{}  {}\n",
-            bar.apply_to("└"),
-            badge.apply_to(format!(" {} ", message))
-        )
+        if message.is_empty() {
+            format!("{}\n", bar.apply_to("└"))
+        } else {
+            let badge = Style::new().on_green().black().bold();
+            format!(
+                "{}  {}\n",
+                bar.apply_to("└"),
+                badge.apply_to(format!(" {} ", message))
+            )
+        }
     }
 
-    /// Cancel outro with yellow background badge.
+    /// Cancel outro with yellow background badge (or plain bar if empty).
     fn format_outro_cancel(&self, message: &str) -> String {
-        let badge = Style::new().on_yellow().black().bold();
         let bar = Style::new().blue().dim();
-        format!(
-            "{}  {}\n",
-            bar.apply_to("└"),
-            badge.apply_to(format!(" {} ", message))
-        )
+        if message.is_empty() {
+            format!("{}\n", bar.apply_to("└"))
+        } else {
+            let badge = Style::new().on_yellow().black().bold();
+            format!(
+                "{}  {}\n",
+                bar.apply_to("└"),
+                badge.apply_to(format!(" {} ", message))
+            )
+        }
     }
 }
