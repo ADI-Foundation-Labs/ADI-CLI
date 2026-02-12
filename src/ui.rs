@@ -28,6 +28,23 @@ pub fn yellow<D: std::fmt::Display>(val: D) -> console::StyledObject<D> {
     style(val).yellow()
 }
 
+/// Style text in red for errors.
+#[allow(dead_code)]
+pub fn red<D: std::fmt::Display>(val: D) -> console::StyledObject<D> {
+    style(val).red()
+}
+
+/// Style text in cyan for info.
+pub fn cyan<D: std::fmt::Display>(val: D) -> console::StyledObject<D> {
+    style(val).cyan()
+}
+
+/// Style text dimmed (gray).
+#[allow(dead_code)]
+pub fn dim<D: std::fmt::Display>(val: D) -> console::StyledObject<D> {
+    style(val).dim()
+}
+
 /// CLI logger using cliclack for user-facing output.
 ///
 /// - `debug()` uses `cliclack::log::remark` (shown only when debug_enabled is true)
@@ -73,7 +90,8 @@ impl Logger for CliLogger {
     }
 
     fn error(&self, message: &str) {
-        let _ = cliclack::log::error(message);
+        let styled = style(message).red();
+        let _ = cliclack::log::error(styled);
     }
 }
 

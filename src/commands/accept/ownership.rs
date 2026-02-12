@@ -104,14 +104,17 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
 
     // Check ecosystem ownership status
     ui::info("Checking ecosystem ownership status...")?;
-    let ecosystem_status =
-        check_ecosystem_ownership_status(rpc_url.as_str(), &ecosystem_contracts, governor_address)
-            .await
-            .wrap_err("Failed to check ecosystem ownership status")?;
+    let ecosystem_status = check_ecosystem_ownership_status(
+        rpc_url.as_str(),
+        &ecosystem_contracts,
+        governor_address,
+        context.logger().as_ref(),
+    )
+    .await
+    .wrap_err("Failed to check ecosystem ownership status")?;
 
     // Display ecosystem contracts with pending status
-    ui::info("Ecosystem contracts:")?;
-    display_ownership_status(&ecosystem_status)?;
+    display_ownership_status("Ecosystem contracts", &ecosystem_status)?;
 
     // Load and check chain contracts if --chain is provided
     let chain_contracts: Option<ChainContracts>;
@@ -124,13 +127,16 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
                     "Checking chain '{}' ownership status...",
                     chain_name
                 ))?;
-                let status =
-                    check_chain_ownership_status(rpc_url.as_str(), &contracts, governor_address)
-                        .await
-                        .wrap_err("Failed to check chain ownership status")?;
+                let status = check_chain_ownership_status(
+                    rpc_url.as_str(),
+                    &contracts,
+                    governor_address,
+                    context.logger().as_ref(),
+                )
+                .await
+                .wrap_err("Failed to check chain ownership status")?;
 
-                ui::info(format!("Chain '{}' contracts:", chain_name))?;
-                display_ownership_status(&status)?;
+                display_ownership_status(&format!("Chain '{}' contracts", chain_name), &status)?;
 
                 chain_contracts = Some(contracts);
                 chain_status = Some(status);

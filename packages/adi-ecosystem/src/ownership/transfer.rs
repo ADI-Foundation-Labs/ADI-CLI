@@ -59,7 +59,7 @@ where
     };
 
     // Verify governor is current owner before transferring
-    match check_ownership_state(provider, governance, governor).await {
+    match check_ownership_state(provider, governance, governor, "Governance", logger).await {
         OwnershipState::Accepted => {} // Good - we can transfer
         OwnershipState::Pending => {
             return OwnershipResult::skipped(
@@ -120,7 +120,15 @@ where
     };
 
     // Verify governor is current owner before transferring
-    match check_ownership_state(provider, chain_admin, governor).await {
+    match check_ownership_state(
+        provider,
+        chain_admin,
+        governor,
+        "Ecosystem Chain Admin",
+        logger,
+    )
+    .await
+    {
         OwnershipState::Accepted => {} // Good - we can transfer
         OwnershipState::Pending => {
             return OwnershipResult::skipped(
@@ -190,7 +198,7 @@ where
     };
 
     // Verify governor is current owner before transferring
-    match check_ownership_state(provider, timelock, governor).await {
+    match check_ownership_state(provider, timelock, governor, "Validator Timelock", logger).await {
         OwnershipState::Accepted => {} // Good - we can transfer
         OwnershipState::Pending => {
             return OwnershipResult::skipped(
@@ -272,7 +280,7 @@ where
 
     // Verify governor is current owner before transferring
     // Note: Bridged Token Beacon uses Ownable, not Ownable2Step
-    match check_ownership_state(provider, beacon, governor).await {
+    match check_ownership_state(provider, beacon, governor, "Bridged Token Beacon", logger).await {
         OwnershipState::Accepted => {} // Good - we can transfer
         OwnershipState::Pending | OwnershipState::NotTransferred => {
             return OwnershipResult::skipped(
@@ -327,7 +335,7 @@ where
     };
 
     // Verify governor is current owner before transferring
-    match check_ownership_state(provider, governance, governor).await {
+    match check_ownership_state(provider, governance, governor, "Chain Governance", logger).await {
         OwnershipState::Accepted => {} // Good - we can transfer
         OwnershipState::Pending => {
             return OwnershipResult::skipped(
@@ -391,7 +399,8 @@ where
     };
 
     // Verify governor is current owner before transferring
-    match check_ownership_state(provider, chain_admin, governor).await {
+    match check_ownership_state(provider, chain_admin, governor, "Chain Chain Admin", logger).await
+    {
         OwnershipState::Accepted => {} // Good - we can transfer
         OwnershipState::Pending => {
             return OwnershipResult::skipped(

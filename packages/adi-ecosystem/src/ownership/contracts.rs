@@ -40,7 +40,7 @@ where
     };
 
     // Check if ownership acceptance is needed
-    match check_ownership_state(provider, chain_admin, governor).await {
+    match check_ownership_state(provider, chain_admin, governor, "Chain Admin", logger).await {
         OwnershipState::Accepted => {
             logger.info("  ✓ Chain Admin: ownership already accepted");
             return OwnershipResult::skipped("Chain Admin", "ownership already accepted");
@@ -111,7 +111,15 @@ where
 
     // Check if ownership acceptance is needed
     // Note: Server Notifier is owned by ChainAdmin, not governor
-    match check_ownership_state(provider, server_notifier, chain_admin_addr).await {
+    match check_ownership_state(
+        provider,
+        server_notifier,
+        chain_admin_addr,
+        "Server Notifier",
+        logger,
+    )
+    .await
+    {
         OwnershipState::Accepted => {
             logger.info("  ✓ Server Notifier: ownership already accepted");
             return OwnershipResult::skipped("Server Notifier", "ownership already accepted");
@@ -175,7 +183,7 @@ where
     };
 
     // Check if ownership acceptance is needed
-    match check_ownership_state(provider, timelock, governor).await {
+    match check_ownership_state(provider, timelock, governor, "Validator Timelock", logger).await {
         OwnershipState::Accepted => {
             logger.info("  ✓ Validator Timelock: ownership already accepted");
             return OwnershipResult::skipped("Validator Timelock", "ownership already accepted");
@@ -230,7 +238,7 @@ where
     };
 
     // Check if ownership acceptance is needed
-    match check_ownership_state(provider, verifier, governor).await {
+    match check_ownership_state(provider, verifier, governor, "Verifier", logger).await {
         OwnershipState::Accepted => {
             logger.info("  ✓ Verifier: ownership already accepted");
             return OwnershipResult::skipped("Verifier", "ownership already accepted");
@@ -282,7 +290,7 @@ where
     };
 
     // Check if ownership acceptance is needed
-    match check_ownership_state(provider, governance, governor).await {
+    match check_ownership_state(provider, governance, governor, "Governance", logger).await {
         OwnershipState::Accepted => {
             logger.info("  ✓ Governance: ownership already accepted");
             return OwnershipResult::skipped("Governance", "ownership already accepted");
@@ -354,7 +362,15 @@ where
 
     // Check if ownership acceptance is needed by checking pendingOwner on DA Manager
     // Note: for DA Manager, the expected pending owner is the governance contract
-    match check_ownership_state(provider, da_manager, governance).await {
+    match check_ownership_state(
+        provider,
+        da_manager,
+        governance,
+        "Rollup DA Manager",
+        logger,
+    )
+    .await
+    {
         OwnershipState::Accepted => {
             logger.info("  ✓ Rollup DA Manager: ownership already accepted");
             return OwnershipResult::skipped("Rollup DA Manager", "ownership already accepted");

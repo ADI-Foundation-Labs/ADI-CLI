@@ -6,7 +6,7 @@
 use super::types::OwnershipStatusSummary;
 use super::types::{ownerCall, pendingOwnerCall, OwnershipState, OwnershipStatus};
 use crate::error::{EcosystemError, Result};
-use adi_types::{ChainContracts, EcosystemContracts};
+use adi_types::{ChainContracts, EcosystemContracts, Logger};
 use alloy_primitives::Address;
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_sol_types::SolCall;
@@ -21,6 +21,7 @@ use alloy_sol_types::SolCall;
 /// * `rpc_url` - Settlement layer RPC endpoint URL.
 /// * `contracts` - Ecosystem contracts containing addresses.
 /// * `governor_address` - Governor address to check as pending owner.
+/// * `logger` - Logger for debug output.
 ///
 /// # Returns
 ///
@@ -29,6 +30,7 @@ pub async fn check_ecosystem_ownership_status(
     rpc_url: &str,
     contracts: &EcosystemContracts,
     governor_address: Address,
+    logger: &dyn Logger,
 ) -> Result<OwnershipStatusSummary> {
     let url: url::Url = rpc_url
         .parse()
@@ -37,13 +39,20 @@ pub async fn check_ecosystem_ownership_status(
 
     let mut statuses = Vec::new();
 
+    logger.debug(&format!(
+        "Checking ecosystem ownership with governor: {}",
+        governor_address
+    ));
+
     // Get chain_admin for contracts that are owned by it
     let chain_admin = contracts.chain_admin_addr();
 
     // Check Server Notifier (owned by ChainAdmin, not governor)
     let server_notifier_addr = contracts.server_notifier_addr();
     let state = match (server_notifier_addr, chain_admin) {
-        (Some(addr), Some(ca)) => check_ownership_state(&provider, addr, ca).await,
+        (Some(addr), Some(ca)) => {
+            check_ownership_state(&provider, addr, ca, "Server Notifier", logger).await
+        }
         _ => OwnershipState::NotTransferred,
     };
     statuses.push(OwnershipStatus {
@@ -55,7 +64,14 @@ pub async fn check_ecosystem_ownership_status(
     // Check Validator Timelock
     let timelock_addr = contracts.validator_timelock_addr();
     let state = if let Some(addr) = timelock_addr {
-        check_ownership_state(&provider, addr, governor_address).await
+        check_ownership_state(
+            &provider,
+            addr,
+            governor_address,
+            "Validator Timelock",
+            logger,
+        )
+        .await
     } else {
         OwnershipState::NotTransferred
     };
@@ -68,7 +84,7 @@ pub async fn check_ecosystem_ownership_status(
     // Check Verifier
     let verifier_addr = contracts.verifier_addr();
     let state = if let Some(addr) = verifier_addr {
-        check_ownership_state(&provider, addr, governor_address).await
+        check_ownership_state(&provider, addr, governor_address, "Verifier", logger).await
     } else {
         OwnershipState::NotTransferred
     };
@@ -81,7 +97,7 @@ pub async fn check_ecosystem_ownership_status(
     // Check Governance
     let governance_addr = contracts.governance_addr();
     let state = if let Some(addr) = governance_addr {
-        check_ownership_state(&provider, addr, governor_address).await
+        check_ownership_state(&provider, addr, governor_address, "Governance", logger).await
     } else {
         OwnershipState::NotTransferred
     };
@@ -94,7 +110,7 @@ pub async fn check_ecosystem_ownership_status(
     // Check Rollup DA Manager (pending owner should be governance, not governor)
     let da_manager_addr = contracts.l1_rollup_da_manager_addr();
     let state = if let (Some(da_addr), Some(gov_addr)) = (da_manager_addr, governance_addr) {
-        check_ownership_state(&provider, da_addr, gov_addr).await
+        check_ownership_state(&provider, da_addr, gov_addr, "Rollup DA Manager", logger).await
     } else {
         OwnershipState::NotTransferred
     };
@@ -114,6 +130,7 @@ pub async fn check_ecosystem_ownership_status(
 /// * `rpc_url` - Settlement layer RPC endpoint URL.
 /// * `contracts` - Chain contracts containing addresses.
 /// * `governor_address` - Governor address to check as pending owner.
+/// * `logger` - Logger for debug output.
 ///
 /// # Returns
 ///
@@ -122,6 +139,7 @@ pub async fn check_chain_ownership_status(
     rpc_url: &str,
     contracts: &ChainContracts,
     governor_address: Address,
+    logger: &dyn Logger,
 ) -> Result<OwnershipStatusSummary> {
     let url: url::Url = rpc_url
         .parse()
@@ -130,10 +148,15 @@ pub async fn check_chain_ownership_status(
 
     let mut statuses = Vec::new();
 
+    logger.debug(&format!(
+        "Checking chain ownership with governor: {}",
+        governor_address
+    ));
+
     // Check Chain Admin
     let chain_admin_addr = contracts.chain_admin_addr();
     let state = if let Some(addr) = chain_admin_addr {
-        check_ownership_state(&provider, addr, governor_address).await
+        check_ownership_state(&provider, addr, governor_address, "Chain Admin", logger).await
     } else {
         OwnershipState::NotTransferred
     };
@@ -150,6 +173,8 @@ pub async fn check_chain_ownership_status(
 pub(crate) async fn call_pending_owner<P>(
     provider: &P,
     contract_address: Address,
+    contract_name: &str,
+    logger: &dyn Logger,
 ) -> Option<Address>
 where
     P: Provider + Clone,
@@ -160,16 +185,33 @@ where
         .input(calldata.into());
 
     match provider.call(tx).await {
-        Ok(result) => result.get(12..32).map(Address::from_slice),
-        Err(_e) => {
-            // Debug logging for pendingOwner failures happens at call site
+        Ok(result) => {
+            let addr = result.get(12..32).map(Address::from_slice);
+            logger.debug(&format!(
+                "  {} pendingOwner() = {:?}",
+                contract_name,
+                addr.map(|a| a.to_string())
+                    .unwrap_or_else(|| "None".to_string())
+            ));
+            addr
+        }
+        Err(e) => {
+            logger.error(&format!(
+                "  {} pendingOwner() call failed: {}",
+                contract_name, e
+            ));
             None
         }
     }
 }
 
 /// Call owner() on a contract and return the result.
-pub(crate) async fn call_owner<P>(provider: &P, contract_address: Address) -> Option<Address>
+pub(crate) async fn call_owner<P>(
+    provider: &P,
+    contract_address: Address,
+    contract_name: &str,
+    logger: &dyn Logger,
+) -> Option<Address>
 where
     P: Provider + Clone,
 {
@@ -179,9 +221,18 @@ where
         .input(calldata.into());
 
     match provider.call(tx).await {
-        Ok(result) => result.get(12..32).map(Address::from_slice),
-        Err(_e) => {
-            // Debug logging for owner failures happens at call site
+        Ok(result) => {
+            let addr = result.get(12..32).map(Address::from_slice);
+            logger.debug(&format!(
+                "  {} owner() = {:?}",
+                contract_name,
+                addr.map(|a| a.to_string())
+                    .unwrap_or_else(|| "None".to_string())
+            ));
+            addr
+        }
+        Err(e) => {
+            logger.error(&format!("  {} owner() call failed: {}", contract_name, e));
             None
         }
     }
@@ -197,22 +248,38 @@ pub(crate) async fn check_ownership_state<P>(
     provider: &P,
     contract_address: Address,
     governor_address: Address,
+    contract_name: &str,
+    logger: &dyn Logger,
 ) -> OwnershipState
 where
     P: Provider + Clone,
 {
+    logger.debug(&format!(
+        "Checking {} at {} (expected owner: {})",
+        contract_name, contract_address, governor_address
+    ));
+
     // Check if governor is pending owner
-    let pending_owner = call_pending_owner(provider, contract_address).await;
+    let pending_owner = call_pending_owner(provider, contract_address, contract_name, logger).await;
     if pending_owner == Some(governor_address) {
+        logger.debug(&format!(
+            "  {} -> Pending (pendingOwner matches)",
+            contract_name
+        ));
         return OwnershipState::Pending;
     }
 
     // Check if governor is already owner
-    let current_owner = call_owner(provider, contract_address).await;
+    let current_owner = call_owner(provider, contract_address, contract_name, logger).await;
     if current_owner == Some(governor_address) {
+        logger.debug(&format!("  {} -> Accepted (owner matches)", contract_name));
         return OwnershipState::Accepted;
     }
 
     // Neither pending nor owner - ownership transfer not initiated
+    logger.debug(&format!(
+        "  {} -> NotTransferred (neither pendingOwner nor owner matches)",
+        contract_name
+    ));
     OwnershipState::NotTransferred
 }

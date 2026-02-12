@@ -69,27 +69,43 @@ pub fn display_summary(summary: &OwnershipSummary) -> Result<()> {
     Ok(())
 }
 
-/// Display ownership status for contracts.
-pub fn display_ownership_status(summary: &OwnershipStatusSummary) -> Result<()> {
-    for status in &summary.statuses {
-        match (status.address, status.state) {
+/// Display ownership status for contracts in a note box.
+pub fn display_ownership_status(title: &str, summary: &OwnershipStatusSummary) -> Result<()> {
+    let lines: Vec<String> = summary
+        .statuses
+        .iter()
+        .map(|status| match (status.address, status.state) {
             (Some(addr), OwnershipState::Pending) => {
-                ui::warning(format!("  {}: {} (pending)", status.name, addr))?;
+                format!(
+                    "{}: {} {}",
+                    status.name,
+                    ui::green(addr),
+                    ui::yellow("(pending)")
+                )
             }
             (Some(addr), OwnershipState::Accepted) => {
-                ui::success(format!("  {}: {} (accepted)", status.name, addr))?;
+                format!(
+                    "{}: {} {}",
+                    status.name,
+                    ui::green(addr),
+                    ui::green("(accepted)")
+                )
             }
             (Some(addr), OwnershipState::NotTransferred) => {
-                ui::error(format!(
-                    "  {}: {} (ownership not transferred!)",
-                    status.name, addr
-                ))?;
+                format!(
+                    "{}: {} {}",
+                    status.name,
+                    ui::green(addr),
+                    ui::cyan("(no pending transfer)")
+                )
             }
             (None, _) => {
-                ui::info(format!("  {}: not configured", status.name))?;
+                format!("{}: {}", status.name, ui::cyan("not configured"))
             }
-        }
-    }
+        })
+        .collect();
+
+    ui::note(title, lines.join("\n"))?;
     Ok(())
 }
 
