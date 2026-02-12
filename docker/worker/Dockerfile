@@ -17,13 +17,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   nodejs \
   npm \
   python3-pip \
-  docker.io \
-  docker-compose \
-  expect \
   && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies for upgrade scripts
-RUN pip3 install eth-abi "eth-hash[pycryptodome]" --break-system-packages
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+  pip3 install eth-abi "eth-hash[pycryptodome]" --break-system-packages
 
 # Install yarn globally (needed for era-contracts build)
 RUN npm install -g yarn
@@ -34,13 +32,29 @@ ENV PATH="/root/.foundry/bin:${PATH}"
 RUN foundryup-zksync
 
 # Install zkstack CLI from specific commit
+# Set global cargo target dir for caching
+ENV CARGO_TARGET_DIR=/cargo-target/${ZKSYNC_ERA_COMMIT}
 WORKDIR /deps
 RUN git clone https://github.com/matter-labs/zksync-era.git zksync-era
 WORKDIR /deps/zksync-era
 RUN git checkout ${ZKSYNC_ERA_COMMIT}
 RUN git submodule update --init --recursive
+# Patch yanked parity-scale-codec version
+RUN echo "[patch.crates-io]" >> Cargo.toml && \
+  echo "parity-scale-codec = { version = \"3.6.12\" }" >> Cargo.toml
+
+# example:
+#  RUN --mount=type=cache,target=/app/target/ \
+#     --mount=type=cache,target=/usr/local/cargo/git/db \
+#     --mount=type=cache,target=/usr/local/cargo/registry/ \
+#     cargo build
+
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
-  cargo install --path zkstack_cli/crates/zkstack --force --locked
+  --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+  --mount=type=cache,target=/cargo-target \
+  --mount=type=cache,target=/usr/local/rustup,sharing=locked \
+  cargo build --release --manifest-path zkstack_cli/crates/zkstack/Cargo.toml && \
+  cp ${CARGO_TARGET_DIR}/release/zkstack /usr/local/bin/zkstack
 
 # zksync-os-integration and submodules (conditional)
 RUN if [ -n "$ZKSYNC_ERA_OS_INTEGRATION_COMMIT" ]; then \
@@ -55,7 +69,8 @@ RUN git clone https://github.com/matter-labs/era-contracts.git .
 RUN git checkout ${ERA_CONTRACTS_TAG}
 RUN git submodule update --init --recursive
 # Pre-install dependencies for faster runtime
-RUN yarn install
+RUN --mount=type=cache,target=/root/.cache/yarn,sharing=locked \
+  yarn install --cache-folder /root/.cache/yarn
 
 WORKDIR /workspace
 ENTRYPOINT ["/bin/bash"]
