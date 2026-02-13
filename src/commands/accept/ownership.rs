@@ -105,8 +105,9 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
 
     // Resolve private key with priority:
     // 1. --private-key argument/env var (new owner mode)
-    // 2. --use-governor flag (use stored governor key)
-    // 3. Interactive prompt: "Accept as governor?"
+    // 2. Config ownership.private_key (new owner mode)
+    // 3. --use-governor flag (use stored governor key)
+    // 4. Interactive prompt: "Accept as governor?"
     //
     // Track whether we're in governor mode to determine which contracts to check.
     // Governor mode: check all contracts (post-deploy acceptance)
@@ -120,6 +121,14 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
             ui::green(address)
         ))?;
         (secret, address, false)
+    } else if let Some(ref config_key) = context.config().ownership.private_key {
+        // Priority 2: Config file - new owner mode
+        let address = derive_address_from_key(config_key)?;
+        ui::info(format!(
+            "Using private key from config (address: {})",
+            ui::green(address)
+        ))?;
+        (config_key.clone(), address, false)
     } else if args.use_governor {
         // Priority 2: --use-governor flag - governor mode
         let ecosystem_wallets = state_manager

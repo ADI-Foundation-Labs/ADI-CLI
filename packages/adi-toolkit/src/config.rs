@@ -5,7 +5,7 @@ use semver::Version;
 use serde::{Deserialize, Serialize};
 
 /// Default registry for ADI toolkit images.
-pub const DEFAULT_REGISTRY: &str = "harbor.sde.adifoundation.ai/adi-chain/cli";
+pub const DEFAULT_REGISTRY: &str = "harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli";
 
 /// Default image name for ADI toolkit.
 pub const DEFAULT_IMAGE_NAME: &str = "adi-toolkit";
@@ -24,7 +24,7 @@ pub const DEFAULT_TIMEOUT_SECONDS: u64 = 1800;
 /// use adi_toolkit::ToolkitConfig;
 ///
 /// let config = ToolkitConfig::default();
-/// assert_eq!(config.registry, "harbor.sde.adifoundation.ai/adi-chain/cli");
+/// assert_eq!(config.registry, "harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli");
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolkitConfig {
@@ -130,7 +130,7 @@ impl ToolkitConfig {
 /// let logger = NoopLogger;
 /// let image_ref = config.image_reference(&version, &logger);
 ///
-/// assert_eq!(image_ref.full_uri(), "harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:v30.0.2");
+/// assert_eq!(image_ref.full_uri(), "harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli/adi-toolkit:v30.0.2");
 /// ```
 #[derive(Debug, Clone)]
 pub struct ImageReference {
@@ -162,7 +162,10 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = ToolkitConfig::default();
-        assert_eq!(config.registry, "harbor.sde.adifoundation.ai/adi-chain/cli");
+        assert_eq!(
+            config.registry,
+            "harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli"
+        );
         assert_eq!(config.image_name, "adi-toolkit");
         assert_eq!(config.timeout_seconds, 1800);
     }
@@ -176,7 +179,7 @@ mod tests {
 
         assert_eq!(
             image_ref.full_uri(),
-            "harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:v30.0.2"
+            "harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli/adi-toolkit:v30.0.2"
         );
     }
 
@@ -199,7 +202,7 @@ mod tests {
         assert_eq!(image_ref.tag, "custom-tag");
         assert_eq!(
             image_ref.full_uri(),
-            "harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:custom-tag"
+            "harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli/adi-toolkit:custom-tag"
         );
     }
 

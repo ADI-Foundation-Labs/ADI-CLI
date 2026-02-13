@@ -275,11 +275,16 @@ funding:
   prove_operator_eth: 5.0     # Submits proofs
   execute_operator_eth: 5.0   # Executes batches
 
-# Default values for ownership transfer operations
+# Default values for ownership operations
 ownership:
   # Address to transfer ownership to after accepting
   # Can be overridden with --new-owner flag
   new_owner: "0x..."
+
+  # SECURITY: Use ADI_PRIVATE_KEY environment variable instead
+  # Private key for accepting ownership (new owner mode)
+  # Can be overridden with --private-key flag or ADI_PRIVATE_KEY env var
+  # private_key: "0x..."
 
 # OPTIONAL: Override Docker toolkit image settings
 # toolkit:
@@ -294,6 +299,7 @@ For sensitive data like private keys, use environment variables instead of confi
 | Variable                   | Purpose                                                                                                          |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `ADI_FUNDER_KEY`           | Private key (hex) of the wallet that funds ecosystem wallets. This is the only wallet you need to fund manually. |
+| `ADI_PRIVATE_KEY`          | Private key (hex) for accepting ownership as new owner. Used by the `accept` command.                            |
 | `ADI_RPC_URL`              | Settlement layer RPC endpoint. Useful for switching networks without editing config.                             |
 | `ADI_CONFIG`               | Path to an alternative config file.                                                                              |
 | `ADI__TOOLKIT__IMAGE_TAG`  | Override Docker image tag for toolkit containers (e.g., `latest` or `custom-build`).                             |
@@ -474,7 +480,7 @@ The `accept` command operates in two modes depending on who is accepting:
 
 **Governor mode (post-deploy):** When you run `accept` as the ecosystem governor (the default), it checks and accepts ownership for all contracts that were deployed with pending transfers. This includes contracts owned directly and those owned through proxy contracts (like Server Notifier via ChainAdmin).
 
-**New owner mode (post-transfer):** When you provide a private key via `--private-key`, the command assumes you're a new owner accepting contracts that were transferred to you. It only shows contracts that are directly owned by you (Governance, Ecosystem Chain Admin, Validator Timelock).
+**New owner mode (post-transfer):** When you provide a private key via `--private-key`, `ADI_PRIVATE_KEY` env var, or `ownership.private_key` in config, the command assumes you're a new owner accepting contracts that were transferred to you. It only shows contracts that are directly owned by you (Governance, Ecosystem Chain Admin, Validator Timelock).
 
 **Command flags:**
 
@@ -509,12 +515,24 @@ adi accept --use-governor --chain my-chain --yes
 After receiving ownership via `transfer`, the new owner must accept:
 
 ```bash
-# Set your private key via environment variable (recommended)
-export ADI_PRIVATE_KEY="0x..."
+# Option 1: Set private key in config file (~/.adi.yml)
+# ownership:
+#   private_key: "0x..."
+adi accept --chain my-chain --yes
 
-# Or pass directly (less secure, visible in shell history)
+# Option 2: Set via environment variable
+export ADI_PRIVATE_KEY="0x..."
+adi accept --chain my-chain --yes
+
+# Option 3: Pass directly (less secure, visible in shell history)
 adi accept --private-key 0x... --chain my-chain --yes
 ```
+
+**Private key resolution priority (highest to lowest):**
+1. `--private-key` CLI flag or `ADI_PRIVATE_KEY` env var
+2. `ownership.private_key` in config file
+3. `--use-governor` flag (uses stored governor key)
+4. Interactive prompt
 
 The output shows the status of each contract:
 - **Pending** — Ownership transfer awaiting acceptance
@@ -629,14 +647,14 @@ Pre-built images contain all required tools for ecosystem management:
 
 | Property        | Value                                       |
 | --------------- | ------------------------------------------- |
-| Registry        | `harbor.sde.adifoundation.ai/adi-chain/cli` |
+| Registry        | `harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli` |
 | Image           | `adi-toolkit`                               |
 | Tag format      | `v{MAJOR}.{MINOR}.{PATCH}`                  |
 | Default timeout | 30 minutes                                  |
 
 Full image reference example:
 ```
-harbor.sde.adifoundation.ai/adi-chain/cli/adi-toolkit:v30.0.2
+harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli/adi-toolkit:v30.0.2
 ```
 
 ### What's in the Toolkit

@@ -49,7 +49,8 @@ impl DockerClient {
     /// Returns an error if connection to Docker daemon fails.
     pub async fn with_logger(logger: Arc<dyn Logger>) -> Result<Self> {
         logger.debug("Connecting to Docker daemon...");
-        let docker = Docker::connect_with_defaults()
+        // Use socket connection with longer timeout for large image pulls
+        let docker = Docker::connect_with_socket_defaults()
             .map_err(|e: bollard::errors::Error| DockerError::DaemonNotRunning(e.to_string()))?;
 
         let client = Self {

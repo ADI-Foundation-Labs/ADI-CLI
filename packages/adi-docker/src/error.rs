@@ -24,9 +24,7 @@ pub enum DockerError {
     },
 
     /// Failed to pull image from registry.
-    #[error(
-        "Failed to pull image {image}. Make sure you are logged in with 'docker login': {reason}"
-    )]
+    #[error("Failed to pull image {image}: {reason}")]
     PullFailed {
         /// The image that failed to pull.
         image: String,

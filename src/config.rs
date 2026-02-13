@@ -84,6 +84,12 @@ pub struct OwnershipDefaults {
     /// Can be overridden with --new-owner flag.
     #[serde(default)]
     pub new_owner: Option<Address>,
+
+    /// Private key for accepting ownership (new owner mode).
+    /// Can be overridden with --private-key or ADI_PRIVATE_KEY env var.
+    /// Note: This field is never serialized (skipped) for security.
+    #[serde(default, skip_serializing)]
+    pub private_key: Option<SecretString>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

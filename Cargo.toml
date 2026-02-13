@@ -76,6 +76,7 @@ env_logger = { version = "0.11", default-features = false, features = ["auto-col
 
 # Docker
 bollard = { version = "0.18" }
+docker_credential = { version = "1.3", default-features = false }
 futures-util = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 
 # Version handling
