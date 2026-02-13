@@ -115,7 +115,10 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
         // Priority 1: CLI argument or env var - new owner mode
         let secret = SecretString::from(key_hex.clone());
         let address = derive_address_from_key(&secret)?;
-        ui::info(format!("Using provided private key (address: {})", address))?;
+        ui::info(format!(
+            "Using provided private key (address: {})",
+            ui::green(address)
+        ))?;
         (secret, address, false)
     } else if args.use_governor {
         // Priority 2: --use-governor flag - governor mode
@@ -129,7 +132,10 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
             .as_ref()
             .ok_or_else(|| eyre::eyre!("Governor wallet not found in ecosystem state"))?;
         let address = derive_address_from_key(&governor.private_key)?;
-        ui::info(format!("Using governor key (address: {})", address))?;
+        ui::info(format!(
+            "Using governor key (address: {})",
+            ui::green(address)
+        ))?;
         (governor.private_key.clone(), address, true)
     } else {
         // Priority 3: Interactive prompt
@@ -158,7 +164,10 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
                 .wrap_err("Failed to read private key")?;
             let secret = SecretString::from(key_hex);
             let address = derive_address_from_key(&secret)?;
-            ui::info(format!("Using provided key (address: {})", address))?;
+            ui::info(format!(
+                "Using provided key (address: {})",
+                ui::green(address)
+            ))?;
             (secret, address, false)
         }
     };
