@@ -18,10 +18,9 @@ use alloy_primitives::{Address, U256};
 use clap::Args;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use url::Url;
-use walkdir::WalkDir;
 
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
@@ -1133,6 +1132,23 @@ const KNOWN_CHAIN_FILES: &[&str] = &[
     "configs/external_node.yaml",
 ];
 
+/// Recursively collect all file paths from a directory.
+fn collect_files(dir: &Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return files;
+    };
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.is_dir() {
+            files.extend(collect_files(&path));
+        } else if path.is_file() {
+            files.push(path);
+        }
+    }
+    files
+}
+
 /// Log all deployment files and warn about unhandled ones.
 ///
 /// Scans the state directory for config files (yaml, yml, json) and logs:
@@ -1142,13 +1158,11 @@ fn log_deployment_files(state_path: &Path, chain_name: &str) -> Result<()> {
     let mut known_files = Vec::new();
     let mut unknown_files = Vec::new();
 
-    for entry in WalkDir::new(state_path)
+    for path in collect_files(state_path)
         .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file())
-        .filter(|e| is_config_file(e.path()))
+        .filter(|p| is_config_file(p))
     {
-        let Ok(relative) = entry.path().strip_prefix(state_path) else {
+        let Ok(relative) = path.strip_prefix(state_path) else {
             continue;
         };
         let rel_str = relative.to_string_lossy();

@@ -21,7 +21,5 @@ docker_credential = { workspace = true }
 cliclack = { workspace = true }
 colored = { workspace = true }
 console = { workspace = true }
-crossterm = { workspace = true }
 url = { workspace = true }
-chrono = { workspace = true }
 adi-types = { workspace = true }

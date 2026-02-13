@@ -4,11 +4,10 @@ use crate::error::{DockerError, Result};
 use adi_types::Logger;
 use bollard::container::LogsOptions;
 use bollard::Docker;
-use console::Style;
-use crossterm::{cursor, terminal, ExecutableCommand};
+use console::{Style, Term};
 use futures_util::StreamExt;
 use std::collections::VecDeque;
-use std::io::{stderr, Write};
+use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
@@ -79,38 +78,36 @@ impl LogDisplay {
     }
 
     fn render(&mut self) -> std::io::Result<()> {
-        let mut stderr = stderr();
+        let mut term = Term::stderr();
 
         // Move cursor up to overwrite previous output
         if self.rendered_count > 0 {
-            let count = u16::try_from(self.rendered_count).unwrap_or(u16::MAX);
-            stderr.execute(cursor::MoveUp(count))?;
+            term.move_cursor_up(self.rendered_count)?;
         }
 
         // Clear from cursor down and print fresh
-        stderr.execute(terminal::Clear(terminal::ClearType::FromCursorDown))?;
+        term.clear_to_end_of_screen()?;
 
         // Print current lines with cliclack-style bar prefix (blue dim)
         let bar_style = Style::new().blue().dim();
         for line in &self.lines {
             writeln!(
-                stderr,
+                term,
                 "{}",
                 bar_style.apply_to(format!("{}{}", BAR_PREFIX, line))
             )?;
         }
 
         self.rendered_count = self.lines.len();
-        stderr.flush()?;
+        term.flush()?;
         Ok(())
     }
 
     fn clear(&mut self) -> std::io::Result<()> {
-        let mut stderr = stderr();
+        let term = Term::stderr();
         if self.rendered_count > 0 {
-            let count = u16::try_from(self.rendered_count).unwrap_or(u16::MAX);
-            stderr.execute(cursor::MoveUp(count))?;
-            stderr.execute(terminal::Clear(terminal::ClearType::FromCursorDown))?;
+            term.move_cursor_up(self.rendered_count)?;
+            term.clear_to_end_of_screen()?;
         }
         self.rendered_count = 0;
         Ok(())
@@ -152,7 +149,10 @@ impl OutputStreamer {
         let mut buffer: Vec<u8> = Vec::new();
         let start = Instant::now();
 
-        let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
         let log_path = log_dir
             .join("logs")
             .join(format!("{}_{}.log", command, timestamp));
