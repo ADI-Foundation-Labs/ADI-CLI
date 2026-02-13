@@ -470,28 +470,56 @@ adi deploy -p v30.0.2 --skip-funding
 
 After deployment, some contracts have pending ownership transfers that must be accepted. ZkSync contracts use the Ownable2Step pattern: ownership isn't transferred in one transaction—instead, new ownership is proposed, then the new owner must accept.
 
-The `accept` command handles this for all ecosystem contracts, using the appropriate method for each:
-- **Direct acceptance** — Calls `acceptOwnership()` directly
-- **Multicall** — Batches multiple acceptances via ChainAdmin
-- **Governance scheduling** — Uses the governance contract for time-locked operations
+The `accept` command operates in two modes depending on who is accepting:
 
-**Example workflow:**
+**Governor mode (post-deploy):** When you run `accept` as the ecosystem governor (the default), it checks and accepts ownership for all contracts that were deployed with pending transfers. This includes contracts owned directly and those owned through proxy contracts (like Server Notifier via ChainAdmin).
+
+**New owner mode (post-transfer):** When you provide a private key via `--private-key`, the command assumes you're a new owner accepting contracts that were transferred to you. It only shows contracts that are directly owned by you (Governance, Ecosystem Chain Admin, Validator Timelock).
+
+**Command flags:**
+
+| Flag | Description |
+| ---- | ----------- |
+| `--use-governor` | Use the stored governor key without prompting |
+| `--private-key` | Provide your own private key (for new owner acceptance) |
+| `--chain <name>` | Also process chain-level contracts |
+| `--dry-run` | Preview contracts without executing transactions |
+| `--yes, -y` | Skip confirmation prompt |
+
+**Acceptance methods by contract:**
+- **Direct acceptance** — Calls `acceptOwnership()` directly (Governance, Validator Timelock, Verifier)
+- **Multicall** — Batches acceptances via ChainAdmin (Server Notifier)
+- **Governance scheduling** — Uses governance timelock (Rollup DA Manager)
+
+**Example: Post-deploy acceptance (as governor)**
 
 ```bash
-# First, see which contracts have pending ownership
+# Preview which contracts have pending ownership
 adi accept --dry-run
 
-# Accept ecosystem-level ownership
-adi accept --yes
+# Accept ecosystem-level ownership using stored governor key
+adi accept --use-governor --yes
 
 # Also accept chain-level ownership
-adi accept --chain my-chain --yes
+adi accept --use-governor --chain my-chain --yes
+```
+
+**Example: Post-transfer acceptance (as new owner)**
+
+After receiving ownership via `transfer`, the new owner must accept:
+
+```bash
+# Set your private key via environment variable (recommended)
+export ADI_PRIVATE_KEY="0x..."
+
+# Or pass directly (less secure, visible in shell history)
+adi accept --private-key 0x... --chain my-chain --yes
 ```
 
 The output shows the status of each contract:
 - **Pending** — Ownership transfer awaiting acceptance
-- **Accepted** — Successfully accepted
-- **Skipped** — Already owned correctly
+- **Accepted** — Successfully accepted in this run
+- **Skipped** — Already owned or not applicable
 - **Failed** — Acceptance failed (check logs)
 
 ### Step 5: Transfer Ownership (Optional)
@@ -501,30 +529,56 @@ After accepting ownership, you may want to transfer it to a final owner address 
 **What this command does:**
 1. Accepts all pending ownership transfers (same as `accept` command)
 2. Calls `transferOwnership()` on each contract to transfer to the new owner
-3. For Ownable2Step contracts, the new owner must still call `acceptOwnership()`
+3. Displays next steps for the new owner
+
+**Contracts transferred to new owner:**
+
+| Contract | Type | Accept Required |
+| -------- | ---- | --------------- |
+| Governance | Ownable2Step | Yes |
+| Ecosystem Chain Admin | Ownable2Step | Yes |
+| Validator Timelock | Ownable2Step | Yes |
+| Bridged Token Beacon | Ownable | No (immediate) |
+| Chain Governance | Ownable2Step | Yes |
+| Chain Chain Admin | Ownable2Step | Yes |
+
+**Contracts NOT transferred (proxy-owned):**
+- Server Notifier (controlled via Ecosystem Chain Admin)
+- Rollup DA Manager (controlled via Governance)
+- Verifier (remains with original owner)
 
 **Example workflow:**
 
 ```bash
-# Preview what will be transferred
+# Step 1: Preview what will be transferred
 adi transfer --dry-run
 
-# Transfer to a multisig address
+# Step 2: Transfer to a multisig address
 adi transfer --new-owner 0x1234...abcd --yes
-
-# Or configure in ~/.adi.yml and run without flags
-adi transfer --yes
 ```
 
-**Contracts transferred:**
-- Governance (Ownable2Step)
-- Ecosystem Chain Admin (Ownable2Step)
-- Validator Timelock (Ownable2Step)
-- Bridged Token Beacon (Ownable - immediate transfer)
-- Chain Governance (Ownable2Step)
-- Chain Chain Admin (Ownable2Step)
+After transfer completes, the CLI displays the command the new owner must run:
 
-> **Note:** For Ownable2Step contracts, ownership transfer is a two-step process. After running `transfer`, the new owner must call `acceptOwnership()` on each contract to complete the transfer. The Bridged Token Beacon uses standard Ownable, so its ownership transfers immediately.
+```
+┌  Next step ─────────────────────────────────────────────────╮
+│                                                             │
+│  New owner 0x1234...abcd must accept ownership:             │
+│                                                             │
+│    adi accept --private-key <NEW_OWNER_PRIVATE_KEY>         │
+├─────────────────────────────────────────────────────────────╯
+│
+└  Transfer complete! 10 operation(s) processed.
+```
+
+**Step 3: New owner accepts (run by the new owner)**
+
+```bash
+# New owner runs this command with their private key
+export ADI_PRIVATE_KEY="0x..."
+adi accept --chain my-chain --yes
+```
+
+> **Note:** For Ownable2Step contracts, ownership transfer is a two-step process. The Bridged Token Beacon uses standard Ownable, so its ownership transfers immediately without requiring acceptance.
 
 ## State Management
 
