@@ -165,8 +165,9 @@ cp ./target/release/adi ~/.local/bin/
 If you have Task installed:
 
 ```bash
-task build           # Development build (faster compilation)
+task build           # Development build
 task build:release   # Optimized release build
+task check           # fmt:check + lint + test
 ```
 
 ### Verifying Installation
@@ -708,18 +709,59 @@ When an override is set, the CLI will use it instead of deriving the tag from th
 
 ### Building Custom Images
 
-For development or custom tooling:
+`Taskfile.yml` provides Docker image build tasks backed by `docker buildx bake`.
+Default behavior is local single-platform builds (`linux/arm64`) unless overridden.
 
 ```bash
-# Build the default toolkit image
-task build:toolkit
+# Build amd64 image and load to local Docker
+task build:docker:amd64 TARGETS=toolkit-v30-0-2
 
-# Build a specific version
-task build:toolkit:v30.0.2
+# Build arm64 image and load to local Docker
+task build:docker:arm64 TARGETS=toolkit-v30-0-2
 
-# Build for local testing only (faster, single platform)
-task build:toolkit:local
+# Build and push architecture-specific image with branch-aware suffix tags
+task build:docker:amd64 TARGETS=toolkit-v30-0-2 LOAD=false PUSH=true CI_COMMIT_REF_SLUG=my-branch
+
+# Create and push multi-arch manifest tags
+# Requires architecture-specific images already pushed by CI
+task build:docker:manifest TARGETS=toolkit-v30-0-2 CI_COMMIT_REF_SLUG=main
 ```
+
+Docker task reference:
+
+| Task | Purpose |
+| ---- | ------- |
+| `build:docker:amd64` | Build linux/amd64 image (`--load` by default, can `--push`) |
+| `build:docker:arm64` | Build linux/arm64 image (`--load` by default, can `--push`) |
+| `build:docker:manifest` | Create multi-arch manifest tags from pushed arch images |
+| `build:docker:internal` | Internal worker task used by arch-specific tasks |
+
+Public Docker task parameters:
+
+| Variable               | Purpose |
+| ---------------------- | ------- |
+| `TARGETS`              | Bake target(s). Default: `default` (all toolkit targets) |
+| `LOAD`                 | `true`/`false` (default `true`). When `true`, image is loaded locally and uses clean version tag |
+| `PUSH`                 | `true`/`false` (default `false`). When `true`, image is pushed to registry |
+| `CI_COMMIT_REF_SLUG`   | Branch slug used for cache refs and suffix tags |
+| `REF_SLUG`             | Optional explicit branch slug override (defaults to `CI_COMMIT_REF_SLUG`) |
+| `CACHE_TO_REF`         | Optional explicit buildx cache destination (defaults to registry cache tag per arch/branch) |
+
+`build:docker:internal` parameters (advanced):
+
+| Variable | Purpose |
+| -------- | ------- |
+| `ARCH_SLUG` | Architecture label in tag suffix (`amd64`, `arm64`) |
+| `PLATFORM` | Docker platform passed to bake (`linux/amd64`, `linux/arm64`) |
+| `REF_SLUG` | Branch slug used in suffix tags for pushed images |
+| `CACHE_TO_REF` | Build cache destination ref |
+| `LOAD` | Enables `docker buildx bake --load` |
+| `PUSH` | Enables `docker buildx bake --push` |
+
+Tag behavior in `build:docker:internal`:
+
+- `LOAD=true`: `TAG_SUFFIX=""` (clean tags like `v30.0.2`)
+- `LOAD=false`: `TAG_SUFFIX=-<ref>-<arch>-<sha>` (for pushed branch/commit tracking)
 
 ## Development
 
@@ -773,9 +815,15 @@ task build          # Development build
 task build:release  # Release build
 task test           # All tests
 task test:unit      # Unit tests only
+task test:integration # Integration tests only (fails if no tests found)
 task lint           # Clippy linter
 task fmt            # Format code
+task fmt:check      # Verify formatting
 task check          # Run all checks (fmt, lint, test)
+task install        # Install adi binary from current repo
+task build:docker:amd64 TARGETS=toolkit-v30-0-2
+task build:docker:arm64 TARGETS=toolkit-v30-0-2
+task build:docker:manifest TARGETS=toolkit-v30-0-2 CI_COMMIT_REF_SLUG=main
 ```
 
 ### Code Standards
