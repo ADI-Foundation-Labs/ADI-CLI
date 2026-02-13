@@ -288,6 +288,113 @@ where
     OwnershipState::NotTransferred
 }
 
+/// Check ownership status for ecosystem contracts after transfer to new owner.
+///
+/// This function only checks contracts that are directly owned by the new owner
+/// (not proxy-owned contracts like Server Notifier or Rollup DA Manager).
+///
+/// Contracts checked:
+/// - Governance (Ownable2Step - new owner must accept)
+/// - Validator Timelock (Ownable2Step - new owner must accept)
+/// - Ecosystem Chain Admin (Ownable2Step - new owner must accept)
+///
+/// Contracts NOT checked (proxy-owned):
+/// - Server Notifier (owned by ChainAdmin contract)
+/// - Rollup DA Manager (owned by Governance contract)
+/// - Verifier (not transferred to new owner)
+///
+/// # Arguments
+///
+/// * `rpc_url` - Settlement layer RPC endpoint URL.
+/// * `contracts` - Ecosystem contracts containing addresses.
+/// * `new_owner_address` - New owner address to check as pending owner.
+/// * `logger` - Logger for debug output.
+///
+/// # Returns
+///
+/// Summary of ownership status for directly-owned contracts only.
+pub async fn check_ecosystem_ownership_status_for_new_owner(
+    rpc_url: &str,
+    contracts: &EcosystemContracts,
+    new_owner_address: Address,
+    logger: &dyn Logger,
+) -> Result<OwnershipStatusSummary> {
+    // Normalize URL for host-side connections (host.docker.internal -> localhost)
+    let normalized_url = normalize_rpc_url(rpc_url);
+    let url: url::Url = normalized_url
+        .parse()
+        .map_err(|e| EcosystemError::InvalidConfig(format!("Invalid RPC URL: {}", e)))?;
+    let provider = ProviderBuilder::new().connect_http(url);
+
+    let mut statuses = Vec::new();
+
+    logger.debug(&format!(
+        "Checking ecosystem ownership for new owner: {}",
+        new_owner_address
+    ));
+
+    // Check Governance (directly transferred to new owner)
+    let governance_addr = contracts.governance_addr();
+    let state = if let Some(addr) = governance_addr {
+        check_ownership_state(&provider, addr, new_owner_address, "Governance", logger).await
+    } else {
+        OwnershipState::NotTransferred
+    };
+    statuses.push(OwnershipStatus {
+        name: "Governance",
+        address: governance_addr,
+        state,
+    });
+
+    // Check Ecosystem Chain Admin (directly transferred to new owner)
+    let chain_admin_addr = contracts.chain_admin_addr();
+    let state = if let Some(addr) = chain_admin_addr {
+        check_ownership_state(
+            &provider,
+            addr,
+            new_owner_address,
+            "Ecosystem Chain Admin",
+            logger,
+        )
+        .await
+    } else {
+        OwnershipState::NotTransferred
+    };
+    statuses.push(OwnershipStatus {
+        name: "Ecosystem Chain Admin",
+        address: chain_admin_addr,
+        state,
+    });
+
+    // Check Validator Timelock (directly transferred to new owner)
+    let timelock_addr = contracts.validator_timelock_addr();
+    let state = if let Some(addr) = timelock_addr {
+        check_ownership_state(
+            &provider,
+            addr,
+            new_owner_address,
+            "Validator Timelock",
+            logger,
+        )
+        .await
+    } else {
+        OwnershipState::NotTransferred
+    };
+    statuses.push(OwnershipStatus {
+        name: "Validator Timelock",
+        address: timelock_addr,
+        state,
+    });
+
+    // NOTE: The following contracts are NOT checked because they are proxy-owned:
+    // - Server Notifier: owned by ChainAdmin contract, not directly by new owner
+    // - Rollup DA Manager: owned by Governance contract, not directly by new owner
+    // - Verifier: not transferred to new owner per documentation
+    // - Bridged Token Beacon: uses Ownable (not Ownable2Step), no accept needed
+
+    Ok(OwnershipStatusSummary { statuses })
+}
+
 /// Check ownership state for Ownable contracts (not Ownable2Step).
 ///
 /// This function only calls `owner()` - it does not call `pendingOwner()`

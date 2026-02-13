@@ -5,10 +5,12 @@
 
 use adi_ecosystem::{
     accept_all_ownership, accept_chain_ownership, check_chain_ownership_status,
-    check_ecosystem_ownership_status, OwnershipStatusSummary,
+    check_ecosystem_ownership_status, check_ecosystem_ownership_status_for_new_owner,
+    OwnershipStatusSummary,
 };
 use adi_types::{ChainContracts, EcosystemContracts};
 use clap::Args;
+use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -56,6 +58,20 @@ pub struct AcceptArgs {
     /// Chain name for chain-level ownership acceptance.
     #[arg(long, help = "Chain name for chain-level ownership acceptance")]
     pub chain: Option<String>,
+
+    /// Private key for accepting ownership (hex format).
+    /// Use this when accepting ownership as a new owner after transfer.
+    /// Prefer environment variable for security.
+    #[arg(
+        long,
+        env = "ADI_PRIVATE_KEY",
+        help = "Private key for accepting ownership (hex). Use when accepting as new owner after transfer"
+    )]
+    pub private_key: Option<String>,
+
+    /// Use stored governor key without prompting.
+    #[arg(long, help = "Use stored governor key without prompting")]
+    pub use_governor: bool,
 }
 
 /// Execute the accept ownership command.
@@ -87,31 +103,89 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
         .await
         .wrap_err("Failed to load ecosystem contracts")?;
 
-    // Load ecosystem wallets to get governor key
-    let ecosystem_wallets = state_manager
-        .ecosystem()
-        .wallets()
-        .await
-        .wrap_err("Failed to load ecosystem wallets")?;
+    // Resolve private key with priority:
+    // 1. --private-key argument/env var (new owner mode)
+    // 2. --use-governor flag (use stored governor key)
+    // 3. Interactive prompt: "Accept as governor?"
+    //
+    // Track whether we're in governor mode to determine which contracts to check.
+    // Governor mode: check all contracts (post-deploy acceptance)
+    // New owner mode: check only directly-owned contracts (post-transfer acceptance)
+    let (private_key, key_address, is_governor_mode) = if let Some(ref key_hex) = args.private_key {
+        // Priority 1: CLI argument or env var - new owner mode
+        let secret = SecretString::from(key_hex.clone());
+        let address = derive_address_from_key(&secret)?;
+        ui::info(format!("Using provided private key (address: {})", address))?;
+        (secret, address, false)
+    } else if args.use_governor {
+        // Priority 2: --use-governor flag - governor mode
+        let ecosystem_wallets = state_manager
+            .ecosystem()
+            .wallets()
+            .await
+            .wrap_err("Failed to load ecosystem wallets")?;
+        let governor = ecosystem_wallets
+            .governor
+            .as_ref()
+            .ok_or_else(|| eyre::eyre!("Governor wallet not found in ecosystem state"))?;
+        let address = derive_address_from_key(&governor.private_key)?;
+        ui::info(format!("Using governor key (address: {})", address))?;
+        (governor.private_key.clone(), address, true)
+    } else {
+        // Priority 3: Interactive prompt
+        let use_governor = ui::confirm("Accept ownership as governor?")
+            .initial_value(true)
+            .interact()
+            .wrap_err("Failed to get confirmation")?;
 
-    let governor = ecosystem_wallets
-        .governor
-        .as_ref()
-        .ok_or_else(|| eyre::eyre!("Governor wallet not found in ecosystem wallets"))?;
-
-    // Get governor address for ownership checks
-    let governor_address = derive_address_from_key(&governor.private_key)?;
+        if use_governor {
+            let ecosystem_wallets = state_manager
+                .ecosystem()
+                .wallets()
+                .await
+                .wrap_err("Failed to load ecosystem wallets")?;
+            let governor = ecosystem_wallets
+                .governor
+                .as_ref()
+                .ok_or_else(|| eyre::eyre!("Governor wallet not found in ecosystem state"))?;
+            let address = derive_address_from_key(&governor.private_key)?;
+            (governor.private_key.clone(), address, true)
+        } else {
+            // Prompt for private key using password input - new owner mode
+            let key_hex: String = ui::password("Enter private key (hex):")
+                .mask('*')
+                .interact()
+                .wrap_err("Failed to read private key")?;
+            let secret = SecretString::from(key_hex);
+            let address = derive_address_from_key(&secret)?;
+            ui::info(format!("Using provided key (address: {})", address))?;
+            (secret, address, false)
+        }
+    };
 
     // Check ecosystem ownership status
+    // In governor mode: check all contracts (post-deploy acceptance)
+    // In new owner mode: check only directly-owned contracts (post-transfer acceptance)
     ui::info("Checking ecosystem ownership status...")?;
-    let ecosystem_status = check_ecosystem_ownership_status(
-        rpc_url.as_str(),
-        &ecosystem_contracts,
-        governor_address,
-        context.logger().as_ref(),
-    )
-    .await
-    .wrap_err("Failed to check ecosystem ownership status")?;
+    let ecosystem_status = if is_governor_mode {
+        check_ecosystem_ownership_status(
+            rpc_url.as_str(),
+            &ecosystem_contracts,
+            key_address,
+            context.logger().as_ref(),
+        )
+        .await
+        .wrap_err("Failed to check ecosystem ownership status")?
+    } else {
+        check_ecosystem_ownership_status_for_new_owner(
+            rpc_url.as_str(),
+            &ecosystem_contracts,
+            key_address,
+            context.logger().as_ref(),
+        )
+        .await
+        .wrap_err("Failed to check ecosystem ownership status")?
+    };
 
     // Display ecosystem contracts with pending status
     display_ownership_status("Ecosystem contracts", &ecosystem_status)?;
@@ -130,7 +204,7 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
                 let status = check_chain_ownership_status(
                     rpc_url.as_str(),
                     &contracts,
-                    governor_address,
+                    key_address,
                     context.logger().as_ref(),
                 )
                 .await
@@ -191,7 +265,7 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
     let ecosystem_summary = accept_all_ownership(
         rpc_url.as_str(),
         &ecosystem_contracts,
-        &governor.private_key,
+        &private_key,
         args.gas_price_wei,
         context.logger().as_ref(),
     )
@@ -204,7 +278,7 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
             accept_chain_ownership(
                 rpc_url.as_str(),
                 &contracts,
-                &governor.private_key,
+                &private_key,
                 args.gas_price_wei,
                 context.logger().as_ref(),
             )

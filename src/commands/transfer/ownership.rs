@@ -279,10 +279,17 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
         + chain_transfer_summary.results.len();
 
     if total_successes > 0 {
+        ui::note(
+            "Next step",
+            format!(
+                "New owner {} must accept ownership:\n\n  {}",
+                ui::green(new_owner),
+                ui::cyan("adi accept --private-key <NEW_OWNER_PRIVATE_KEY>")
+            ),
+        )?;
         ui::outro(format!(
-            "Successfully processed {} operation(s). New owner {} must call acceptOwnership() on Ownable2Step contracts.",
-            total_successes,
-            new_owner
+            "Transfer complete! {} operation(s) processed.",
+            total_successes
         ))?;
         Ok(())
     } else if total_results == 0 {

@@ -27,7 +27,10 @@ pub use calldata::{
     build_governance_execute_calldata, build_governance_schedule_calldata,
     build_transfer_ownership_calldata,
 };
-pub use status::{check_chain_ownership_status, check_ecosystem_ownership_status};
+pub use status::{
+    check_chain_ownership_status, check_ecosystem_ownership_status,
+    check_ecosystem_ownership_status_for_new_owner,
+};
 pub use types::{
     OwnershipContract, OwnershipMethod, OwnershipResult, OwnershipState, OwnershipStatus,
     OwnershipStatusSummary, OwnershipSummary,
