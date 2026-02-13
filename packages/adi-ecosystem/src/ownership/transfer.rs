@@ -5,7 +5,7 @@
 //! it to a final owner address.
 
 use super::calldata::build_transfer_ownership_calldata;
-use super::status::check_ownership_state;
+use super::status::{check_ownership_state, check_ownership_state_for_ownable};
 use super::transaction::send_ownership_tx;
 use super::types::{bridgedTokenBeaconCall, OwnershipResult, OwnershipState};
 use adi_types::{ChainContracts, EcosystemContracts, Logger};
@@ -13,6 +13,7 @@ use alloy_primitives::Address;
 use alloy_provider::Provider;
 use alloy_rpc_types::TransactionRequest;
 use alloy_sol_types::SolCall;
+use console::Style;
 
 /// Query bridged token beacon address from NativeTokenVault contract.
 pub(crate) async fn get_bridged_token_beacon<P>(
@@ -51,6 +52,8 @@ pub(crate) async fn transfer_governance<P>(
 where
     P: Provider + Clone,
 {
+    let green = Style::new().green();
+
     let governance = match contracts.governance_addr() {
         Some(addr) => addr,
         None => {
@@ -72,6 +75,9 @@ where
         }
     }
 
+    let spinner = cliclack::spinner();
+    spinner.start("Governance");
+
     let calldata = build_transfer_ownership_calldata(new_owner);
 
     match send_ownership_tx(
@@ -79,16 +85,16 @@ where
     )
     .await
     {
-        Ok(tx_hash) => {
-            logger.info(&format!(
-                "  ✓ Governance ownership transferred: {}",
-                tx_hash
+        Ok(result) => {
+            spinner.stop(format!(
+                "Governance → Transferred (block {})",
+                green.apply_to(result.block_number)
             ));
             *nonce += 1;
-            OwnershipResult::success("Governance", tx_hash)
+            OwnershipResult::success("Governance", result.tx_hash)
         }
         Err(e) => {
-            logger.warning(&format!("  ✗ Governance transfer failed: {}", e));
+            spinner.error(format!("Governance transfer failed: {}", e));
             OwnershipResult::failure("Governance", e.to_string())
         }
     }
@@ -109,6 +115,8 @@ pub(crate) async fn transfer_ecosystem_chain_admin<P>(
 where
     P: Provider + Clone,
 {
+    let green = Style::new().green();
+
     let chain_admin = match contracts.chain_admin_addr() {
         Some(addr) => addr,
         None => {
@@ -144,6 +152,9 @@ where
         }
     }
 
+    let spinner = cliclack::spinner();
+    spinner.start("Ecosystem Chain Admin");
+
     let calldata = build_transfer_ownership_calldata(new_owner);
 
     match send_ownership_tx(
@@ -157,16 +168,16 @@ where
     )
     .await
     {
-        Ok(tx_hash) => {
-            logger.info(&format!(
-                "  ✓ Ecosystem Chain Admin ownership transferred: {}",
-                tx_hash
+        Ok(result) => {
+            spinner.stop(format!(
+                "Ecosystem Chain Admin → Transferred (block {})",
+                green.apply_to(result.block_number)
             ));
             *nonce += 1;
-            OwnershipResult::success("Ecosystem Chain Admin", tx_hash)
+            OwnershipResult::success("Ecosystem Chain Admin", result.tx_hash)
         }
         Err(e) => {
-            logger.warning(&format!("  ✗ Ecosystem Chain Admin transfer failed: {}", e));
+            spinner.error(format!("Ecosystem Chain Admin transfer failed: {}", e));
             OwnershipResult::failure("Ecosystem Chain Admin", e.to_string())
         }
     }
@@ -187,6 +198,8 @@ pub(crate) async fn transfer_validator_timelock<P>(
 where
     P: Provider + Clone,
 {
+    let green = Style::new().green();
+
     let timelock = match contracts.validator_timelock_addr() {
         Some(addr) => addr,
         None => {
@@ -214,6 +227,9 @@ where
         }
     }
 
+    let spinner = cliclack::spinner();
+    spinner.start("Validator Timelock");
+
     let calldata = build_transfer_ownership_calldata(new_owner);
 
     match send_ownership_tx(
@@ -221,16 +237,16 @@ where
     )
     .await
     {
-        Ok(tx_hash) => {
-            logger.info(&format!(
-                "  ✓ Validator Timelock ownership transferred: {}",
-                tx_hash
+        Ok(result) => {
+            spinner.stop(format!(
+                "Validator Timelock → Transferred (block {})",
+                green.apply_to(result.block_number)
             ));
             *nonce += 1;
-            OwnershipResult::success("Validator Timelock", tx_hash)
+            OwnershipResult::success("Validator Timelock", result.tx_hash)
         }
         Err(e) => {
-            logger.warning(&format!("  ✗ Validator Timelock transfer failed: {}", e));
+            spinner.error(format!("Validator Timelock transfer failed: {}", e));
             OwnershipResult::failure("Validator Timelock", e.to_string())
         }
     }
@@ -254,6 +270,8 @@ pub(crate) async fn transfer_bridged_token_beacon<P>(
 where
     P: Provider + Clone,
 {
+    let green = Style::new().green();
+
     // Get native token vault address
     let native_token_vault = match contracts.native_token_vault_addr() {
         Some(addr) => addr,
@@ -276,19 +294,29 @@ where
         }
     };
 
-    logger.info(&format!("    Bridged Token Beacon address: {}", beacon));
-
     // Verify governor is current owner before transferring
-    // Note: Bridged Token Beacon uses Ownable, not Ownable2Step
-    match check_ownership_state(provider, beacon, governor, "Bridged Token Beacon", logger).await {
+    // Note: Bridged Token Beacon uses Ownable (not Ownable2Step), so we only check owner()
+    match check_ownership_state_for_ownable(
+        provider,
+        beacon,
+        governor,
+        "Bridged Token Beacon",
+        logger,
+    )
+    .await
+    {
         OwnershipState::Accepted => {} // Good - we can transfer
-        OwnershipState::Pending | OwnershipState::NotTransferred => {
+        OwnershipState::NotTransferred => {
             return OwnershipResult::skipped(
                 "Bridged Token Beacon",
                 "governor is not the current owner",
             );
         }
+        OwnershipState::Pending => {} // Unreachable for Ownable contracts
     }
+
+    let spinner = cliclack::spinner();
+    spinner.start("Bridged Token Beacon");
 
     let calldata = build_transfer_ownership_calldata(new_owner);
 
@@ -297,16 +325,16 @@ where
     )
     .await
     {
-        Ok(tx_hash) => {
-            logger.info(&format!(
-                "  ✓ Bridged Token Beacon ownership transferred: {}",
-                tx_hash
+        Ok(result) => {
+            spinner.stop(format!(
+                "Bridged Token Beacon → Transferred (block {})",
+                green.apply_to(result.block_number)
             ));
             *nonce += 1;
-            OwnershipResult::success("Bridged Token Beacon", tx_hash)
+            OwnershipResult::success("Bridged Token Beacon", result.tx_hash)
         }
         Err(e) => {
-            logger.warning(&format!("  ✗ Bridged Token Beacon transfer failed: {}", e));
+            spinner.error(format!("Bridged Token Beacon transfer failed: {}", e));
             OwnershipResult::failure("Bridged Token Beacon", e.to_string())
         }
     }
@@ -327,6 +355,8 @@ pub(crate) async fn transfer_chain_governance<P>(
 where
     P: Provider + Clone,
 {
+    let green = Style::new().green();
+
     let governance = match contracts.governance_addr() {
         Some(addr) => addr,
         None => {
@@ -351,6 +381,9 @@ where
         }
     }
 
+    let spinner = cliclack::spinner();
+    spinner.start("Chain Governance");
+
     let calldata = build_transfer_ownership_calldata(new_owner);
 
     match send_ownership_tx(
@@ -358,16 +391,16 @@ where
     )
     .await
     {
-        Ok(tx_hash) => {
-            logger.info(&format!(
-                "  ✓ Chain Governance ownership transferred: {}",
-                tx_hash
+        Ok(result) => {
+            spinner.stop(format!(
+                "Chain Governance → Transferred (block {})",
+                green.apply_to(result.block_number)
             ));
             *nonce += 1;
-            OwnershipResult::success("Chain Governance", tx_hash)
+            OwnershipResult::success("Chain Governance", result.tx_hash)
         }
         Err(e) => {
-            logger.warning(&format!("  ✗ Chain Governance transfer failed: {}", e));
+            spinner.error(format!("Chain Governance transfer failed: {}", e));
             OwnershipResult::failure("Chain Governance", e.to_string())
         }
     }
@@ -388,6 +421,8 @@ pub(crate) async fn transfer_chain_chain_admin<P>(
 where
     P: Provider + Clone,
 {
+    let green = Style::new().green();
+
     let chain_admin = match contracts.chain_admin_addr() {
         Some(addr) => addr,
         None => {
@@ -416,6 +451,9 @@ where
         }
     }
 
+    let spinner = cliclack::spinner();
+    spinner.start("Chain Chain Admin");
+
     let calldata = build_transfer_ownership_calldata(new_owner);
 
     match send_ownership_tx(
@@ -429,16 +467,16 @@ where
     )
     .await
     {
-        Ok(tx_hash) => {
-            logger.info(&format!(
-                "  ✓ Chain Chain Admin ownership transferred: {}",
-                tx_hash
+        Ok(result) => {
+            spinner.stop(format!(
+                "Chain Chain Admin → Transferred (block {})",
+                green.apply_to(result.block_number)
             ));
             *nonce += 1;
-            OwnershipResult::success("Chain Chain Admin", tx_hash)
+            OwnershipResult::success("Chain Chain Admin", result.tx_hash)
         }
         Err(e) => {
-            logger.warning(&format!("  ✗ Chain Chain Admin transfer failed: {}", e));
+            spinner.error(format!("Chain Chain Admin transfer failed: {}", e));
             OwnershipResult::failure("Chain Chain Admin", e.to_string())
         }
     }

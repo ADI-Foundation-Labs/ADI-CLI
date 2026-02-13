@@ -37,6 +37,7 @@ use adi_types::{normalize_rpc_url, ChainContracts, EcosystemContracts, Logger};
 use alloy_network::EthereumWallet;
 use alloy_primitives::Address;
 use alloy_provider::{Provider, ProviderBuilder};
+use console::Style;
 use secrecy::SecretString;
 
 use contracts::{
@@ -154,7 +155,6 @@ pub async fn accept_all_ownership(
     let chain_admin = contracts.chain_admin_addr();
 
     // 1. Server Notifier (via multicall)
-    logger.info("Processing Server Notifier...");
     let result = accept_server_notifier(
         &provider,
         contracts,
@@ -169,7 +169,6 @@ pub async fn accept_all_ownership(
     results.push(result);
 
     // 2. Validator Timelock (direct)
-    logger.info("Processing Validator Timelock...");
     let result = accept_validator_timelock(
         &provider,
         contracts,
@@ -183,7 +182,6 @@ pub async fn accept_all_ownership(
     results.push(result);
 
     // 3. Verifier (direct)
-    logger.info("Processing Verifier...");
     let result = accept_verifier(
         &provider,
         contracts,
@@ -197,7 +195,6 @@ pub async fn accept_all_ownership(
     results.push(result);
 
     // 4. Governance (direct)
-    logger.info("Processing Governance...");
     let result = accept_governance(
         &provider,
         contracts,
@@ -211,7 +208,6 @@ pub async fn accept_all_ownership(
     results.push(result);
 
     // 5. Rollup DA Manager (via governance acceptOwner)
-    logger.info("Processing Rollup DA Manager...");
     let result = accept_rollup_da_manager(
         &provider,
         contracts,
@@ -325,7 +321,6 @@ pub async fn accept_chain_ownership(
     };
 
     // 1. Chain Admin (direct)
-    logger.info("Processing Chain Admin...");
     let result = accept_chain_admin(
         &provider,
         contracts,
@@ -447,10 +442,13 @@ pub async fn transfer_all_ownership(
         },
     };
 
-    logger.info(&format!("Transferring ownership to: {}", new_owner));
+    let green = Style::new().green();
+    logger.info(&format!(
+        "Transferring ownership to: {}",
+        green.apply_to(new_owner)
+    ));
 
     // 1. Transfer Governance
-    logger.info("Transferring Governance ownership...");
     let result = transfer_governance(
         &provider,
         contracts,
@@ -465,7 +463,6 @@ pub async fn transfer_all_ownership(
     results.push(result);
 
     // 2. Transfer Ecosystem Chain Admin
-    logger.info("Transferring Ecosystem Chain Admin ownership...");
     let result = transfer_ecosystem_chain_admin(
         &provider,
         contracts,
@@ -480,7 +477,6 @@ pub async fn transfer_all_ownership(
     results.push(result);
 
     // 3. Transfer Bridged Token Beacon (Ownable - immediate transfer)
-    logger.info("Transferring Bridged Token Beacon ownership...");
     let result = transfer_bridged_token_beacon(
         &provider,
         contracts,
@@ -495,7 +491,6 @@ pub async fn transfer_all_ownership(
     results.push(result);
 
     // 4. Transfer Validator Timelock
-    logger.info("Transferring Validator Timelock ownership...");
     let result = transfer_validator_timelock(
         &provider,
         contracts,
@@ -615,10 +610,13 @@ pub async fn transfer_chain_ownership(
         },
     };
 
-    logger.info(&format!("Transferring chain ownership to: {}", new_owner));
+    let green = Style::new().green();
+    logger.info(&format!(
+        "Transferring chain ownership to: {}",
+        green.apply_to(new_owner)
+    ));
 
     // 1. Transfer Chain Governance
-    logger.info("Transferring Chain Governance ownership...");
     let result = transfer_chain_governance(
         &provider,
         contracts,
@@ -633,7 +631,6 @@ pub async fn transfer_chain_ownership(
     results.push(result);
 
     // 2. Transfer Chain Chain Admin
-    logger.info("Transferring Chain Chain Admin ownership...");
     let result = transfer_chain_chain_admin(
         &provider,
         contracts,

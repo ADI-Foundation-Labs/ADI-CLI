@@ -287,3 +287,41 @@ where
     ));
     OwnershipState::NotTransferred
 }
+
+/// Check ownership state for Ownable contracts (not Ownable2Step).
+///
+/// This function only calls `owner()` - it does not call `pendingOwner()`
+/// since Ownable contracts don't have this function.
+///
+/// Returns:
+/// - `Accepted` if governor is the current owner
+/// - `NotTransferred` if governor is not the owner
+pub(crate) async fn check_ownership_state_for_ownable<P>(
+    provider: &P,
+    contract_address: Address,
+    governor_address: Address,
+    contract_name: &str,
+    logger: &dyn Logger,
+) -> OwnershipState
+where
+    P: Provider + Clone,
+{
+    logger.debug(&format!(
+        "Checking {} at {} (expected owner: {}) [Ownable]",
+        contract_name, contract_address, governor_address
+    ));
+
+    // Only check owner() - Ownable contracts don't have pendingOwner()
+    let current_owner = call_owner(provider, contract_address, contract_name, logger).await;
+    if current_owner == Some(governor_address) {
+        logger.debug(&format!("  {} -> Accepted (owner matches)", contract_name));
+        return OwnershipState::Accepted;
+    }
+
+    // Governor is not owner
+    logger.debug(&format!(
+        "  {} -> NotTransferred (owner does not match)",
+        contract_name
+    ));
+    OwnershipState::NotTransferred
+}

@@ -75,7 +75,7 @@ impl Theme for AdiTheme {
 
     /// Intro with cyan background badge.
     fn format_intro(&self, title: &str) -> String {
-        let badge = Style::new().on_cyan().black().bold();
+        let badge = Style::new().on_blue().black().bold();
         let bar = Style::new().blue().dim();
         format!(
             "{}  {}\n{}\n",
@@ -106,7 +106,7 @@ impl Theme for AdiTheme {
         if message.is_empty() {
             format!("{}\n", bar.apply_to("└"))
         } else {
-            let badge = Style::new().on_yellow().black().bold();
+            let badge = Style::new().on_red().black().bold();
             format!(
                 "{}  {}\n",
                 bar.apply_to("└"),

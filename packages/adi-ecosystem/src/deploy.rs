@@ -182,8 +182,9 @@ pub async fn add_validator_roles(
     let green = Style::new().green();
 
     for assignment in assignments {
-        logger.info(&format!(
-            "Adding validator roles for {} ({})",
+        let spinner = cliclack::spinner();
+        spinner.start(format!(
+            "{} ({})",
             assignment.name,
             green.apply_to(assignment.operator)
         ));
@@ -206,45 +207,42 @@ pub async fn add_validator_roles(
             .with_chain_id(chain_id);
 
         // Send transaction
-        let pending =
-            provider
-                .send_transaction(tx)
-                .await
-                .map_err(|e| EcosystemError::TransactionFailed {
-                    reason: format!(
-                        "Failed to send {} validator role tx: {}",
-                        assignment.name, e
-                    ),
-                })?;
+        let pending = provider.send_transaction(tx).await.map_err(|e| {
+            spinner.error(format!("Failed to send tx: {}", e));
+            EcosystemError::TransactionFailed {
+                reason: format!(
+                    "Failed to send {} validator role tx: {}",
+                    assignment.name, e
+                ),
+            }
+        })?;
 
         let tx_hash = *pending.tx_hash();
-        logger.info(&format!(
-            "  Transaction submitted: {}",
-            green.apply_to(tx_hash)
-        ));
 
         // Wait for confirmation
-        let receipt =
-            pending
-                .get_receipt()
-                .await
-                .map_err(|e| EcosystemError::TransactionFailed {
-                    reason: format!(
-                        "Failed to confirm {} validator role tx: {}",
-                        assignment.name, e
-                    ),
-                })?;
+        let receipt = pending.get_receipt().await.map_err(|e| {
+            spinner.error(format!("Confirmation failed: {}", e));
+            EcosystemError::TransactionFailed {
+                reason: format!(
+                    "Failed to confirm {} validator role tx: {}",
+                    assignment.name, e
+                ),
+            }
+        })?;
 
         if !receipt.status() {
+            spinner.error("Transaction reverted");
             return Err(EcosystemError::TransactionFailed {
                 reason: format!("Transaction {} reverted for {}", tx_hash, assignment.name),
             });
         }
 
-        logger.info(&format!(
-            "  Confirmed in block {} (gas used: {})",
+        spinner.stop(format!(
+            "{} ({}) → Confirmed in block {} (gas: {})",
+            assignment.name,
+            green.apply_to(assignment.operator),
             green.apply_to(receipt.block_number.unwrap_or_default()),
-            green.apply_to(receipt.gas_used)
+            receipt.gas_used
         ));
 
         tx_hashes.push(tx_hash);

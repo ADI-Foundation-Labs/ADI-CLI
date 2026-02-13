@@ -18,7 +18,7 @@ use super::types::{OwnershipResult, OwnershipState};
 use adi_types::{ChainContracts, EcosystemContracts, Logger};
 use alloy_primitives::{Address, B256, U256};
 use alloy_provider::Provider;
-use colored::Colorize;
+use console::Style;
 
 /// Accept ownership for Chain Admin contract.
 pub(crate) async fn accept_chain_admin<P>(
@@ -33,6 +33,8 @@ pub(crate) async fn accept_chain_admin<P>(
 where
     P: Provider + Clone,
 {
+    let green = Style::new().green();
+
     let chain_admin = match contracts.chain_admin_addr() {
         Some(addr) => addr,
         None => {
@@ -43,15 +45,18 @@ where
     // Check if ownership acceptance is needed
     match check_ownership_state(provider, chain_admin, governor, "Chain Admin", logger).await {
         OwnershipState::Accepted => {
-            logger.info("  ✓ Chain Admin: ownership already accepted");
+            logger.info("Chain Admin: ownership already accepted");
             return OwnershipResult::skipped("Chain Admin", "ownership already accepted");
         }
         OwnershipState::NotTransferred => {
-            logger.info("  ⚠ Chain Admin: ownership not transferred");
+            logger.warning("Chain Admin: ownership not transferred");
             return OwnershipResult::skipped("Chain Admin", "ownership not transferred");
         }
         OwnershipState::Pending => {}
     }
+
+    let spinner = cliclack::spinner();
+    spinner.start("Chain Admin");
 
     let calldata = build_accept_ownership_calldata();
 
@@ -66,16 +71,16 @@ where
     )
     .await
     {
-        Ok(tx_hash) => {
-            logger.info(&format!(
-                "  ✓ Chain Admin ownership accepted: {}",
-                tx_hash.to_string().green()
+        Ok(result) => {
+            spinner.stop(format!(
+                "Chain Admin → Accepted (block {})",
+                green.apply_to(result.block_number)
             ));
             *nonce += 1;
-            OwnershipResult::success("Chain Admin", tx_hash)
+            OwnershipResult::success("Chain Admin", result.tx_hash)
         }
         Err(e) => {
-            logger.warning(&format!("  ✗ Chain Admin ownership failed: {}", e));
+            spinner.error(format!("Chain Admin failed: {}", e));
             OwnershipResult::failure("Chain Admin", e.to_string())
         }
     }
@@ -96,6 +101,8 @@ pub(crate) async fn accept_server_notifier<P>(
 where
     P: Provider + Clone,
 {
+    let green = Style::new().green();
+
     let server_notifier = match contracts.server_notifier_addr() {
         Some(addr) => addr,
         None => {
@@ -125,15 +132,18 @@ where
     .await
     {
         OwnershipState::Accepted => {
-            logger.info("  ✓ Server Notifier: ownership already accepted");
+            logger.info("Server Notifier: ownership already accepted");
             return OwnershipResult::skipped("Server Notifier", "ownership already accepted");
         }
         OwnershipState::NotTransferred => {
-            logger.info("  ⚠ Server Notifier: ownership not transferred");
+            logger.warning("Server Notifier: ownership not transferred");
             return OwnershipResult::skipped("Server Notifier", "ownership not transferred");
         }
         OwnershipState::Pending => {}
     }
+
+    let spinner = cliclack::spinner();
+    spinner.start("Server Notifier");
 
     let calldata = build_accept_ownership_multicall_calldata(server_notifier);
 
@@ -148,16 +158,16 @@ where
     )
     .await
     {
-        Ok(tx_hash) => {
-            logger.info(&format!(
-                "  ✓ Server Notifier ownership accepted: {}",
-                tx_hash.to_string().green()
+        Ok(result) => {
+            spinner.stop(format!(
+                "Server Notifier → Accepted (block {})",
+                green.apply_to(result.block_number)
             ));
             *nonce += 1;
-            OwnershipResult::success("Server Notifier", tx_hash)
+            OwnershipResult::success("Server Notifier", result.tx_hash)
         }
         Err(e) => {
-            logger.warning(&format!("  ✗ Server Notifier ownership failed: {}", e));
+            spinner.error(format!("Server Notifier failed: {}", e));
             OwnershipResult::failure("Server Notifier", e.to_string())
         }
     }
@@ -176,6 +186,8 @@ pub(crate) async fn accept_validator_timelock<P>(
 where
     P: Provider + Clone,
 {
+    let green = Style::new().green();
+
     let timelock = match contracts.validator_timelock_addr() {
         Some(addr) => addr,
         None => {
@@ -189,15 +201,18 @@ where
     // Check if ownership acceptance is needed
     match check_ownership_state(provider, timelock, governor, "Validator Timelock", logger).await {
         OwnershipState::Accepted => {
-            logger.info("  ✓ Validator Timelock: ownership already accepted");
+            logger.info("Validator Timelock: ownership already accepted");
             return OwnershipResult::skipped("Validator Timelock", "ownership already accepted");
         }
         OwnershipState::NotTransferred => {
-            logger.info("  ⚠ Validator Timelock: ownership not transferred");
+            logger.warning("Validator Timelock: ownership not transferred");
             return OwnershipResult::skipped("Validator Timelock", "ownership not transferred");
         }
         OwnershipState::Pending => {}
     }
+
+    let spinner = cliclack::spinner();
+    spinner.start("Validator Timelock");
 
     let calldata = build_accept_ownership_calldata();
 
@@ -206,16 +221,16 @@ where
     )
     .await
     {
-        Ok(tx_hash) => {
-            logger.info(&format!(
-                "  ✓ Validator Timelock ownership accepted: {}",
-                tx_hash.to_string().green()
+        Ok(result) => {
+            spinner.stop(format!(
+                "Validator Timelock → Accepted (block {})",
+                green.apply_to(result.block_number)
             ));
             *nonce += 1;
-            OwnershipResult::success("Validator Timelock", tx_hash)
+            OwnershipResult::success("Validator Timelock", result.tx_hash)
         }
         Err(e) => {
-            logger.warning(&format!("  ✗ Validator Timelock ownership failed: {}", e));
+            spinner.error(format!("Validator Timelock failed: {}", e));
             OwnershipResult::failure("Validator Timelock", e.to_string())
         }
     }
@@ -234,6 +249,8 @@ pub(crate) async fn accept_verifier<P>(
 where
     P: Provider + Clone,
 {
+    let green = Style::new().green();
+
     let verifier = match contracts.verifier_addr() {
         Some(addr) => addr,
         None => {
@@ -244,15 +261,18 @@ where
     // Check if ownership acceptance is needed
     match check_ownership_state(provider, verifier, governor, "Verifier", logger).await {
         OwnershipState::Accepted => {
-            logger.info("  ✓ Verifier: ownership already accepted");
+            logger.info("Verifier: ownership already accepted");
             return OwnershipResult::skipped("Verifier", "ownership already accepted");
         }
         OwnershipState::NotTransferred => {
-            logger.info("  ⚠ Verifier: ownership not transferred");
+            logger.warning("Verifier: ownership not transferred");
             return OwnershipResult::skipped("Verifier", "ownership not transferred");
         }
         OwnershipState::Pending => {}
     }
+
+    let spinner = cliclack::spinner();
+    spinner.start("Verifier");
 
     let calldata = build_accept_ownership_calldata();
 
@@ -261,16 +281,16 @@ where
     )
     .await
     {
-        Ok(tx_hash) => {
-            logger.info(&format!(
-                "  ✓ Verifier ownership accepted: {}",
-                tx_hash.to_string().green()
+        Ok(result) => {
+            spinner.stop(format!(
+                "Verifier → Accepted (block {})",
+                green.apply_to(result.block_number)
             ));
             *nonce += 1;
-            OwnershipResult::success("Verifier", tx_hash)
+            OwnershipResult::success("Verifier", result.tx_hash)
         }
         Err(e) => {
-            logger.warning(&format!("  ✗ Verifier ownership failed: {}", e));
+            spinner.error(format!("Verifier failed: {}", e));
             OwnershipResult::failure("Verifier", e.to_string())
         }
     }
@@ -289,6 +309,8 @@ pub(crate) async fn accept_governance<P>(
 where
     P: Provider + Clone,
 {
+    let green = Style::new().green();
+
     let governance = match contracts.governance_addr() {
         Some(addr) => addr,
         None => {
@@ -299,15 +321,18 @@ where
     // Check if ownership acceptance is needed
     match check_ownership_state(provider, governance, governor, "Governance", logger).await {
         OwnershipState::Accepted => {
-            logger.info("  ✓ Governance: ownership already accepted");
+            logger.info("Governance: ownership already accepted");
             return OwnershipResult::skipped("Governance", "ownership already accepted");
         }
         OwnershipState::NotTransferred => {
-            logger.info("  ⚠ Governance: ownership not transferred");
+            logger.warning("Governance: ownership not transferred");
             return OwnershipResult::skipped("Governance", "ownership not transferred");
         }
         OwnershipState::Pending => {}
     }
+
+    let spinner = cliclack::spinner();
+    spinner.start("Governance");
 
     let calldata = build_accept_ownership_calldata();
 
@@ -316,16 +341,16 @@ where
     )
     .await
     {
-        Ok(tx_hash) => {
-            logger.info(&format!(
-                "  ✓ Governance ownership accepted: {}",
-                tx_hash.to_string().green()
+        Ok(result) => {
+            spinner.stop(format!(
+                "Governance → Accepted (block {})",
+                green.apply_to(result.block_number)
             ));
             *nonce += 1;
-            OwnershipResult::success("Governance", tx_hash)
+            OwnershipResult::success("Governance", result.tx_hash)
         }
         Err(e) => {
-            logger.warning(&format!("  ✗ Governance ownership failed: {}", e));
+            spinner.error(format!("Governance failed: {}", e));
             OwnershipResult::failure("Governance", e.to_string())
         }
     }
@@ -350,6 +375,8 @@ pub(crate) async fn accept_rollup_da_manager<P>(
 where
     P: Provider + Clone,
 {
+    let green = Style::new().green();
+
     let da_manager = match contracts.l1_rollup_da_manager_addr() {
         Some(addr) => addr,
         None => {
@@ -382,11 +409,11 @@ where
     .await
     {
         OwnershipState::Accepted => {
-            logger.info("  ✓ Rollup DA Manager: ownership already accepted");
+            logger.info("Rollup DA Manager: ownership already accepted");
             return OwnershipResult::skipped("Rollup DA Manager", "ownership already accepted");
         }
         OwnershipState::NotTransferred => {
-            logger.info("  ⚠ Rollup DA Manager: ownership not transferred");
+            logger.warning("Rollup DA Manager: ownership not transferred");
             return OwnershipResult::skipped("Rollup DA Manager", "ownership not transferred");
         }
         OwnershipState::Pending => {}
@@ -395,11 +422,13 @@ where
     // Generate a unique salt for this operation (using current nonce as entropy)
     let salt = B256::from(U256::from(*nonce));
 
+    let spinner = cliclack::spinner();
+    spinner.start("Rollup DA Manager");
+
     // Step 1: Schedule the operation via Governance
-    logger.info("    Scheduling operation via Governance timelock...");
     let schedule_calldata = build_governance_schedule_calldata(da_manager, salt);
 
-    match send_ownership_tx(
+    let schedule_block = match send_ownership_tx(
         provider,
         governance,
         schedule_calldata,
@@ -410,21 +439,20 @@ where
     )
     .await
     {
-        Ok(tx_hash) => {
-            logger.info(&format!("    ✓ Scheduled: {}", tx_hash.to_string().green()));
+        Ok(result) => {
             *nonce += 1;
+            result.block_number
         }
         Err(e) => {
-            logger.warning(&format!("  ✗ Rollup DA Manager schedule failed: {}", e));
+            spinner.error(format!("Rollup DA Manager schedule failed: {}", e));
             return OwnershipResult::failure(
                 "Rollup DA Manager",
                 format!("Schedule failed: {}", e),
             );
         }
-    }
+    };
 
     // Step 2: Execute the scheduled operation
-    logger.info("    Executing scheduled operation...");
     let execute_calldata = build_governance_execute_calldata(da_manager, salt);
 
     match send_ownership_tx(
@@ -438,16 +466,17 @@ where
     )
     .await
     {
-        Ok(tx_hash) => {
-            logger.info(&format!(
-                "  ✓ Rollup DA Manager ownership accepted: {}",
-                tx_hash.to_string().green()
+        Ok(result) => {
+            spinner.stop(format!(
+                "Rollup DA Manager → Accepted (blocks {}, {})",
+                green.apply_to(schedule_block),
+                green.apply_to(result.block_number)
             ));
             *nonce += 1;
-            OwnershipResult::success("Rollup DA Manager", tx_hash)
+            OwnershipResult::success("Rollup DA Manager", result.tx_hash)
         }
         Err(e) => {
-            logger.warning(&format!("  ✗ Rollup DA Manager execute failed: {}", e));
+            spinner.error(format!("Rollup DA Manager execute failed: {}", e));
             OwnershipResult::failure("Rollup DA Manager", format!("Execute failed: {}", e))
         }
     }

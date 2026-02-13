@@ -11,7 +11,15 @@ use alloy_rpc_types::TransactionRequest;
 use alloy_signer_local::PrivateKeySigner;
 use secrecy::{ExposeSecret, SecretString};
 
-/// Send an ownership acceptance transaction.
+/// Transaction result with hash and block number.
+pub struct TxResult {
+    /// Transaction hash.
+    pub tx_hash: B256,
+    /// Block number where transaction was confirmed.
+    pub block_number: u64,
+}
+
+/// Send an ownership transaction and wait for confirmation (no spinner).
 pub async fn send_ownership_tx<P>(
     provider: &P,
     to: Address,
@@ -20,7 +28,7 @@ pub async fn send_ownership_tx<P>(
     chain_id: u64,
     nonce: u64,
     gas_price: u128,
-) -> Result<B256>
+) -> Result<TxResult>
 where
     P: Provider + Clone,
 {
@@ -42,31 +50,24 @@ where
             })?;
 
     let tx_hash = *pending.tx_hash();
-    let tx_hash_short = &tx_hash.to_string()[..12];
 
-    // Show spinner while waiting for confirmation
-    let spinner = cliclack::spinner();
-    spinner.start(format!("Confirming tx {}...", tx_hash_short));
-
-    let receipt = pending.get_receipt().await.map_err(|e| {
-        spinner.error("Confirmation failed");
-        EcosystemError::TransactionFailed {
+    let receipt = pending
+        .get_receipt()
+        .await
+        .map_err(|e| EcosystemError::TransactionFailed {
             reason: format!("Failed to get receipt: {}", e),
-        }
-    })?;
+        })?;
 
     if !receipt.status() {
-        spinner.error("Transaction reverted");
         return Err(EcosystemError::TransactionFailed {
             reason: format!("Transaction {} reverted", tx_hash),
         });
     }
 
-    spinner.stop(format!(
-        "Confirmed in block {}",
-        receipt.block_number.unwrap_or_default()
-    ));
-    Ok(tx_hash)
+    Ok(TxResult {
+        tx_hash,
+        block_number: receipt.block_number.unwrap_or_default(),
+    })
 }
 
 /// Create a signer from a private key.

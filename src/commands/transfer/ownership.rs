@@ -143,6 +143,20 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
             chain_name
         ))?;
 
+    // Load chain wallets to get chain governor key
+    let chain_wallets = state_manager
+        .chain(&chain_name)
+        .wallets()
+        .await
+        .wrap_err(format!("Failed to load chain wallets for '{}'", chain_name))?;
+
+    let chain_governor = chain_wallets
+        .governor
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("Governor wallet not found in chain wallets"))?;
+
+    let chain_governor_address = derive_address_from_key(&chain_governor.private_key)?;
+
     ui::info(format!(
         "Checking chain '{}' ownership status...",
         chain_name
@@ -150,7 +164,7 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
     let chain_status = check_chain_ownership_status(
         rpc_url.as_str(),
         &chain_contracts,
-        governor_address,
+        chain_governor_address,
         context.logger().as_ref(),
     )
     .await
@@ -180,7 +194,7 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
     if !args.yes {
         let confirmed = ui::confirm(format!(
             "Proceed with ownership acceptance and transfer to {}?",
-            new_owner
+            ui::green(new_owner)
         ))
         .initial_value(true)
         .interact()
@@ -211,7 +225,7 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
     let chain_accept_summary = accept_chain_ownership(
         rpc_url.as_str(),
         &chain_contracts,
-        &governor.private_key,
+        &chain_governor.private_key,
         args.gas_price_wei,
         context.logger().as_ref(),
     )
@@ -241,7 +255,7 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
     let chain_transfer_summary = transfer_chain_ownership(
         rpc_url.as_str(),
         &chain_contracts,
-        &governor.private_key,
+        &chain_governor.private_key,
         new_owner,
         args.gas_price_wei,
         context.logger().as_ref(),

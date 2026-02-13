@@ -427,7 +427,7 @@ foundryup
 Start Anvil with state persistence (recommended to preserve state between restarts):
 
 ```bash
-anvil --state ~/.adi_cli/anvil-state
+anvil --block-base-fee-per-gas 1 --disable-min-priority-fee --disable-block-gas-limit --state ~/.adi_cli/anvil-state
 ```
 
 **Important:** Because the CLI runs blockchain tooling inside Docker containers, you must configure the RPC URL to use Docker's host networking. Create or update your `~/.adi.yml`:

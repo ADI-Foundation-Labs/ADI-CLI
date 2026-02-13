@@ -595,13 +595,20 @@ async fn run_ecosystem_deployment(
         ui::info("Copied genesis.json to ecosystem directory")?;
     }
 
+    // Skip gas price for localhost/anvil - it handles gas pricing automatically
+    let gas_price_wei = if is_localhost_rpc(rpc_url.as_str()) {
+        None
+    } else {
+        args.gas_price_wei
+    };
+
     ui::info("Running zkstack ecosystem init...")?;
 
     let exit_code = runner
         .run_zkstack_ecosystem_init(
             &ecosystem_path,
             rpc_url.as_str(),
-            args.gas_price_wei,
+            gas_price_wei,
             &protocol_version.to_semver(),
         )
         .await
@@ -657,7 +664,7 @@ async fn run_ecosystem_deployment(
         &deployed,
         chain_wallets,
         &governor_key,
-        args.gas_price_wei,
+        gas_price_wei,
         context.logger().as_ref(),
     )
     .await
