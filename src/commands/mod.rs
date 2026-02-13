@@ -8,6 +8,7 @@ use crate::{context::Context, error::Result};
 mod accept;
 mod config;
 mod deploy;
+mod ecosystem;
 pub mod helpers;
 mod init;
 mod transfer;
@@ -21,6 +22,8 @@ pub enum Commands {
     Version,
     /// Display current configuration
     Config,
+    /// Display ecosystem and chain information with deployed contracts
+    Ecosystem(ecosystem::EcosystemArgs),
     /// Initialize ecosystem configuration (run before deploy)
     Init(init::InitArgs),
     /// Deploy smart contracts to the settlement layer (L1)
@@ -37,6 +40,7 @@ impl Commands {
         match self {
             Commands::Version => version::run().await,
             Commands::Config => config::run(context).await,
+            Commands::Ecosystem(args) => ecosystem::run(&args, context).await,
             Commands::Init(args) => init::run(&args, context).await,
             Commands::Deploy(args) => deploy::run(args, context).await,
             Commands::Accept(args) => accept::run(args, context).await,

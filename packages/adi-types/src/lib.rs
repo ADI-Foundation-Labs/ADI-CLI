@@ -53,8 +53,8 @@ pub use base_token::{BaseToken, ETH_TOKEN_ADDRESS, ETH_TOKEN_ADDRESS_STR};
 
 // Re-export contract types
 pub use contracts::{
-    BridgeContracts, BridgesConfig, ChainContracts, ChainL1Contracts, CoreEcosystemContracts,
-    EcosystemContracts, L1Contracts,
+    BridgeContracts, BridgesConfig, ChainContracts, ChainEcosystemContracts, ChainL1Contracts,
+    ChainL2Contracts, CoreEcosystemContracts, EcosystemContracts, L1Contracts, ZkSyncOsCtm,
 };
 
 // Re-export deployment types
