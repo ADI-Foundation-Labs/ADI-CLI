@@ -733,12 +733,16 @@ async fn run_ecosystem_deployment(
 
     // Normalize URL for host-side connection (host.docker.internal -> localhost)
     let normalized_rpc = normalize_rpc_url(rpc_url.as_str());
+    let gas_multiplier = args
+        .gas_multiplier
+        .or(Some(context.config().funding.gas_multiplier));
     let tx_hashes = add_validator_roles(
         &normalized_rpc,
         &deployed,
         chain_wallets,
         &governor_key,
         gas_price_wei,
+        gas_multiplier,
         context.logger().as_ref(),
     )
     .await

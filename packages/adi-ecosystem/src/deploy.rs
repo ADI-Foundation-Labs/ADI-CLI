@@ -82,6 +82,7 @@ struct ValidatorRoleAssignment {
 /// * `chain_wallets` - Chain wallets containing operator addresses.
 /// * `governor_key` - Chain governor private key for signing transactions.
 /// * `gas_price_wei` - Optional gas price in wei (estimated if not provided).
+/// * `gas_multiplier` - Gas price multiplier percentage (e.g., 120 = 20% buffer). Applied only to estimated gas price.
 /// * `logger` - Logger for debug/info/warning output.
 ///
 /// # Returns
@@ -97,6 +98,7 @@ pub async fn add_validator_roles(
     chain_wallets: &Wallets,
     governor_key: &SecretString,
     gas_price_wei: Option<u128>,
+    gas_multiplier: Option<u64>,
     logger: &dyn Logger,
 ) -> Result<Vec<B256>> {
     logger.debug(&format!(
@@ -133,16 +135,23 @@ pub async fn add_validator_roles(
             reason: format!("Failed to get nonce: {}", e),
         })?;
 
-    // Get gas price if not provided
-    let gas_price = match gas_price_wei {
-        Some(price) => price,
-        None => provider
-            .get_gas_price()
-            .await
-            .map_err(|e| EcosystemError::TransactionFailed {
-                reason: format!("Failed to get gas price: {}", e),
-            })?,
-    };
+    // Get gas price if not provided, apply multiplier to estimated price
+    let gas_price =
+        match gas_price_wei {
+            Some(price) => price,
+            None => {
+                let estimated = provider.get_gas_price().await.map_err(|e| {
+                    EcosystemError::TransactionFailed {
+                        reason: format!("Failed to get gas price: {}", e),
+                    }
+                })?;
+                // Apply multiplier if provided (e.g., 120 = 20% buffer)
+                match gas_multiplier {
+                    Some(multiplier) => estimated * u128::from(multiplier) / 100,
+                    None => estimated,
+                }
+            }
+        };
     logger.debug(&format!("Using gas price: {} wei", gas_price));
 
     // Build list of role assignments
