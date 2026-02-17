@@ -91,6 +91,7 @@ dependencies = [
  "alloy-sol-types",
  "alloy-transport-http",
  "async-trait",
+ "cliclack",
  "console 0.15.11",
  "eyre",
  "hex",

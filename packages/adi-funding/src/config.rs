@@ -152,6 +152,30 @@ impl FundingTarget {
     }
 }
 
+/// A funding target with current balance and status for display.
+///
+/// This struct captures both the required funding amounts and current balances,
+/// allowing unified display of funding plans (similar to `AnvilFundingTarget`).
+#[derive(Clone, Debug)]
+pub struct FundingTargetStatus {
+    /// Wallet role (deployer, governor, operator, etc.).
+    pub role: WalletRole,
+    /// Wallet address.
+    pub address: Address,
+    /// Required ETH amount (in wei).
+    pub required_eth: U256,
+    /// Required token amount (if custom gas token is configured).
+    pub required_token: Option<U256>,
+    /// Current ETH balance.
+    pub current_eth: U256,
+    /// Current token balance (if custom gas token is configured).
+    pub current_token: Option<U256>,
+    /// Whether ETH funding is needed.
+    pub needs_eth_funding: bool,
+    /// Whether token funding is needed.
+    pub needs_token_funding: bool,
+}
+
 /// Funding configuration for an operation.
 #[derive(Clone, Debug)]
 pub struct FundingConfig {

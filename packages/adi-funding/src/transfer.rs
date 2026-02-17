@@ -122,6 +122,16 @@ impl Transfer {
             }
         }
     }
+
+    /// Get a short description of the amount being transferred.
+    pub fn amount_description(&self) -> String {
+        match &self.transfer_type {
+            TransferType::Eth { amount } => format!("{} ETH", format_eth(*amount)),
+            TransferType::Token { amount, symbol, .. } => {
+                format!("{} {}", format_token(*amount), symbol)
+            }
+        }
+    }
 }
 
 /// Estimate gas for an ETH transfer.

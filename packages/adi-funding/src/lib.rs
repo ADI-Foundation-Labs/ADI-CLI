@@ -102,11 +102,13 @@ pub use balance::{
     get_eth_balance, get_token_balance, get_token_decimals, get_token_symbol, get_wallet_balance,
     WalletBalance,
 };
-pub use config::{DefaultAmounts, FundingConfig, FundingTarget, WalletRole};
+pub use config::{DefaultAmounts, FundingConfig, FundingTarget, FundingTargetStatus, WalletRole};
 pub use error::{FundingError, Result};
-pub use events::{FundingEvent, FundingEventHandler, LoggingEventHandler, NoOpEventHandler};
+pub use events::{
+    FundingEvent, FundingEventHandler, LoggingEventHandler, NoOpEventHandler, SpinnerEventHandler,
+};
 pub use executor::{FundingExecutor, FundingResult};
-pub use plan::{FundingPlan, FundingPlanBuilder};
+pub use plan::{build_funding_target_statuses, FundingPlan, FundingPlanBuilder};
 pub use provider::FundingProvider;
 pub use signer::{create_signer, signer_address};
 pub use transfer::{Transfer, TransferType};

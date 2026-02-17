@@ -1,7 +1,7 @@
 //! Funding plan calculation and validation.
 
 use crate::balance::{get_token_balance, get_token_decimals, get_token_symbol, get_wallet_balance};
-use crate::config::{FundingConfig, FundingTarget, WalletRole};
+use crate::config::{FundingConfig, FundingTarget, FundingTargetStatus, WalletRole};
 use crate::error::{FundingError, Result};
 use crate::provider::FundingProvider;
 use crate::transfer::{estimate_eth_transfer_gas, estimate_token_transfer_gas, Transfer};
@@ -412,4 +412,106 @@ impl<'a> FundingPlanBuilder<'a> {
             gas_price: adjusted_gas_price,
         })
     }
+}
+
+/// Build funding target statuses for display.
+///
+/// Returns all targets with their current balances and funding status,
+/// suitable for displaying a funding plan summary before execution.
+/// This matches the pattern used by `AnvilFunder::get_funding_targets()`.
+pub async fn build_funding_target_statuses(
+    provider: &FundingProvider,
+    config: &FundingConfig,
+    ecosystem_wallets: &Wallets,
+    chain_wallets: &Wallets,
+) -> Result<Vec<FundingTargetStatus>> {
+    let amounts = &config.default_amounts;
+    let mut targets: Vec<FundingTarget> = Vec::new();
+
+    // Add ecosystem wallets
+    if let Some(w) = &ecosystem_wallets.deployer {
+        targets.push(FundingTarget::new(
+            WalletRole::Deployer,
+            w.address,
+            amounts.deployer_eth,
+        ));
+    }
+    if let Some(w) = &ecosystem_wallets.governor {
+        targets.push(FundingTarget::new(
+            WalletRole::Governor,
+            w.address,
+            amounts.governor_eth,
+        ));
+    }
+
+    // Add chain wallets
+    if let Some(w) = &chain_wallets.governor {
+        targets.push(FundingTarget::new(
+            WalletRole::Governor,
+            w.address,
+            amounts.governor_eth,
+        ));
+    }
+    if let Some(w) = &chain_wallets.operator {
+        targets.push(FundingTarget::new(
+            WalletRole::Operator,
+            w.address,
+            amounts.operator_eth,
+        ));
+    }
+    if let Some(w) = &chain_wallets.prove_operator {
+        targets.push(FundingTarget::new(
+            WalletRole::ProveOperator,
+            w.address,
+            amounts.prove_operator_eth,
+        ));
+    }
+    if let Some(w) = &chain_wallets.execute_operator {
+        targets.push(FundingTarget::new(
+            WalletRole::ExecuteOperator,
+            w.address,
+            amounts.execute_operator_eth,
+        ));
+    }
+
+    // Get token decimals for CGT amount calculation
+    let token_decimals = match config.token_address {
+        Some(token) => Some(get_token_decimals(provider, token).await?),
+        None => None,
+    };
+
+    // Add token amounts to governor targets
+    if let Some(decimals) = token_decimals {
+        let cgt_amount = amounts.governor_cgt_amount(decimals);
+        for target in &mut targets {
+            if target.role == WalletRole::Governor && target.token_amount.is_none() {
+                target.token_amount = Some(cgt_amount);
+            }
+        }
+    }
+
+    // Query balances and build statuses
+    let mut statuses = Vec::with_capacity(targets.len());
+    for target in &targets {
+        let balance = get_wallet_balance(provider, target.address, config.token_address).await?;
+
+        let needs_eth = balance.eth_balance < target.eth_amount;
+        let needs_token = target
+            .token_amount
+            .map(|req| balance.token_balance.unwrap_or(U256::ZERO) < req)
+            .unwrap_or(false);
+
+        statuses.push(FundingTargetStatus {
+            role: target.role,
+            address: target.address,
+            required_eth: target.eth_amount,
+            required_token: target.token_amount,
+            current_eth: balance.eth_balance,
+            current_token: balance.token_balance,
+            needs_eth_funding: needs_eth,
+            needs_token_funding: needs_token,
+        });
+    }
+
+    Ok(statuses)
 }

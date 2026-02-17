@@ -7,9 +7,9 @@
 
 use adi_ecosystem::{add_validator_roles, DeployedContracts};
 use adi_funding::{
-    get_wallet_balance, is_localhost_rpc, normalize_rpc_url, AnvilFunder, AnvilFundingTarget,
-    DefaultAmounts, FundingConfig, FundingError, FundingExecutor, FundingPlanBuilder,
-    LoggingEventHandler,
+    build_funding_target_statuses, is_localhost_rpc, normalize_rpc_url, AnvilFunder,
+    AnvilFundingTarget, DefaultAmounts, FundingConfig, FundingError, FundingExecutor,
+    FundingPlanBuilder, FundingTargetStatus, LoggingEventHandler, SpinnerEventHandler,
 };
 use adi_state::StateManager;
 use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
@@ -224,12 +224,10 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
         ui::green(count_wallets(&chain_wallets))
     ))?;
 
-    // 9. Create executor with logging handler (needed for provider)
+    // 9. Create executor with spinner handler for visual progress
     let executor = FundingExecutor::new(rpc_url.as_str(), &funder_key)
         .wrap_err("Failed to create funding executor")?
-        .with_event_handler(Arc::new(LoggingEventHandler::new(Arc::clone(
-            context.logger(),
-        ))));
+        .with_event_handler(Arc::new(SpinnerEventHandler::new()));
 
     let funder_address = executor.funder_address();
     ui::info(format!("Funder address: {}", ui::green(funder_address)))?;
@@ -245,19 +243,23 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     )
     .await?;
 
-    // 11. Display current wallet balances
-    display_wallet_balances(
+    // 11. Display funding plan with current balances (unified Anvil-style display)
+    let target_statuses = build_funding_target_statuses(
         executor.provider(),
+        &funding_config,
         &ecosystem_wallets,
         &chain_wallets,
-        &chain_name,
-        funding_config.token_address,
-        funding_config.token_symbol.as_deref(),
     )
-    .await?;
+    .await
+    .wrap_err("Failed to get funding target statuses")?;
+
+    display_funding_plan(
+        funder_address,
+        &target_statuses,
+        funding_config.token_symbol.as_deref(),
+    )?;
 
     // 12. Build funding plan
-    ui::info("Building funding plan...")?;
     let plan_result = FundingPlanBuilder::new(executor.provider(), &funding_config, funder_address)
         .with_ecosystem_wallets(&ecosystem_wallets)
         .with_chain_wallets(&chain_wallets)
@@ -275,49 +277,8 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
 
     // 13-16. Funding plan display, confirmation, and execution (if needed)
     if let Some(plan) = plan {
-        ui::section("Funding Plan Summary")?;
-        ui::info(format!(
-            "  Transfers needed: {}",
-            ui::green(plan.transfer_count())
-        ))?;
-        ui::info(format!(
-            "  Total ETH to transfer: {} {}",
-            ui::green(format_eth(plan.total_eth_transfers())),
-            ui::green("ETH")
-        ))?;
-        if !plan.total_token_required.is_zero() {
-            let symbol = funding_config.token_symbol.as_deref().unwrap_or("tokens");
-            ui::info(format!(
-                "  Total {} to transfer: {} {}",
-                symbol,
-                ui::green(format_token(plan.total_token_required)),
-                ui::green(symbol)
-            ))?;
-        }
-        ui::info(format!(
-            "  Estimated gas cost: {} {}",
-            ui::green(format_eth(plan.total_gas_cost)),
-            ui::green("ETH")
-        ))?;
-        ui::info(format!(
-            "  Total ETH required: {} {}",
-            ui::green(format_eth(plan.total_eth_required)),
-            ui::green("ETH")
-        ))?;
-        ui::info(format!(
-            "  Funder balance: {} {}",
-            ui::green(format_eth(plan.funder_eth_balance)),
-            ui::green("ETH")
-        ))?;
-        if let Some(token_balance) = plan.funder_token_balance {
-            let symbol = funding_config.token_symbol.as_deref().unwrap_or("tokens");
-            ui::info(format!(
-                "  Funder {} balance: {} {}",
-                symbol,
-                ui::green(format_token(token_balance)),
-                ui::green(symbol)
-            ))?;
-        }
+        // Display funding summary in boxed note (matches Anvil style)
+        display_funding_summary(&plan, &funding_config)?;
 
         if !plan.is_valid() {
             let needed = plan.total_eth_required;
@@ -330,7 +291,6 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
                 format_eth(needed - have)
             ));
         }
-        ui::success("  Status: Sufficient balance")?;
 
         // Dry-run mode - show plan without executing
         if args.dry_run {
@@ -352,8 +312,8 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
             }
         }
 
-        // Execute funding
-        ui::info("Executing funding transfers...")?;
+        // Execute funding with spinner progress
+        ui::section("Executing Transfers")?;
         let result = executor
             .execute(&plan)
             .await
@@ -539,6 +499,121 @@ fn display_anvil_funding_plan(targets: &[AnvilFundingTarget]) -> Result<()> {
     ));
 
     ui::note("Anvil Funding Plan", lines.join("\n"))?;
+    Ok(())
+}
+
+/// Display funding plan with current balances (normal network).
+///
+/// Matches the Anvil funding plan display format with boxed note.
+fn display_funding_plan(
+    funder_address: Address,
+    targets: &[FundingTargetStatus],
+    token_symbol: Option<&str>,
+) -> Result<()> {
+    let mut lines = vec![format!("Funder: {}", ui::green(funder_address))];
+
+    for target in targets {
+        let current = format_eth(target.current_eth);
+        let required = format_eth(target.required_eth);
+        let status = if target.needs_eth_funding {
+            format!("{}", ui::yellow("→ Will fund"))
+        } else {
+            format!("{}", ui::green("✓ Already funded"))
+        };
+        lines.push(format!(
+            "{:20} {} ETH (current: {} ETH) {}",
+            target.role.to_string(),
+            ui::green(&required),
+            current,
+            status
+        ));
+
+        // Add token line if applicable
+        if let (Some(req_tok), Some(cur_tok)) = (target.required_token, target.current_token) {
+            let symbol = token_symbol.unwrap_or("CGT");
+            let tok_status = if target.needs_token_funding {
+                format!("{}", ui::yellow("→ Will fund"))
+            } else {
+                format!("{}", ui::green("✓ Already funded"))
+            };
+            lines.push(format!(
+                "{:20} {} {} (current: {} {}) {}",
+                "",
+                ui::green(format_token(req_tok)),
+                symbol,
+                format_token(cur_tok),
+                symbol,
+                tok_status
+            ));
+        }
+    }
+
+    let needs_funding = targets
+        .iter()
+        .filter(|t| t.needs_eth_funding || t.needs_token_funding)
+        .count();
+    let already_funded = targets.len() - needs_funding;
+    lines.push(format!(
+        "\nSummary: {} need funding, {} already funded",
+        ui::green(needs_funding),
+        already_funded
+    ));
+
+    ui::note("Funding Plan", lines.join("\n"))?;
+    Ok(())
+}
+
+/// Display funding summary in boxed note (transfer counts, gas, balances).
+fn display_funding_summary(plan: &adi_funding::FundingPlan, config: &FundingConfig) -> Result<()> {
+    let mut lines = vec![
+        format!("Transfers needed: {}", ui::green(plan.transfer_count())),
+        format!(
+            "Total ETH to transfer: {} ETH",
+            ui::green(format_eth(plan.total_eth_transfers()))
+        ),
+    ];
+
+    if !plan.total_token_required.is_zero() {
+        let symbol = config.token_symbol.as_deref().unwrap_or("tokens");
+        lines.push(format!(
+            "Total {} to transfer: {} {}",
+            symbol,
+            ui::green(format_token(plan.total_token_required)),
+            symbol
+        ));
+    }
+
+    lines.push(format!(
+        "Estimated gas cost: {} ETH",
+        ui::green(format_eth(plan.total_gas_cost))
+    ));
+    lines.push(format!(
+        "Total ETH required: {} ETH",
+        ui::green(format_eth(plan.total_eth_required))
+    ));
+    lines.push(format!(
+        "Funder balance: {} ETH",
+        ui::green(format_eth(plan.funder_eth_balance))
+    ));
+
+    if let Some(token_balance) = plan.funder_token_balance {
+        let symbol = config.token_symbol.as_deref().unwrap_or("tokens");
+        lines.push(format!(
+            "Funder {} balance: {} {}",
+            symbol,
+            ui::green(format_token(token_balance)),
+            symbol
+        ));
+    }
+
+    let status = if plan.is_valid() {
+        format!("{}", ui::green("Sufficient balance"))
+    } else {
+        format!("{}", ui::yellow("Insufficient balance"))
+    };
+    lines.push(format!("Status: {}", status));
+
+    ui::note("Funding Summary", lines.join("\n"))?;
     Ok(())
 }
 
@@ -939,109 +1014,6 @@ fn count_wallets(wallets: &Wallets) -> usize {
         count += 1;
     }
     count
-}
-
-/// Display current wallet balances.
-async fn display_wallet_balances(
-    provider: &adi_funding::FundingProvider,
-    ecosystem_wallets: &Wallets,
-    chain_wallets: &Wallets,
-    chain_name: &str,
-    token_address: Option<Address>,
-    token_symbol: Option<&str>,
-) -> Result<()> {
-    ui::section("Current Wallet Balances")?;
-
-    // Ecosystem wallets
-    ui::info("Ecosystem Wallets:")?;
-    display_wallet_balance(
-        provider,
-        "deployer",
-        ecosystem_wallets.deployer.as_ref(),
-        token_address,
-        token_symbol,
-    )
-    .await?;
-    display_wallet_balance(
-        provider,
-        "governor",
-        ecosystem_wallets.governor.as_ref(),
-        token_address,
-        token_symbol,
-    )
-    .await?;
-
-    // Chain wallets (only those that will be funded)
-    ui::info(format!("Chain Wallets ({}):", chain_name))?;
-    display_wallet_balance(
-        provider,
-        "governor",
-        chain_wallets.governor.as_ref(),
-        token_address,
-        token_symbol,
-    )
-    .await?;
-    display_wallet_balance(
-        provider,
-        "operator",
-        chain_wallets.operator.as_ref(),
-        token_address,
-        token_symbol,
-    )
-    .await?;
-    display_wallet_balance(
-        provider,
-        "prove_operator",
-        chain_wallets.prove_operator.as_ref(),
-        token_address,
-        token_symbol,
-    )
-    .await?;
-    display_wallet_balance(
-        provider,
-        "execute_operator",
-        chain_wallets.execute_operator.as_ref(),
-        token_address,
-        token_symbol,
-    )
-    .await?;
-
-    Ok(())
-}
-
-/// Display a single wallet's balance.
-async fn display_wallet_balance(
-    provider: &adi_funding::FundingProvider,
-    role: &str,
-    wallet: Option<&adi_types::Wallet>,
-    token_address: Option<Address>,
-    token_symbol: Option<&str>,
-) -> Result<()> {
-    let Some(w) = wallet else {
-        return Ok(());
-    };
-
-    let balance = get_wallet_balance(provider, w.address, token_address)
-        .await
-        .wrap_err_with(|| format!("Failed to get balance for {}", role))?;
-
-    let eth_str = ui::green(format_eth(balance.eth_balance));
-    let symbol = token_symbol.unwrap_or("tokens");
-    let token_str = balance
-        .token_balance
-        .map(|t| format!(" + {} {}", ui::green(format_token(t)), ui::green(symbol)))
-        .unwrap_or_default();
-
-    ui::info(format!(
-        "  {:24} ({}): {} {}{}",
-        role,
-        ui::green(w.address),
-        eth_str,
-        ui::green("ETH"),
-        token_str
-    ))?;
-
-    Ok(())
 }
 
 /// Display detailed funding plan (for dry-run mode).

@@ -28,6 +28,7 @@ adi-types = { workspace = true }
 
 # Terminal styling
 console = { workspace = true }
+cliclack = { workspace = true }
 
 # Alloy EVM stack
 alloy-primitives = { workspace = true }
