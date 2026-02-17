@@ -11,6 +11,7 @@ mod deploy;
 mod ecosystem;
 pub mod helpers;
 mod init;
+mod owners;
 mod transfer;
 mod version;
 
@@ -32,6 +33,8 @@ pub enum Commands {
     Accept(accept::AcceptArgs),
     /// Accept and transfer ownership of ecosystem contracts to a new owner
     Transfer(transfer::TransferArgs),
+    /// Display owners of deployed L1 contracts
+    Owners(owners::OwnersArgs),
 }
 
 impl Commands {
@@ -45,6 +48,7 @@ impl Commands {
             Commands::Deploy(args) => deploy::run(args, context).await,
             Commands::Accept(args) => accept::run(args, context).await,
             Commands::Transfer(args) => transfer::run(args, context).await,
+            Commands::Owners(args) => owners::run(&args, context).await,
         }
     }
 }

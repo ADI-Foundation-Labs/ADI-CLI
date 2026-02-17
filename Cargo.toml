@@ -150,6 +150,9 @@ adi-types = { workspace = true }
 # EVM types
 alloy-primitives = { workspace = true }
 alloy-signer-local = { workspace = true }
+alloy-provider = { workspace = true }
+alloy-sol-types = { workspace = true }
+alloy-rpc-types = { workspace = true }
 hex = { workspace = true }
 secrecy = { workspace = true }
 url = { workspace = true }
