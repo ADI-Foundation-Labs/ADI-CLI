@@ -20,7 +20,7 @@ use alloy_primitives::{Address, B256, U256};
 use alloy_provider::Provider;
 use console::Style;
 
-/// Accept ownership for Chain Admin contract.
+/// Accept ownership for Chain Admin contract (chain-level).
 pub(crate) async fn accept_chain_admin<P>(
     provider: &P,
     contracts: &ChainContracts,
@@ -82,6 +82,83 @@ where
         Err(e) => {
             spinner.error(format!("Chain Admin failed: {}", e));
             OwnershipResult::failure("Chain Admin", e.to_string())
+        }
+    }
+}
+
+/// Accept ownership for Ecosystem Chain Admin contract.
+pub(crate) async fn accept_ecosystem_chain_admin<P>(
+    provider: &P,
+    contracts: &EcosystemContracts,
+    governor: Address,
+    chain_id: u64,
+    nonce: &mut u64,
+    gas_price: u128,
+    logger: &dyn Logger,
+) -> OwnershipResult
+where
+    P: Provider + Clone,
+{
+    let green = Style::new().green();
+
+    let chain_admin = match contracts.chain_admin_addr() {
+        Some(addr) => addr,
+        None => {
+            return OwnershipResult::skipped(
+                "Ecosystem Chain Admin",
+                "chain_admin_addr not configured",
+            );
+        }
+    };
+
+    // Check if ownership acceptance is needed
+    match check_ownership_state(
+        provider,
+        chain_admin,
+        governor,
+        "Ecosystem Chain Admin",
+        logger,
+    )
+    .await
+    {
+        OwnershipState::Accepted => {
+            logger.info("Ecosystem Chain Admin: ownership already accepted");
+            return OwnershipResult::skipped("Ecosystem Chain Admin", "ownership already accepted");
+        }
+        OwnershipState::NotTransferred => {
+            logger.warning("Ecosystem Chain Admin: ownership not transferred");
+            return OwnershipResult::skipped("Ecosystem Chain Admin", "ownership not transferred");
+        }
+        OwnershipState::Pending => {}
+    }
+
+    let spinner = cliclack::spinner();
+    spinner.start("Ecosystem Chain Admin");
+
+    let calldata = build_accept_ownership_calldata();
+
+    match send_ownership_tx(
+        provider,
+        chain_admin,
+        calldata,
+        governor,
+        chain_id,
+        *nonce,
+        gas_price,
+    )
+    .await
+    {
+        Ok(result) => {
+            spinner.stop(format!(
+                "Ecosystem Chain Admin → Accepted (block {})",
+                green.apply_to(result.block_number)
+            ));
+            *nonce += 1;
+            OwnershipResult::success("Ecosystem Chain Admin", result.tx_hash)
+        }
+        Err(e) => {
+            spinner.error(format!("Ecosystem Chain Admin failed: {}", e));
+            OwnershipResult::failure("Ecosystem Chain Admin", e.to_string())
         }
     }
 }

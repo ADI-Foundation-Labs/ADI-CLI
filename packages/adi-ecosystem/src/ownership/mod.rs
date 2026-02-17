@@ -44,8 +44,8 @@ use console::Style;
 use secrecy::SecretString;
 
 use contracts::{
-    accept_chain_admin, accept_governance, accept_rollup_da_manager, accept_server_notifier,
-    accept_validator_timelock, accept_verifier,
+    accept_chain_admin, accept_ecosystem_chain_admin, accept_governance, accept_rollup_da_manager,
+    accept_server_notifier, accept_validator_timelock, accept_verifier,
 };
 use transaction::create_signer;
 use transfer::{
@@ -210,7 +210,20 @@ pub async fn accept_all_ownership(
     .await;
     results.push(result);
 
-    // 5. Rollup DA Manager (via governance acceptOwner)
+    // 5. Ecosystem Chain Admin (direct)
+    let result = accept_ecosystem_chain_admin(
+        &provider,
+        contracts,
+        governor_address,
+        chain_id,
+        &mut nonce,
+        gas_price,
+        logger,
+    )
+    .await;
+    results.push(result);
+
+    // 6. Rollup DA Manager (via governance acceptOwner)
     let result = accept_rollup_da_manager(
         &provider,
         contracts,

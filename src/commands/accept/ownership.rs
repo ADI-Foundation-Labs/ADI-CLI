@@ -16,7 +16,7 @@ use url::Url;
 
 use crate::commands::helpers::{
     create_state_manager_with_context, derive_address_from_key, display_ownership_status,
-    display_summary, resolve_ecosystem_name, resolve_rpc_url,
+    display_summary, resolve_chain_name, resolve_ecosystem_name, resolve_rpc_url,
 };
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
@@ -208,11 +208,20 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
     // Display ecosystem contracts with pending status
     display_ownership_status("Ecosystem contracts", &ecosystem_status)?;
 
-    // Load and check chain contracts if --chain is provided
+    // In new owner mode, automatically include chain contracts from config
+    // This ensures Chain Admin is accepted without requiring --chain flag
+    let effective_chain_name = if !is_governor_mode && args.chain.is_none() {
+        // Try to resolve chain from config, but don't error if not set
+        resolve_chain_name(args.chain.as_ref(), context.config()).ok()
+    } else {
+        args.chain.clone()
+    };
+
+    // Load and check chain contracts if chain name is available
     let chain_contracts: Option<ChainContracts>;
     let chain_status: Option<OwnershipStatusSummary>;
 
-    if let Some(ref chain_name) = args.chain {
+    if let Some(ref chain_name) = effective_chain_name {
         match state_manager.chain(chain_name).contracts().await {
             Ok(contracts) => {
                 ui::info(format!(
