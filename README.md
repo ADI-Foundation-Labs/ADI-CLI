@@ -253,11 +253,6 @@ funding:
   # Never commit private keys to config files
   # funder_key: "0x..."
 
-  # Buffer added to estimated gas prices (percentage)
-  # Recommended: 200 for Anvil, 300 for Sepolia
-  # Default: 120
-  gas_multiplier: 300
-
   # ETH amounts to send to each wallet role (in ether)
   #
   # For Sepolia TESTING (short-term, minimal funding):
@@ -286,6 +281,13 @@ ownership:
   # Private key for accepting ownership (new owner mode)
   # Can be overridden with --private-key flag or ADI_PRIVATE_KEY env var
   # private_key: "0x..."
+
+# Gas price multiplier percentage (default: 120 = 20% buffer).
+# Applied to all on-chain transactions (deploy, accept, transfer).
+# The CLI fetches current gas price and multiplies by this percentage.
+# Example: 120 means use 120% of estimated gas price (20% buffer).
+# Recommended: 200 for Anvil, 300 for Sepolia/mainnet.
+gas_multiplier: 120
 
 # OPTIONAL: Override Docker toolkit image settings
 # toolkit:
@@ -403,6 +405,23 @@ After funding, the CLI runs zkstack inside a container to deploy ecosystem contr
 | Prove Operator   | Submits validity proofs                     | 5+ ETH          |
 | Execute Operator | Executes verified batches                   | 5+ ETH          |
 
+**Gas multiplier:**
+
+The `--gas-multiplier` flag controls gas price buffering for on-chain transactions. The CLI fetches the current gas price from the RPC endpoint and multiplies it by the specified percentage.
+
+| Value | Meaning | Recommended For |
+| ----- | ------- | --------------- |
+| 100   | Use exact estimated gas price | Not recommended |
+| 120   | 20% buffer (default) | Stable networks |
+| 200   | 100% buffer | Anvil (local) |
+| 300   | 200% buffer | Sepolia, congested networks |
+
+This flag is available on `deploy`, `accept`, and `transfer` commands. You can also set it globally in `~/.adi.yml`:
+
+```yaml
+gas_multiplier: 200
+```
+
 **Recommended workflow:**
 
 Always start with a dry-run to see what will happen:
@@ -451,8 +470,8 @@ funding:
   # No funder_key needed - Anvil accounts are pre-funded
   # funder_key: not required
 
-  # Higher gas multiplier recommended for Anvil
-  gas_multiplier: 200
+# Higher gas multiplier recommended for Anvil
+gas_multiplier: 200
 ```
 
 Then deploy:
@@ -598,6 +617,30 @@ adi accept --chain my-chain --yes
 ```
 
 > **Note:** For Ownable2Step contracts, ownership transfer is a two-step process. The Bridged Token Beacon uses standard Ownable, so its ownership transfers immediately without requiring acceptance.
+
+### Step 6: View Ecosystem Information
+
+The `ecosystem` command displays information about your deployed ecosystem, including contract addresses and chain configuration.
+
+```bash
+# Display ecosystem information
+adi ecosystem
+
+# Include chain-level information
+adi ecosystem --chain my-chain
+```
+
+### Step 7: View Contract Owners
+
+The `owners` command shows the current owners of all deployed L1 contracts. This is useful for verifying ownership state after deployment or transfer operations.
+
+```bash
+# Display owners of ecosystem-level contracts
+adi owners
+
+# Include chain-level contract owners
+adi owners --chain my-chain
+```
 
 ## State Management
 

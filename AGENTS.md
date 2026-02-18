@@ -69,6 +69,8 @@ cargo test               # Run tests
 
 - `adi version` - Display CLI version and build information
 - `adi config` - Display current configuration
+- `adi ecosystem` - Display ecosystem and chain information with deployed contracts
+- `adi owners` - Display owners of deployed L1 contracts
 - `adi init` - Initialize new ecosystem configuration
 - `adi deploy` - Deploy ecosystem contracts to settlement layer
 - `adi accept` - Accept pending ownership transfers for deployed contracts
