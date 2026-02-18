@@ -121,10 +121,6 @@ pub struct DeployArgs {
     )]
     pub yes: bool,
 
-    /// Custom gas price in wei (for non-local networks). If not set, gas price is estimated
-    #[arg(long, help = "Custom gas price in wei (for non-local networks)")]
-    pub gas_price_wei: Option<u128>,
-
     /// Skip contract deployment step (only fund wallets)
     #[arg(long, help = "Skip contract deployment step (only fund wallets)")]
     pub skip_deployment: bool,
@@ -669,11 +665,21 @@ async fn run_ecosystem_deployment(
         ui::info("Copied genesis.json to ecosystem directory")?;
     }
 
-    // Skip gas price for localhost/anvil - it handles gas pricing automatically
+    // Resolve gas multiplier from args or config
+    let gas_multiplier = resolve_gas_multiplier(args, context);
+
+    // Compute gas price: skip for localhost, estimate + apply multiplier for testnets
     let gas_price_wei = if is_localhost_rpc(rpc_url.as_str()) {
         None
     } else {
-        args.gas_price_wei
+        // Estimate gas price and apply multiplier
+        let provider = adi_funding::FundingProvider::new(rpc_url.as_str())
+            .wrap_err("Failed to create provider for gas estimation")?;
+        let estimated = provider
+            .get_gas_price()
+            .await
+            .wrap_err("Failed to estimate gas price")?;
+        Some(estimated * u128::from(gas_multiplier) / 100)
     };
 
     ui::info("Running zkstack ecosystem init...")?;
@@ -733,16 +739,20 @@ async fn run_ecosystem_deployment(
 
     // Normalize URL for host-side connection (host.docker.internal -> localhost)
     let normalized_rpc = normalize_rpc_url(rpc_url.as_str());
-    let gas_multiplier = args
-        .gas_multiplier
-        .or(Some(context.config().funding.gas_multiplier));
+
+    // Pass gas_multiplier (None for localhost to skip multiplier)
+    let validator_gas_multiplier = if is_localhost_rpc(rpc_url.as_str()) {
+        None
+    } else {
+        Some(gas_multiplier)
+    };
+
     let tx_hashes = add_validator_roles(
         &normalized_rpc,
         &deployed,
         chain_wallets,
         &governor_key,
-        gas_price_wei,
-        gas_multiplier,
+        validator_gas_multiplier,
         context.logger().as_ref(),
     )
     .await
@@ -864,6 +874,14 @@ fn resolve_funder_key(args: &DeployArgs, context: &Context) -> Result<SecretStri
     ))
 }
 
+/// Resolve gas multiplier from args or config.
+///
+/// Priority: CLI arg > top-level config > funding config (backward compat) > default (120)
+fn resolve_gas_multiplier(args: &DeployArgs, context: &Context) -> u64 {
+    args.gas_multiplier
+        .unwrap_or_else(|| context.config().gas_multiplier)
+}
+
 /// Build FundingConfig from ecosystem metadata.
 ///
 /// Token address is read from chain's base_token config.
@@ -884,7 +902,7 @@ async fn build_funding_config(
     // Set gas multiplier (args > config > default)
     let multiplier = args
         .gas_multiplier
-        .unwrap_or(funding_defaults.gas_multiplier);
+        .unwrap_or(context.config().gas_multiplier);
     config = config.with_gas_multiplier(multiplier);
     context
         .logger()

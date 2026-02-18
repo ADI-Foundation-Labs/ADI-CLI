@@ -42,10 +42,6 @@ pub struct FundingDefaults {
     #[serde(default, skip_serializing)]
     pub funder_key: Option<SecretString>,
 
-    /// Gas price multiplier percentage (default: 120 = 20% buffer).
-    #[serde(default = "default_gas_multiplier")]
-    pub gas_multiplier: u64,
-
     /// Deployer ETH amount (default: 1.0 ETH).
     #[serde(default)]
     pub deployer_eth: Option<f64>,
@@ -128,6 +124,12 @@ pub struct Config {
     /// These can be overridden by CLI flags.
     #[serde(default)]
     pub ownership: OwnershipDefaults,
+
+    /// Gas price multiplier percentage (default: 120 = 20% buffer).
+    /// Applied to all on-chain transactions.
+    /// Can be overridden with --gas-multiplier flag.
+    #[serde(default = "default_gas_multiplier")]
+    pub gas_multiplier: u64,
 }
 
 impl Config {

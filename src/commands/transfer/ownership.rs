@@ -43,9 +43,12 @@ pub struct TransferArgs {
     )]
     pub rpc_url: Option<Url>,
 
-    /// Custom gas price in wei.
-    #[arg(long, help = "Custom gas price in wei")]
-    pub gas_price_wei: Option<u128>,
+    /// Gas price multiplier percentage (default: 120 = 20% buffer over estimated gas).
+    #[arg(
+        long,
+        help = "Gas price multiplier percentage (default: 120 = 20% buffer over estimated gas)"
+    )]
+    pub gas_multiplier: Option<u64>,
 
     /// Preview contracts without executing transactions.
     #[arg(long, help = "Preview contracts without executing transactions")]
@@ -206,6 +209,11 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
         }
     }
 
+    // Resolve gas multiplier (use config default if not provided)
+    let gas_multiplier = args
+        .gas_multiplier
+        .or(Some(context.config().gas_multiplier));
+
     // Accept phase
     ui::section("Accept Phase")?;
 
@@ -215,7 +223,7 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
         rpc_url.as_str(),
         &ecosystem_contracts,
         &governor.private_key,
-        args.gas_price_wei,
+        gas_multiplier,
         context.logger().as_ref(),
     )
     .await;
@@ -226,7 +234,7 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
         rpc_url.as_str(),
         &chain_contracts,
         &chain_governor.private_key,
-        args.gas_price_wei,
+        gas_multiplier,
         context.logger().as_ref(),
     )
     .await;
@@ -245,7 +253,7 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
         &ecosystem_contracts,
         &governor.private_key,
         new_owner,
-        args.gas_price_wei,
+        gas_multiplier,
         context.logger().as_ref(),
     )
     .await;
@@ -257,7 +265,7 @@ pub async fn run(args: TransferArgs, context: &Context) -> Result<()> {
         &chain_contracts,
         &chain_governor.private_key,
         new_owner,
-        args.gas_price_wei,
+        gas_multiplier,
         context.logger().as_ref(),
     )
     .await;

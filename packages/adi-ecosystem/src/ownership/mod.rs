@@ -67,7 +67,7 @@ use transfer::{
 /// * `rpc_url` - Settlement layer RPC endpoint URL.
 /// * `contracts` - Ecosystem contracts containing addresses.
 /// * `governor_key` - Governor private key for signing transactions.
-/// * `gas_price_wei` - Optional gas price in wei (estimated if not provided).
+/// * `gas_multiplier` - Gas price multiplier percentage (e.g., 120 = 20% buffer). None to use raw estimate.
 /// * `logger` - Logger for info/error/warning output.
 ///
 /// # Returns
@@ -77,7 +77,7 @@ pub async fn accept_all_ownership(
     rpc_url: &str,
     contracts: &EcosystemContracts,
     governor_key: &SecretString,
-    gas_price_wei: Option<u128>,
+    gas_multiplier: Option<u64>,
     logger: &dyn Logger,
 ) -> OwnershipSummary {
     let mut results = Vec::new();
@@ -138,21 +138,19 @@ pub async fn accept_all_ownership(
         }
     };
 
-    // Get gas price if not provided
-    let gas_price = match gas_price_wei {
-        Some(price) => price,
-        None => match provider.get_gas_price().await {
-            Ok(p) => p,
-            Err(e) => {
-                logger.error(&format!("Failed to get gas price: {}", e));
-                results.push(OwnershipResult::failure(
-                    "all",
-                    format!("Failed to get gas price: {}", e),
-                ));
-                return OwnershipSummary::new(results);
-            }
-        },
+    // Estimate gas price and apply multiplier if provided
+    let estimated = match provider.get_gas_price().await {
+        Ok(p) => p,
+        Err(e) => {
+            logger.error(&format!("Failed to get gas price: {}", e));
+            results.push(OwnershipResult::failure(
+                "all",
+                format!("Failed to get gas price: {}", e),
+            ));
+            return OwnershipSummary::new(results);
+        }
     };
+    let gas_price = gas_multiplier.map_or(estimated, |m| estimated * u128::from(m) / 100);
 
     // Get chain admin for multicall operations
     let chain_admin = contracts.chain_admin_addr();
@@ -249,7 +247,7 @@ pub async fn accept_all_ownership(
 /// * `rpc_url` - Settlement layer RPC endpoint URL.
 /// * `contracts` - Chain contracts containing addresses.
 /// * `governor_key` - Governor private key for signing transactions.
-/// * `gas_price_wei` - Optional gas price in wei (estimated if not provided).
+/// * `gas_multiplier` - Gas price multiplier percentage (e.g., 120 = 20% buffer). None to use raw estimate.
 /// * `logger` - Logger for info/error/warning output.
 ///
 /// # Returns
@@ -259,7 +257,7 @@ pub async fn accept_chain_ownership(
     rpc_url: &str,
     contracts: &ChainContracts,
     governor_key: &SecretString,
-    gas_price_wei: Option<u128>,
+    gas_multiplier: Option<u64>,
     logger: &dyn Logger,
 ) -> OwnershipSummary {
     let mut results = Vec::new();
@@ -320,21 +318,19 @@ pub async fn accept_chain_ownership(
         }
     };
 
-    // Get gas price if not provided
-    let gas_price = match gas_price_wei {
-        Some(price) => price,
-        None => match provider.get_gas_price().await {
-            Ok(p) => p,
-            Err(e) => {
-                logger.error(&format!("Failed to get gas price: {}", e));
-                results.push(OwnershipResult::failure(
-                    "all",
-                    format!("Failed to get gas price: {}", e),
-                ));
-                return OwnershipSummary::new(results);
-            }
-        },
+    // Estimate gas price and apply multiplier if provided
+    let estimated = match provider.get_gas_price().await {
+        Ok(p) => p,
+        Err(e) => {
+            logger.error(&format!("Failed to get gas price: {}", e));
+            results.push(OwnershipResult::failure(
+                "all",
+                format!("Failed to get gas price: {}", e),
+            ));
+            return OwnershipSummary::new(results);
+        }
     };
+    let gas_price = gas_multiplier.map_or(estimated, |m| estimated * u128::from(m) / 100);
 
     // 1. Chain Admin (direct)
     let result = accept_chain_admin(
@@ -370,7 +366,7 @@ pub async fn accept_chain_ownership(
 /// * `contracts` - Ecosystem contracts containing addresses.
 /// * `governor_key` - Governor private key for signing transactions.
 /// * `new_owner` - Address to transfer ownership to.
-/// * `gas_price_wei` - Optional gas price in wei (estimated if not provided).
+/// * `gas_multiplier` - Gas price multiplier percentage (e.g., 120 = 20% buffer). None to use raw estimate.
 /// * `logger` - Logger for info/error/warning output.
 ///
 /// # Returns
@@ -381,7 +377,7 @@ pub async fn transfer_all_ownership(
     contracts: &EcosystemContracts,
     governor_key: &SecretString,
     new_owner: Address,
-    gas_price_wei: Option<u128>,
+    gas_multiplier: Option<u64>,
     logger: &dyn Logger,
 ) -> OwnershipSummary {
     let mut results = Vec::new();
@@ -442,21 +438,19 @@ pub async fn transfer_all_ownership(
         }
     };
 
-    // Get gas price if not provided
-    let gas_price = match gas_price_wei {
-        Some(price) => price,
-        None => match provider.get_gas_price().await {
-            Ok(p) => p,
-            Err(e) => {
-                logger.error(&format!("Failed to get gas price: {}", e));
-                results.push(OwnershipResult::failure(
-                    "all",
-                    format!("Failed to get gas price: {}", e),
-                ));
-                return OwnershipSummary::new(results);
-            }
-        },
+    // Estimate gas price and apply multiplier if provided
+    let estimated = match provider.get_gas_price().await {
+        Ok(p) => p,
+        Err(e) => {
+            logger.error(&format!("Failed to get gas price: {}", e));
+            results.push(OwnershipResult::failure(
+                "all",
+                format!("Failed to get gas price: {}", e),
+            ));
+            return OwnershipSummary::new(results);
+        }
     };
+    let gas_price = gas_multiplier.map_or(estimated, |m| estimated * u128::from(m) / 100);
 
     let green = Style::new().green();
     logger.info(&format!(
@@ -538,7 +532,7 @@ pub async fn transfer_all_ownership(
 /// * `contracts` - Chain contracts containing addresses.
 /// * `governor_key` - Governor private key for signing transactions.
 /// * `new_owner` - Address to transfer ownership to.
-/// * `gas_price_wei` - Optional gas price in wei (estimated if not provided).
+/// * `gas_multiplier` - Gas price multiplier percentage (e.g., 120 = 20% buffer). None to use raw estimate.
 /// * `logger` - Logger for info/error/warning output.
 ///
 /// # Returns
@@ -549,7 +543,7 @@ pub async fn transfer_chain_ownership(
     contracts: &ChainContracts,
     governor_key: &SecretString,
     new_owner: Address,
-    gas_price_wei: Option<u128>,
+    gas_multiplier: Option<u64>,
     logger: &dyn Logger,
 ) -> OwnershipSummary {
     let mut results = Vec::new();
@@ -610,21 +604,19 @@ pub async fn transfer_chain_ownership(
         }
     };
 
-    // Get gas price if not provided
-    let gas_price = match gas_price_wei {
-        Some(price) => price,
-        None => match provider.get_gas_price().await {
-            Ok(p) => p,
-            Err(e) => {
-                logger.error(&format!("Failed to get gas price: {}", e));
-                results.push(OwnershipResult::failure(
-                    "all",
-                    format!("Failed to get gas price: {}", e),
-                ));
-                return OwnershipSummary::new(results);
-            }
-        },
+    // Estimate gas price and apply multiplier if provided
+    let estimated = match provider.get_gas_price().await {
+        Ok(p) => p,
+        Err(e) => {
+            logger.error(&format!("Failed to get gas price: {}", e));
+            results.push(OwnershipResult::failure(
+                "all",
+                format!("Failed to get gas price: {}", e),
+            ));
+            return OwnershipSummary::new(results);
+        }
     };
+    let gas_price = gas_multiplier.map_or(estimated, |m| estimated * u128::from(m) / 100);
 
     let green = Style::new().green();
     logger.info(&format!(
