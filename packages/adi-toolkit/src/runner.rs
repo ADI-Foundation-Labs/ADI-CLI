@@ -256,6 +256,68 @@ impl ToolkitRunner {
         .await
     }
 
+    /// Execute `forge verify-contract` in toolkit container.
+    ///
+    /// # Arguments
+    /// * `address` - Contract address to verify
+    /// * `contract_path` - Path to contract in format "path/to/Contract.sol:ContractName"
+    /// * `chain_id` - Chain ID for the network
+    /// * `verifier_url` - Block explorer API URL
+    /// * `api_key` - Block explorer API key
+    /// * `constructor_args` - Optional constructor arguments (hex-encoded)
+    /// * `protocol_version` - Protocol version for toolkit image selection
+    #[allow(clippy::too_many_arguments)]
+    pub async fn run_forge_verify(
+        &self,
+        address: &str,
+        contract_path: &str,
+        chain_id: u64,
+        verifier_url: &str,
+        api_key: &str,
+        constructor_args: Option<&str>,
+        protocol_version: &Version,
+    ) -> Result<i64> {
+        self.logger.debug(&format!(
+            "Running forge verify-contract for {} (contract: {})",
+            address, contract_path
+        ));
+
+        // Build the forge verify-contract command
+        // Working directory inside container is /deps/era-contracts/l1-contracts
+        let chain_id_str = chain_id.to_string();
+        let mut args: Vec<&str> = vec![
+            "forge",
+            "verify-contract",
+            address,
+            contract_path,
+            "--chain-id",
+            &chain_id_str,
+            "--verifier-url",
+            verifier_url,
+            "--etherscan-api-key",
+            api_key,
+            "--root",
+            "/deps/era-contracts/l1-contracts",
+        ];
+
+        if let Some(ctor_args) = constructor_args {
+            args.push("--constructor-args");
+            args.push(ctor_args);
+        }
+
+        let temp_dir = std::env::temp_dir();
+
+        self.run_command(
+            &args,
+            &temp_dir,
+            protocol_version,
+            &[],
+            "forge-verify",
+            &format!("Verifying {}...", address),
+        )
+        .await
+    }
+
     /// Execute `zkstack ecosystem init` with foundry.toml permission fix.
     pub async fn run_zkstack_ecosystem_init(
         &self,

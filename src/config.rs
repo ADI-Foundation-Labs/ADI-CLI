@@ -88,6 +88,28 @@ pub struct OwnershipDefaults {
     pub private_key: Option<SecretString>,
 }
 
+/// Default verification configuration values.
+///
+/// These can be overridden by CLI flags or environment variables.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct VerificationDefaults {
+    /// Block explorer type (etherscan, blockscout, custom).
+    /// Can be overridden with --explorer flag.
+    #[serde(default)]
+    pub explorer: Option<String>,
+
+    /// Block explorer API URL.
+    /// Can be overridden with --explorer-url or ADI_EXPLORER_API_URL env var.
+    #[serde(default)]
+    pub explorer_url: Option<Url>,
+
+    /// Block explorer API key.
+    /// Prefer ADI_EXPLORER_API_KEY env var for security.
+    /// Note: This field is never serialized (skipped) for security.
+    #[serde(default, skip_serializing)]
+    pub api_key: Option<SecretString>,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     /// State directory path for storing ecosystem and chain data.
@@ -124,6 +146,11 @@ pub struct Config {
     /// These can be overridden by CLI flags.
     #[serde(default)]
     pub ownership: OwnershipDefaults,
+
+    /// Default verification configuration values.
+    /// These can be overridden by CLI flags.
+    #[serde(default)]
+    pub verification: VerificationDefaults,
 
     /// Gas price multiplier percentage (default: 120 = 20% buffer).
     /// Applied to all on-chain transactions.

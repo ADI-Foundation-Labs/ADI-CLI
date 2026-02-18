@@ -13,6 +13,7 @@ pub mod helpers;
 mod init;
 mod owners;
 mod transfer;
+mod verify;
 mod version;
 
 /// Available CLI commands.
@@ -35,6 +36,8 @@ pub enum Commands {
     Transfer(transfer::TransferArgs),
     /// Display owners of deployed L1 contracts
     Owners(owners::OwnersArgs),
+    /// Verify deployed smart contracts on block explorers
+    Verify(verify::VerifyArgs),
 }
 
 impl Commands {
@@ -49,6 +52,7 @@ impl Commands {
             Commands::Accept(args) => accept::run(args, context).await,
             Commands::Transfer(args) => transfer::run(args, context).await,
             Commands::Owners(args) => owners::run(&args, context).await,
+            Commands::Verify(args) => verify::run(args, context).await,
         }
     }
 }

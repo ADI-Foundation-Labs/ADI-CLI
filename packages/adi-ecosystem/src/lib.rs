@@ -51,6 +51,8 @@ mod types;
 mod validator;
 mod verify;
 
+pub mod verification;
+
 // Public re-exports
 pub use commands::{build_ecosystem_create_args, ERA_CONTRACTS_PATH};
 pub use config::{EcosystemConfig, EcosystemConfigBuilder};
