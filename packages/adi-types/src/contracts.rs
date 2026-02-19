@@ -140,6 +140,107 @@ pub struct ZkSyncOsCtm {
     /// Avail L1 DA validator address.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub avail_l1_da_validator_addr: Option<Address>,
+
+    /// Diamond cut data (hex-encoded ABI data containing facet addresses).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diamond_cut_data: Option<String>,
+
+    /// Force deployments data (hex-encoded).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub force_deployments_data: Option<String>,
+
+    // Diamond facets (extracted from diamond_cut_data)
+    /// Admin facet address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub admin_facet_addr: Option<Address>,
+
+    /// Executor facet address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub executor_facet_addr: Option<Address>,
+
+    /// Mailbox facet address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mailbox_facet_addr: Option<Address>,
+
+    /// Getters facet address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub getters_facet_addr: Option<Address>,
+
+    /// DiamondInit address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diamond_init_addr: Option<Address>,
+
+    // Implementation contracts (read via EIP-1967 storage slot)
+    /// Bridgehub implementation address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bridgehub_impl_addr: Option<Address>,
+
+    /// Message root implementation address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message_root_impl_addr: Option<Address>,
+
+    /// Native token vault implementation address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_token_vault_impl_addr: Option<Address>,
+
+    /// STM deployment tracker implementation address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stm_deployment_tracker_impl_addr: Option<Address>,
+
+    /// Chain type manager implementation address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chain_type_manager_impl_addr: Option<Address>,
+
+    /// Server notifier implementation address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_notifier_impl_addr: Option<Address>,
+
+    /// ERC20 bridge implementation address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub erc20_bridge_impl_addr: Option<Address>,
+
+    /// Shared bridge (L1 Asset Router) implementation address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shared_bridge_impl_addr: Option<Address>,
+
+    /// L1 Nullifier implementation address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub l1_nullifier_impl_addr: Option<Address>,
+
+    /// Validator timelock implementation address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub validator_timelock_impl_addr: Option<Address>,
+
+    // Verifier components
+    /// ZKsyncOS Verifier Fflonk address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verifier_fflonk_addr: Option<Address>,
+
+    /// ZKsyncOS Verifier Plonk address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verifier_plonk_addr: Option<Address>,
+
+    // Bridge token contracts
+    /// Bridged Standard ERC20 implementation address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bridged_standard_erc20_addr: Option<Address>,
+
+    /// Bridged Token Beacon address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bridged_token_beacon_addr: Option<Address>,
+
+    // Avail test contracts
+    /// Dummy Avail Bridge address (test/mock).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dummy_avail_bridge_addr: Option<Address>,
+
+    /// Dummy VectorX address (test/mock).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dummy_vector_x_addr: Option<Address>,
+
+    /// Server notifier proxy admin address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_notifier_proxy_admin_addr: Option<Address>,
 }
 
 /// Ecosystem contracts configuration from configs/contracts.yaml.

@@ -30,14 +30,21 @@
 //! let client = ExplorerClient::new(config, Arc::new(NoopLogger));
 //! ```
 
+mod diamond;
 mod error;
 mod explorer;
+mod impl_reader;
 mod registry;
 mod types;
 
 // Re-export public types
+pub use diamond::{parse_diamond_cut_data, DiamondFacets};
 pub use error::VerificationError;
 pub use explorer::{ExplorerClient, ExplorerConfig};
+pub use impl_reader::{
+    apply_implementations, read_all_implementations, read_implementation_address,
+    ImplementationAddresses,
+};
 pub use registry::{ContractRegistry, ContractType, VerificationTarget};
 pub use types::{
     ContractVerificationStatus, ExplorerType, VerificationOutcome, VerificationResult,

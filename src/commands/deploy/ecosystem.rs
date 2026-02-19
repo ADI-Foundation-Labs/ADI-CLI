@@ -5,6 +5,9 @@
 //! 2. Deploys ecosystem contracts via zkstack
 //! 3. Configures validator roles for operators
 
+use adi_ecosystem::verification::{
+    apply_implementations, parse_diamond_cut_data, read_all_implementations,
+};
 use adi_ecosystem::{add_validator_roles, DeployedContracts};
 use adi_funding::{
     build_funding_target_statuses, is_localhost_rpc, normalize_rpc_url, AnvilFunder,
@@ -703,6 +706,9 @@ async fn run_ecosystem_deployment(
 
     ui::success("Ecosystem contracts deployed successfully!")?;
 
+    // Enrich ecosystem contracts with facet and implementation addresses
+    enrich_ecosystem_contracts(context, state_manager, rpc_url).await?;
+
     // Log all deployment files (with warnings for unhandled ones)
     log_deployment_files(&ecosystem_path, chain_name)?;
 
@@ -774,6 +780,94 @@ async fn run_ecosystem_deployment(
         ),
     )?;
     ui::outro("Deployment complete! You can now start containers and operate the rollup.")?;
+
+    Ok(())
+}
+
+/// Enrich ecosystem contracts with facet and implementation addresses.
+///
+/// Reads diamond_cut_data from state and parses facet addresses.
+/// Reads implementation addresses from proxy contracts via RPC.
+/// Saves enriched contracts back to state for future use (e.g., verification).
+async fn enrich_ecosystem_contracts(
+    context: &Context,
+    state_manager: &StateManager,
+    rpc_url: &Url,
+) -> Result<()> {
+    context
+        .logger()
+        .debug("Enriching ecosystem contracts with facet and implementation addresses");
+
+    // Load ecosystem contracts from state
+    let mut ecosystem_contracts = state_manager
+        .ecosystem()
+        .contracts()
+        .await
+        .wrap_err("Failed to load ecosystem contracts for enrichment")?;
+
+    // Track if any changes were made
+    let mut enriched = false;
+
+    // 1. Parse diamond_cut_data for facet addresses
+    if let Some(ref mut ctm) = ecosystem_contracts.zksync_os_ctm {
+        if ctm.admin_facet_addr.is_none() {
+            if let Some(ref diamond_cut_data) = ctm.diamond_cut_data {
+                match parse_diamond_cut_data(diamond_cut_data) {
+                    Ok(facets) => {
+                        ctm.admin_facet_addr = facets.admin_facet;
+                        ctm.executor_facet_addr = facets.executor_facet;
+                        ctm.mailbox_facet_addr = facets.mailbox_facet;
+                        ctm.getters_facet_addr = facets.getters_facet;
+                        ctm.diamond_init_addr = facets.diamond_init;
+                        enriched = true;
+                        context
+                            .logger()
+                            .debug("Extracted facet addresses from diamond_cut_data");
+                    }
+                    Err(e) => {
+                        context
+                            .logger()
+                            .warning(&format!("Could not parse diamond_cut_data: {}", e));
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Read implementation addresses from proxy contracts via RPC
+    if ecosystem_contracts
+        .zksync_os_ctm
+        .as_ref()
+        .is_some_and(|ctm| ctm.bridgehub_impl_addr.is_none())
+    {
+        // Normalize URL for host-side connection
+        let normalized_rpc = normalize_rpc_url(rpc_url.as_str());
+        let provider = adi_funding::FundingProvider::new(&normalized_rpc)
+            .wrap_err("Failed to create provider for implementation address reading")?;
+
+        let impls = read_all_implementations(
+            provider.inner(),
+            &ecosystem_contracts,
+            std::sync::Arc::clone(context.logger()),
+        )
+        .await;
+
+        apply_implementations(&mut ecosystem_contracts, &impls);
+        enriched = true;
+        context
+            .logger()
+            .debug("Read implementation addresses from proxy contracts");
+    }
+
+    // 3. Save enriched contracts back to state
+    if enriched {
+        state_manager
+            .ecosystem()
+            .update_contracts(&ecosystem_contracts)
+            .await
+            .wrap_err("Failed to save enriched ecosystem contracts")?;
+        ui::info("Enriched contracts with facet and implementation addresses")?;
+    }
 
     Ok(())
 }

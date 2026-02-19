@@ -6,7 +6,8 @@
 mod contracts;
 
 use adi_ecosystem::verification::{
-    ContractRegistry, ExplorerClient, ExplorerConfig, ExplorerType, VerificationStatus,
+    parse_diamond_cut_data, ContractRegistry, ExplorerClient, ExplorerConfig, ExplorerType,
+    VerificationStatus,
 };
 use adi_types::{ChainContracts, EcosystemContracts};
 use alloy_provider::Provider;
@@ -111,11 +112,38 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
     let state_manager = create_state_manager_with_context(&ecosystem_name, context);
 
     // Load ecosystem contracts
-    let ecosystem_contracts: EcosystemContracts = state_manager
-        .ecosystem()
-        .contracts()
-        .await
-        .wrap_err("Failed to load ecosystem contracts. Have you deployed the ecosystem?")?;
+    let mut ecosystem_contracts: EcosystemContracts =
+        state_manager
+            .ecosystem()
+            .contracts()
+            .await
+            .wrap_err("Failed to load ecosystem contracts. Have you deployed the ecosystem?")?;
+
+    // Extract facet addresses from diamond_cut_data if present but not yet extracted
+    if let Some(ref mut ctm) = ecosystem_contracts.zksync_os_ctm {
+        // Only parse if we have diamond_cut_data but no facet addresses yet
+        if ctm.admin_facet_addr.is_none() {
+            if let Some(ref diamond_cut_data) = ctm.diamond_cut_data {
+                match parse_diamond_cut_data(diamond_cut_data) {
+                    Ok(facets) => {
+                        context
+                            .logger()
+                            .debug("Extracted facet addresses from diamond_cut_data");
+                        ctm.admin_facet_addr = facets.admin_facet;
+                        ctm.executor_facet_addr = facets.executor_facet;
+                        ctm.mailbox_facet_addr = facets.mailbox_facet;
+                        ctm.getters_facet_addr = facets.getters_facet;
+                        ctm.diamond_init_addr = facets.diamond_init;
+                    }
+                    Err(e) => {
+                        context
+                            .logger()
+                            .warning(&format!("Could not parse diamond_cut_data: {}", e));
+                    }
+                }
+            }
+        }
+    }
 
     // Try to load chain contracts if chain name is provided or can be resolved
     let effective_chain_name = args

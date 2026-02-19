@@ -74,6 +74,61 @@ pub enum ContractType {
     ChainChainAdmin,
     /// Chain proxy admin.
     ChainProxyAdmin,
+
+    // Diamond facets (extracted from diamond_cut_data)
+    /// Admin facet.
+    AdminFacet,
+    /// Executor facet.
+    ExecutorFacet,
+    /// Mailbox facet.
+    MailboxFacet,
+    /// Getters facet.
+    GettersFacet,
+    /// Diamond init contract.
+    DiamondInit,
+
+    // Implementation contracts (read via EIP-1967)
+    /// Bridgehub implementation.
+    BridgehubImpl,
+    /// Message root implementation.
+    MessageRootImpl,
+    /// Native token vault implementation.
+    NativeTokenVaultImpl,
+    /// STM deployment tracker implementation.
+    StmDeploymentTrackerImpl,
+    /// Chain type manager implementation.
+    ChainTypeManagerImpl,
+    /// Server notifier implementation.
+    ServerNotifierImpl,
+    /// ERC20 bridge implementation.
+    Erc20BridgeImpl,
+    /// Shared bridge implementation.
+    SharedBridgeImpl,
+    /// L1 Nullifier implementation.
+    L1NullifierImpl,
+    /// Validator timelock implementation.
+    ValidatorTimelockImpl,
+
+    // Verifier components
+    /// ZKsyncOS Verifier Fflonk.
+    VerifierFflonk,
+    /// ZKsyncOS Verifier Plonk.
+    VerifierPlonk,
+
+    // Bridge token contracts
+    /// Bridged Standard ERC20.
+    BridgedStandardErc20,
+    /// Bridged Token Beacon.
+    BridgedTokenBeacon,
+
+    // Avail test contracts
+    /// Dummy Avail Bridge.
+    DummyAvailBridge,
+    /// Dummy VectorX.
+    DummyVectorX,
+
+    /// Server notifier proxy admin.
+    ServerNotifierProxyAdmin,
 }
 
 impl ContractType {
@@ -106,6 +161,34 @@ impl ContractType {
             Self::ChainGovernance => "Chain Governance",
             Self::ChainChainAdmin => "Chain Admin (Chain)",
             Self::ChainProxyAdmin => "Chain Proxy Admin",
+            // Diamond facets
+            Self::AdminFacet => "Admin Facet",
+            Self::ExecutorFacet => "Executor Facet",
+            Self::MailboxFacet => "Mailbox Facet",
+            Self::GettersFacet => "Getters Facet",
+            Self::DiamondInit => "Diamond Init",
+            // Implementation contracts
+            Self::BridgehubImpl => "Bridgehub Impl",
+            Self::MessageRootImpl => "Message Root Impl",
+            Self::NativeTokenVaultImpl => "Native Token Vault Impl",
+            Self::StmDeploymentTrackerImpl => "STM Deployment Tracker Impl",
+            Self::ChainTypeManagerImpl => "Chain Type Manager Impl",
+            Self::ServerNotifierImpl => "Server Notifier Impl",
+            Self::Erc20BridgeImpl => "ERC20 Bridge Impl",
+            Self::SharedBridgeImpl => "Shared Bridge Impl",
+            Self::L1NullifierImpl => "L1 Nullifier Impl",
+            Self::ValidatorTimelockImpl => "Validator Timelock Impl",
+            // Verifier components
+            Self::VerifierFflonk => "Verifier Fflonk",
+            Self::VerifierPlonk => "Verifier Plonk",
+            // Bridge token contracts
+            Self::BridgedStandardErc20 => "Bridged Standard ERC20",
+            Self::BridgedTokenBeacon => "Bridged Token Beacon",
+            // Avail test contracts
+            Self::DummyAvailBridge => "Dummy Avail Bridge",
+            Self::DummyVectorX => "Dummy VectorX",
+            // Server notifier proxy admin
+            Self::ServerNotifierProxyAdmin => "Server Notifier Proxy Admin",
         }
     }
 
@@ -213,6 +296,38 @@ impl ContractRegistry {
             ContractType::ChainGovernance => "governance/Governance.sol",
             ContractType::ChainChainAdmin => "governance/ChainAdmin.sol",
             ContractType::ChainProxyAdmin => "transparent-proxy/TransparentUpgradeableProxy.sol",
+            // Diamond facets
+            ContractType::AdminFacet => "state-transition/chain-deps/facets/Admin.sol",
+            ContractType::ExecutorFacet => "state-transition/chain-deps/facets/Executor.sol",
+            ContractType::MailboxFacet => "state-transition/chain-deps/facets/Mailbox.sol",
+            ContractType::GettersFacet => "state-transition/chain-deps/facets/Getters.sol",
+            ContractType::DiamondInit => "state-transition/chain-deps/DiamondInit.sol",
+            // Implementation contracts (same source as proxy, different instance)
+            ContractType::BridgehubImpl => "bridgehub/L1Bridgehub.sol",
+            ContractType::MessageRootImpl => "bridgehub/L1MessageRoot.sol",
+            ContractType::NativeTokenVaultImpl => "bridge/ntv/L1NativeTokenVault.sol",
+            ContractType::StmDeploymentTrackerImpl => "bridgehub/CTMDeploymentTracker.sol",
+            ContractType::ChainTypeManagerImpl => "state-transition/ChainTypeManager.sol",
+            ContractType::ServerNotifierImpl => "state-transition/ServerNotifier.sol",
+            ContractType::Erc20BridgeImpl => "bridge/L1ERC20Bridge.sol",
+            ContractType::SharedBridgeImpl => "bridge/asset-router/L1AssetRouter.sol",
+            ContractType::L1NullifierImpl => "bridge/L1Nullifier.sol",
+            ContractType::ValidatorTimelockImpl => "state-transition/ValidatorTimelock.sol",
+            // Verifier components
+            ContractType::VerifierFflonk => "verifier/ZKsyncOsVerifierFflonk.sol",
+            ContractType::VerifierPlonk => "verifier/ZKsyncOsVerifierPlonk.sol",
+            // Bridge token contracts
+            ContractType::BridgedStandardErc20 => "bridge/BridgedStandardERC20.sol",
+            ContractType::BridgedTokenBeacon => "bridge/BridgedTokenBeacon.sol",
+            // Avail test contracts
+            ContractType::DummyAvailBridge => {
+                "state-transition/data-availability/DummyAvailBridge.sol"
+            }
+            ContractType::DummyVectorX => "state-transition/data-availability/DummyVectorX.sol",
+            // Server notifier proxy admin
+            ContractType::ServerNotifierProxyAdmin => {
+                "transparent-proxy/TransparentUpgradeableProxy.sol"
+            }
         }
     }
 
@@ -245,6 +360,34 @@ impl ContractRegistry {
             ContractType::ChainGovernance => "Governance",
             ContractType::ChainChainAdmin => "ChainAdmin",
             ContractType::ChainProxyAdmin => "TransparentUpgradeableProxy",
+            // Diamond facets
+            ContractType::AdminFacet => "AdminFacet",
+            ContractType::ExecutorFacet => "ExecutorFacet",
+            ContractType::MailboxFacet => "MailboxFacet",
+            ContractType::GettersFacet => "GettersFacet",
+            ContractType::DiamondInit => "DiamondInit",
+            // Implementation contracts
+            ContractType::BridgehubImpl => "L1Bridgehub",
+            ContractType::MessageRootImpl => "L1MessageRoot",
+            ContractType::NativeTokenVaultImpl => "L1NativeTokenVault",
+            ContractType::StmDeploymentTrackerImpl => "CTMDeploymentTracker",
+            ContractType::ChainTypeManagerImpl => "ChainTypeManager",
+            ContractType::ServerNotifierImpl => "ServerNotifier",
+            ContractType::Erc20BridgeImpl => "L1ERC20Bridge",
+            ContractType::SharedBridgeImpl => "L1AssetRouter",
+            ContractType::L1NullifierImpl => "L1Nullifier",
+            ContractType::ValidatorTimelockImpl => "ValidatorTimelock",
+            // Verifier components
+            ContractType::VerifierFflonk => "ZKsyncOsVerifierFflonk",
+            ContractType::VerifierPlonk => "ZKsyncOsVerifierPlonk",
+            // Bridge token contracts
+            ContractType::BridgedStandardErc20 => "BridgedStandardERC20",
+            ContractType::BridgedTokenBeacon => "BridgedTokenBeacon",
+            // Avail test contracts
+            ContractType::DummyAvailBridge => "DummyAvailBridge",
+            ContractType::DummyVectorX => "DummyVectorX",
+            // Server notifier proxy admin
+            ContractType::ServerNotifierProxyAdmin => "TransparentUpgradeableProxy",
         }
     }
 
@@ -352,6 +495,93 @@ impl ContractRegistry {
             }
             if let Some(addr) = ctm.genesis_upgrade_addr {
                 targets.push(Self::build_target(ContractType::GenesisUpgrade, addr));
+            }
+
+            // Diamond facets (extracted from diamond_cut_data)
+            if let Some(addr) = ctm.admin_facet_addr {
+                targets.push(Self::build_target(ContractType::AdminFacet, addr));
+            }
+            if let Some(addr) = ctm.executor_facet_addr {
+                targets.push(Self::build_target(ContractType::ExecutorFacet, addr));
+            }
+            if let Some(addr) = ctm.mailbox_facet_addr {
+                targets.push(Self::build_target(ContractType::MailboxFacet, addr));
+            }
+            if let Some(addr) = ctm.getters_facet_addr {
+                targets.push(Self::build_target(ContractType::GettersFacet, addr));
+            }
+            if let Some(addr) = ctm.diamond_init_addr {
+                targets.push(Self::build_target(ContractType::DiamondInit, addr));
+            }
+
+            // Implementation contracts (read via EIP-1967)
+            if let Some(addr) = ctm.bridgehub_impl_addr {
+                targets.push(Self::build_target(ContractType::BridgehubImpl, addr));
+            }
+            if let Some(addr) = ctm.message_root_impl_addr {
+                targets.push(Self::build_target(ContractType::MessageRootImpl, addr));
+            }
+            if let Some(addr) = ctm.native_token_vault_impl_addr {
+                targets.push(Self::build_target(ContractType::NativeTokenVaultImpl, addr));
+            }
+            if let Some(addr) = ctm.stm_deployment_tracker_impl_addr {
+                targets.push(Self::build_target(
+                    ContractType::StmDeploymentTrackerImpl,
+                    addr,
+                ));
+            }
+            if let Some(addr) = ctm.chain_type_manager_impl_addr {
+                targets.push(Self::build_target(ContractType::ChainTypeManagerImpl, addr));
+            }
+            if let Some(addr) = ctm.server_notifier_impl_addr {
+                targets.push(Self::build_target(ContractType::ServerNotifierImpl, addr));
+            }
+            if let Some(addr) = ctm.erc20_bridge_impl_addr {
+                targets.push(Self::build_target(ContractType::Erc20BridgeImpl, addr));
+            }
+            if let Some(addr) = ctm.shared_bridge_impl_addr {
+                targets.push(Self::build_target(ContractType::SharedBridgeImpl, addr));
+            }
+            if let Some(addr) = ctm.l1_nullifier_impl_addr {
+                targets.push(Self::build_target(ContractType::L1NullifierImpl, addr));
+            }
+            if let Some(addr) = ctm.validator_timelock_impl_addr {
+                targets.push(Self::build_target(
+                    ContractType::ValidatorTimelockImpl,
+                    addr,
+                ));
+            }
+
+            // Verifier components
+            if let Some(addr) = ctm.verifier_fflonk_addr {
+                targets.push(Self::build_target(ContractType::VerifierFflonk, addr));
+            }
+            if let Some(addr) = ctm.verifier_plonk_addr {
+                targets.push(Self::build_target(ContractType::VerifierPlonk, addr));
+            }
+
+            // Bridge token contracts
+            if let Some(addr) = ctm.bridged_standard_erc20_addr {
+                targets.push(Self::build_target(ContractType::BridgedStandardErc20, addr));
+            }
+            if let Some(addr) = ctm.bridged_token_beacon_addr {
+                targets.push(Self::build_target(ContractType::BridgedTokenBeacon, addr));
+            }
+
+            // Avail test contracts
+            if let Some(addr) = ctm.dummy_avail_bridge_addr {
+                targets.push(Self::build_target(ContractType::DummyAvailBridge, addr));
+            }
+            if let Some(addr) = ctm.dummy_vector_x_addr {
+                targets.push(Self::build_target(ContractType::DummyVectorX, addr));
+            }
+
+            // Server notifier proxy admin
+            if let Some(addr) = ctm.server_notifier_proxy_admin_addr {
+                targets.push(Self::build_target(
+                    ContractType::ServerNotifierProxyAdmin,
+                    addr,
+                ));
             }
         }
 
