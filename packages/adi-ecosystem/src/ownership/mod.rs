@@ -44,8 +44,8 @@ use console::Style;
 use secrecy::SecretString;
 
 use contracts::{
-    accept_chain_admin, accept_ecosystem_chain_admin, accept_governance, accept_rollup_da_manager,
-    accept_server_notifier, accept_validator_timelock, accept_verifier,
+    accept_chain_admin, accept_chain_governance, accept_ecosystem_chain_admin, accept_governance,
+    accept_rollup_da_manager, accept_server_notifier, accept_validator_timelock, accept_verifier,
 };
 use transaction::create_signer;
 use transfer::{
@@ -240,6 +240,7 @@ pub async fn accept_all_ownership(
 /// Accept ownership for chain-level contracts.
 ///
 /// This function attempts to accept ownership for chain-specific contracts:
+/// - Chain Governance (direct acceptOwnership)
 /// - Chain Admin (direct acceptOwnership)
 ///
 /// # Arguments
@@ -332,7 +333,20 @@ pub async fn accept_chain_ownership(
     };
     let gas_price = gas_multiplier.map_or(estimated, |m| estimated * u128::from(m) / 100);
 
-    // 1. Chain Admin (direct)
+    // 1. Chain Governance (direct)
+    let result = accept_chain_governance(
+        &provider,
+        contracts,
+        governor_address,
+        chain_id,
+        &mut nonce,
+        gas_price,
+        logger,
+    )
+    .await;
+    results.push(result);
+
+    // 2. Chain Admin (direct)
     let result = accept_chain_admin(
         &provider,
         contracts,

@@ -157,6 +157,26 @@ pub async fn check_chain_ownership_status(
         governor_address
     ));
 
+    // Check Chain Governance
+    let chain_governance_addr = contracts.governance_addr();
+    let state = if let Some(addr) = chain_governance_addr {
+        check_ownership_state(
+            &provider,
+            addr,
+            governor_address,
+            "Chain Governance",
+            logger,
+        )
+        .await
+    } else {
+        OwnershipState::NotTransferred
+    };
+    statuses.push(OwnershipStatus {
+        name: "Chain Governance",
+        address: chain_governance_addr,
+        state,
+    });
+
     // Check Chain Admin
     let chain_admin_addr = contracts.chain_admin_addr();
     let state = if let Some(addr) = chain_admin_addr {

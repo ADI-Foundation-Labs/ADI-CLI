@@ -86,6 +86,66 @@ where
     }
 }
 
+/// Accept ownership for Chain Governance contract (chain-level).
+pub(crate) async fn accept_chain_governance<P>(
+    provider: &P,
+    contracts: &ChainContracts,
+    governor: Address,
+    chain_id: u64,
+    nonce: &mut u64,
+    gas_price: u128,
+    logger: &dyn Logger,
+) -> OwnershipResult
+where
+    P: Provider + Clone,
+{
+    let green = Style::new().green();
+
+    let governance = match contracts.governance_addr() {
+        Some(addr) => addr,
+        None => {
+            return OwnershipResult::skipped("Chain Governance", "governance_addr not configured");
+        }
+    };
+
+    // Check if ownership acceptance is needed
+    match check_ownership_state(provider, governance, governor, "Chain Governance", logger).await {
+        OwnershipState::Accepted => {
+            logger.info("Chain Governance: ownership already accepted");
+            return OwnershipResult::skipped("Chain Governance", "ownership already accepted");
+        }
+        OwnershipState::NotTransferred => {
+            logger.warning("Chain Governance: ownership not transferred");
+            return OwnershipResult::skipped("Chain Governance", "ownership not transferred");
+        }
+        OwnershipState::Pending => {}
+    }
+
+    let spinner = cliclack::spinner();
+    spinner.start("Chain Governance");
+
+    let calldata = build_accept_ownership_calldata();
+
+    match send_ownership_tx(
+        provider, governance, calldata, governor, chain_id, *nonce, gas_price,
+    )
+    .await
+    {
+        Ok(result) => {
+            spinner.stop(format!(
+                "Chain Governance → Accepted (block {})",
+                green.apply_to(result.block_number)
+            ));
+            *nonce += 1;
+            OwnershipResult::success("Chain Governance", result.tx_hash)
+        }
+        Err(e) => {
+            spinner.error(format!("Chain Governance failed: {}", e));
+            OwnershipResult::failure("Chain Governance", e.to_string())
+        }
+    }
+}
+
 /// Accept ownership for Ecosystem Chain Admin contract.
 pub(crate) async fn accept_ecosystem_chain_admin<P>(
     provider: &P,

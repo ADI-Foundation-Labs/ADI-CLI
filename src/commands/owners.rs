@@ -1,5 +1,6 @@
 //! Display L1 contract owners with wallet name mapping.
 
+use adi_ecosystem::verification::read_proxy_admin;
 use adi_types::{normalize_rpc_url, ChainContracts, EcosystemContracts, Wallets};
 use alloy_primitives::Address;
 use alloy_provider::{Provider, ProviderBuilder};
@@ -9,6 +10,8 @@ use clap::Args;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use url::Url;
+
+use cliclack::{progress_bar, ProgressBar};
 
 use crate::commands::helpers::{
     create_state_manager_with_context, resolve_ecosystem_name, resolve_rpc_url,
@@ -137,46 +140,66 @@ pub async fn run(args: &OwnersArgs, context: &Context) -> Result<()> {
     let url: Url = normalized_url.parse().wrap_err("Invalid RPC URL")?;
     let provider = ProviderBuilder::new().connect_http(url);
 
-    // Query ecosystem contract owners
-    let ownerships = query_ecosystem_owners(&provider, &contracts).await;
-
-    // Display results
-    display_ownership_results("Ecosystem Contract Owners", &ownerships, &known_map)?;
-
-    // Always display chain owners (use --chain if provided, otherwise default_chain)
+    // Determine chain to query
     let chain_to_display = args.chain.as_ref().unwrap_or(&eco_metadata.default_chain);
     let chain_ops = state_manager.chain(chain_to_display);
 
-    if !chain_ops.exists().await.wrap_err("Failed to check chain")? {
-        ui::warning(format!("Chain '{}' not found.", chain_to_display))?;
-    } else if !chain_ops
-        .contracts_exist()
-        .await
-        .wrap_err("Failed to check chain contracts")?
-    {
-        ui::info(format!(
-            "No contracts deployed for chain '{}'.",
-            chain_to_display
-        ))?;
+    // Check chain state before starting progress bar
+    let chain_exists = chain_ops.exists().await.wrap_err("Failed to check chain")?;
+    let chain_contracts_exist = if chain_exists {
+        chain_ops
+            .contracts_exist()
+            .await
+            .wrap_err("Failed to check chain contracts")?
     } else {
+        false
+    };
+
+    // Calculate total contracts to query
+    // Ecosystem: 14 standard contracts + 1 Message Root Proxy = 15
+    // Chain: 5 ownable + 1 Diamond Proxy + 1 ConsensusRegistry (if configured) = 6-7
+    let ecosystem_count = 15u64;
+    let chain_count = if chain_contracts_exist { 7u64 } else { 0u64 };
+    let pb = progress_bar(ecosystem_count + chain_count);
+    pb.start("Querying contract owners...");
+
+    // Query ecosystem contract owners
+    let ownerships = query_ecosystem_owners(&provider, &contracts, &pb).await;
+
+    // Query chain contracts (if they exist) before stopping progress bar
+    let chain_query_result = if chain_contracts_exist {
         let chain_contracts = chain_ops
             .contracts()
             .await
             .wrap_err("Failed to load chain contracts")?;
 
-        // Load chain wallets and merge with ecosystem known addresses
         let chain_wallets = chain_ops.wallets().await.ok();
         let mut combined_map = known_map.clone();
 
-        // Add chain wallet addresses
         if let Some(ref cw) = chain_wallets {
             add_wallet_addresses(&mut combined_map, cw);
         }
-
-        // Add chain contract addresses
         add_chain_contract_addresses(&mut combined_map, &chain_contracts);
 
-        let chain_ownerships = query_chain_owners(&provider, &chain_contracts).await;
+        let chain_ownerships = query_chain_owners(&provider, &chain_contracts, &pb).await;
+        Some((chain_ownerships, combined_map))
+    } else {
+        None
+    };
+
+    pb.stop("Ownership queries complete");
+
+    // Now display all results after progress bar is stopped
+    display_ownership_results("Ecosystem Contract Owners", &ownerships, &known_map)?;
+
+    if !chain_exists {
+        ui::warning(format!("Chain '{}' not found.", chain_to_display))?;
+    } else if !chain_contracts_exist {
+        ui::info(format!(
+            "No contracts deployed for chain '{}'.",
+            chain_to_display
+        ))?;
+    } else if let Some((chain_ownerships, combined_map)) = chain_query_result {
         display_ownership_results(
             &format!("Chain '{}' Contract Owners", chain_to_display),
             &chain_ownerships,
@@ -502,10 +525,30 @@ fn format_rpc_error(e: &impl std::fmt::Display) -> String {
     }
 }
 
+/// Query admin from EIP-1967 transparent proxy storage slot.
+///
+/// Transparent proxies don't expose admin via a function - the admin address
+/// is stored in the EIP-1967 admin slot and must be read via eth_getStorageAt.
+async fn query_proxy_admin<P: Provider + Clone>(
+    provider: &P,
+    contract_address: Address,
+    contract_name: &str,
+) -> OwnerQueryResult {
+    match read_proxy_admin(provider, contract_address).await {
+        Ok(Some(addr)) => OwnerQueryResult::Ok(addr),
+        Ok(None) => OwnerQueryResult::Err("admin not set".to_string()),
+        Err(e) => {
+            log::debug!("Query proxy admin failed for {}: {}", contract_name, e);
+            OwnerQueryResult::Err(format_rpc_error(&e))
+        }
+    }
+}
+
 /// Query ownership for ecosystem contracts.
 async fn query_ecosystem_owners<P: Provider + Clone>(
     provider: &P,
     contracts: &EcosystemContracts,
+    pb: &ProgressBar,
 ) -> Vec<ContractOwnership> {
     let mut results = Vec::new();
 
@@ -557,7 +600,6 @@ async fn query_ecosystem_owners<P: Provider + Clone>(
         // Core infrastructure
         ("State Transition (CTM)", state_transition_addr),
         ("Bridgehub", contracts.bridgehub_addr()),
-        ("Message Root Proxy", message_root_proxy_addr),
         ("Native Token Vault", contracts.native_token_vault_addr()),
         // Operational contracts
         ("Server Notifier", contracts.server_notifier_addr()),
@@ -593,7 +635,28 @@ async fn query_ecosystem_owners<P: Provider + Clone>(
             owner,
             pending_owner,
         });
+        pb.inc(1);
     }
+
+    // Message Root Proxy uses EIP-1967 Transparent Proxy pattern (admin in storage slot)
+    let (admin, pending_admin) = if let Some(addr) = message_root_proxy_addr {
+        let admin = query_proxy_admin(provider, addr, "Message Root Proxy").await;
+        // Transparent proxies don't have pending admin concept
+        (admin, OwnerQueryResult::Err("not applicable".to_string()))
+    } else {
+        (
+            OwnerQueryResult::NotConfigured,
+            OwnerQueryResult::NotConfigured,
+        )
+    };
+
+    results.push(ContractOwnership {
+        name: "Message Root Proxy (Admin)",
+        address: message_root_proxy_addr,
+        owner: admin,
+        pending_owner: pending_admin,
+    });
+    pb.inc(1);
 
     results
 }
@@ -605,6 +668,7 @@ async fn query_ecosystem_owners<P: Provider + Clone>(
 async fn query_chain_owners<P: Provider + Clone>(
     provider: &P,
     contracts: &ChainContracts,
+    pb: &ProgressBar,
 ) -> Vec<ContractOwnership> {
     let mut results = Vec::new();
 
@@ -642,6 +706,7 @@ async fn query_chain_owners<P: Provider + Clone>(
             owner,
             pending_owner,
         });
+        pb.inc(1);
     }
 
     // Diamond Proxy uses getAdmin()/getPendingAdmin() instead of owner()/pendingOwner()
@@ -663,6 +728,7 @@ async fn query_chain_owners<P: Provider + Clone>(
         owner: admin,
         pending_owner: pending_admin,
     });
+    pb.inc(1);
 
     // L2 ConsensusRegistry - placeholder (requires L2 RPC URL)
     let consensus_addr = contracts.l2.as_ref().and_then(|l2| l2.consensus_registry);
@@ -673,6 +739,7 @@ async fn query_chain_owners<P: Provider + Clone>(
             owner: OwnerQueryResult::Err("L2 contract - requires --l2-rpc-url".to_string()),
             pending_owner: OwnerQueryResult::Err("L2 contract".to_string()),
         });
+        pb.inc(1);
     }
 
     results

@@ -42,7 +42,7 @@ pub use diamond::{parse_diamond_cut_data, DiamondFacets};
 pub use error::VerificationError;
 pub use explorer::{ExplorerClient, ExplorerConfig};
 pub use impl_reader::{
-    apply_implementations, read_all_implementations, read_implementation_address,
+    apply_implementations, read_all_implementations, read_implementation_address, read_proxy_admin,
     ImplementationAddresses,
 };
 pub use registry::{ContractRegistry, ContractType, VerificationTarget};
