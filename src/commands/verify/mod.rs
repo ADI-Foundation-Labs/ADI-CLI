@@ -101,9 +101,35 @@ pub struct VerifyArgs {
     pub contracts: Option<Vec<String>>,
 }
 
+/// Check if an RPC URL points to a local network (Anvil, Hardhat, etc.).
+fn is_local_network_url(url: &Url) -> bool {
+    let host = url.host_str().unwrap_or("");
+    host == "localhost"
+        || host == "127.0.0.1"
+        || host == "host.docker.internal"
+        || host == "0.0.0.0"
+        || host.starts_with("192.168.")
+        || host.starts_with("10.")
+}
+
 /// Execute the verify command.
 pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
     ui::intro("ADI Verify Contracts")?;
+
+    // Early check for local network - verification not supported
+    let rpc_url = args
+        .rpc_url
+        .as_ref()
+        .or(context.config().funding.rpc_url.as_ref());
+
+    if let Some(url) = rpc_url {
+        if is_local_network_url(url) {
+            ui::outro_cancel(
+                "Contract verification is not available for local networks (Anvil, Hardhat, etc.)",
+            )?;
+            return Ok(());
+        }
+    }
 
     // Resolve ecosystem name
     let ecosystem_name = resolve_ecosystem_name(args.ecosystem_name.as_ref(), context.config())?;

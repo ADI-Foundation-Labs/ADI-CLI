@@ -24,6 +24,13 @@ sol! {
 
     #[allow(missing_docs)]
     function pendingOwner() external view returns (address);
+
+    // Diamond Proxy admin interface (NOT Ownable2Step pattern)
+    #[allow(missing_docs)]
+    function getAdmin() external view returns (address);
+
+    #[allow(missing_docs)]
+    function getPendingAdmin() external view returns (address);
 }
 
 /// Arguments for `owners` command.
@@ -108,6 +115,13 @@ pub async fn run(args: &OwnersArgs, context: &Context) -> Result<()> {
         return Ok(());
     }
 
+    // Load ecosystem metadata to get default_chain
+    let eco_metadata = state_manager
+        .ecosystem()
+        .metadata()
+        .await
+        .wrap_err("Failed to load ecosystem metadata")?;
+
     // Load contracts
     let contracts = state_manager
         .ecosystem()
@@ -129,44 +143,54 @@ pub async fn run(args: &OwnersArgs, context: &Context) -> Result<()> {
     // Display results
     display_ownership_results("Ecosystem Contract Owners", &ownerships, &known_map)?;
 
-    // If chain is specified, also query chain contracts
-    if let Some(ref chain_name) = args.chain {
-        let chain_ops = state_manager.chain(chain_name);
+    // Always display chain owners (use --chain if provided, otherwise default_chain)
+    let chain_to_display = args.chain.as_ref().unwrap_or(&eco_metadata.default_chain);
+    let chain_ops = state_manager.chain(chain_to_display);
 
-        if !chain_ops.exists().await.wrap_err("Failed to check chain")? {
-            ui::warning(format!("Chain '{}' not found.", chain_name))?;
-        } else if !chain_ops
-            .contracts_exist()
+    if !chain_ops.exists().await.wrap_err("Failed to check chain")? {
+        ui::warning(format!("Chain '{}' not found.", chain_to_display))?;
+    } else if !chain_ops
+        .contracts_exist()
+        .await
+        .wrap_err("Failed to check chain contracts")?
+    {
+        ui::info(format!(
+            "No contracts deployed for chain '{}'.",
+            chain_to_display
+        ))?;
+    } else {
+        let chain_contracts = chain_ops
+            .contracts()
             .await
-            .wrap_err("Failed to check chain contracts")?
-        {
-            ui::info(format!("No contracts deployed for chain '{}'.", chain_name))?;
-        } else {
-            let chain_contracts = chain_ops
-                .contracts()
-                .await
-                .wrap_err("Failed to load chain contracts")?;
+            .wrap_err("Failed to load chain contracts")?;
 
-            // Load chain wallets and merge with ecosystem known addresses
-            let chain_wallets = chain_ops.wallets().await.ok();
-            let mut combined_map = known_map.clone();
+        // Load chain wallets and merge with ecosystem known addresses
+        let chain_wallets = chain_ops.wallets().await.ok();
+        let mut combined_map = known_map.clone();
 
-            // Add chain wallet addresses
-            if let Some(ref cw) = chain_wallets {
-                add_wallet_addresses(&mut combined_map, cw);
-            }
-
-            // Add chain contract addresses
-            add_chain_contract_addresses(&mut combined_map, &chain_contracts);
-
-            let chain_ownerships = query_chain_owners(&provider, &chain_contracts).await;
-            display_ownership_results(
-                &format!("Chain '{}' Contract Owners", chain_name),
-                &chain_ownerships,
-                &combined_map,
-            )?;
+        // Add chain wallet addresses
+        if let Some(ref cw) = chain_wallets {
+            add_wallet_addresses(&mut combined_map, cw);
         }
+
+        // Add chain contract addresses
+        add_chain_contract_addresses(&mut combined_map, &chain_contracts);
+
+        let chain_ownerships = query_chain_owners(&provider, &chain_contracts).await;
+        display_ownership_results(
+            &format!("Chain '{}' Contract Owners", chain_to_display),
+            &chain_ownerships,
+            &combined_map,
+        )?;
     }
+
+    // Display explanatory note about contract coverage
+    ui::note(
+        "Note",
+        "Only contracts with ownership functions are shown above.\n\
+         Permissionless contracts (DA validators, diamond facets, verifier components,\n\
+         implementation contracts, upgrade contracts) have no owner by design.",
+    )?;
 
     ui::outro("")?;
     Ok(())
@@ -213,6 +237,9 @@ fn build_known_address_map(
         if let Some(addr) = ctm.state_transition_proxy_addr {
             map.insert(addr, "State Transition (CTM)");
         }
+        if let Some(addr) = ctm.l1_wrapped_base_token_store {
+            map.insert(addr, "L1 Wrapped Base Token Store");
+        }
     }
     if let Some(ref core) = contracts.core_ecosystem_contracts {
         if let Some(addr) = core.transparent_proxy_admin_addr {
@@ -220,6 +247,9 @@ fn build_known_address_map(
         }
         if let Some(addr) = core.stm_deployment_tracker_proxy_addr {
             map.insert(addr, "STM Deployment Tracker");
+        }
+        if let Some(addr) = core.message_root_proxy_addr {
+            map.insert(addr, "Message Root Proxy");
         }
     }
     if let Some(ref bridges) = contracts.bridges {
@@ -294,6 +324,12 @@ fn add_chain_contract_addresses(
             map.insert(addr, "Chain Validator Timelock");
         }
     }
+    // L2 contracts
+    if let Some(ref l2) = contracts.l2 {
+        if let Some(addr) = l2.consensus_registry {
+            map.insert(addr, "ConsensusRegistry");
+        }
+    }
 }
 
 /// Query owner() on a contract, returning detailed error on failure.
@@ -312,7 +348,12 @@ async fn query_owner<P: Provider + Clone>(
             if let Some(addr_bytes) = result.get(12..32) {
                 OwnerQueryResult::Ok(Address::from_slice(addr_bytes))
             } else {
-                let err = format!("invalid response length: {} bytes", result.len());
+                // 0 bytes typically means no contract at this address
+                let err = if result.is_empty() {
+                    "contract not deployed".to_string()
+                } else {
+                    format!("invalid response: {} bytes", result.len())
+                };
                 log::debug!("Query owner() failed for {}: {}", contract_name, err);
                 OwnerQueryResult::Err(err)
             }
@@ -341,7 +382,11 @@ async fn query_pending_owner<P: Provider + Clone>(
             if let Some(addr_bytes) = result.get(12..32) {
                 OwnerQueryResult::Ok(Address::from_slice(addr_bytes))
             } else {
-                let err = format!("invalid response length: {} bytes", result.len());
+                let err = if result.is_empty() {
+                    "contract not deployed".to_string()
+                } else {
+                    format!("invalid response: {} bytes", result.len())
+                };
                 log::debug!("Query pendingOwner() failed for {}: {}", contract_name, err);
                 OwnerQueryResult::Err(err)
             }
@@ -350,6 +395,84 @@ async fn query_pending_owner<P: Provider + Clone>(
             // pendingOwner() not implemented is common, treat as "not set"
             let err = format_rpc_error(&e);
             log::debug!("Query pendingOwner() failed for {}: {}", contract_name, err);
+            OwnerQueryResult::Err(err)
+        }
+    }
+}
+
+/// Query getAdmin() on Diamond Proxy contract.
+///
+/// Diamond contracts use a custom admin pattern instead of Ownable2Step.
+async fn query_admin<P: Provider + Clone>(
+    provider: &P,
+    contract_address: Address,
+    contract_name: &str,
+) -> OwnerQueryResult {
+    let calldata = getAdminCall {}.abi_encode();
+    let tx = TransactionRequest::default()
+        .to(contract_address)
+        .input(calldata.into());
+
+    match provider.call(tx).await {
+        Ok(result) => {
+            if let Some(addr_bytes) = result.get(12..32) {
+                OwnerQueryResult::Ok(Address::from_slice(addr_bytes))
+            } else {
+                let err = if result.is_empty() {
+                    "contract not deployed".to_string()
+                } else {
+                    format!("invalid response: {} bytes", result.len())
+                };
+                log::debug!("Query getAdmin() failed for {}: {}", contract_name, err);
+                OwnerQueryResult::Err(err)
+            }
+        }
+        Err(e) => {
+            let err = format_rpc_error(&e);
+            log::debug!("Query getAdmin() failed for {}: {}", contract_name, err);
+            OwnerQueryResult::Err(err)
+        }
+    }
+}
+
+/// Query getPendingAdmin() on Diamond Proxy contract.
+///
+/// Diamond contracts use a custom admin pattern instead of Ownable2Step.
+async fn query_pending_admin<P: Provider + Clone>(
+    provider: &P,
+    contract_address: Address,
+    contract_name: &str,
+) -> OwnerQueryResult {
+    let calldata = getPendingAdminCall {}.abi_encode();
+    let tx = TransactionRequest::default()
+        .to(contract_address)
+        .input(calldata.into());
+
+    match provider.call(tx).await {
+        Ok(result) => {
+            if let Some(addr_bytes) = result.get(12..32) {
+                OwnerQueryResult::Ok(Address::from_slice(addr_bytes))
+            } else {
+                let err = if result.is_empty() {
+                    "contract not deployed".to_string()
+                } else {
+                    format!("invalid response: {} bytes", result.len())
+                };
+                log::debug!(
+                    "Query getPendingAdmin() failed for {}: {}",
+                    contract_name,
+                    err
+                );
+                OwnerQueryResult::Err(err)
+            }
+        }
+        Err(e) => {
+            let err = format_rpc_error(&e);
+            log::debug!(
+                "Query getPendingAdmin() failed for {}: {}",
+                contract_name,
+                err
+            );
             OwnerQueryResult::Err(err)
         }
     }
@@ -410,10 +533,22 @@ async fn query_ecosystem_owners<P: Provider + Clone>(
         .and_then(|b| b.shared.as_ref())
         .and_then(|s| s.l1_address);
 
+    let message_root_proxy_addr = contracts
+        .core_ecosystem_contracts
+        .as_ref()
+        .and_then(|c| c.message_root_proxy_addr);
+
+    let l1_wrapped_base_token_store_addr = contracts
+        .zksync_os_ctm
+        .as_ref()
+        .and_then(|c| c.l1_wrapped_base_token_store);
+
     // List of contracts to query (only those with owner())
     // NOTE: The following contracts are permissionless and have no owner():
     // - ERC20 Bridge (legacy, stateless)
     // - DA Validators (Rollup, Avail, Validium) - permissionless by design
+    // - Diamond Facets (Admin, Executor, Mailbox, Getters) - used via Diamond Proxy
+    // - Verifier components (Fflonk, Plonk) - individual verifiers
     let contract_list: Vec<(&'static str, Option<Address>)> = vec![
         // Governance contracts
         ("Governance", contracts.governance_addr()),
@@ -422,11 +557,16 @@ async fn query_ecosystem_owners<P: Provider + Clone>(
         // Core infrastructure
         ("State Transition (CTM)", state_transition_addr),
         ("Bridgehub", contracts.bridgehub_addr()),
+        ("Message Root Proxy", message_root_proxy_addr),
         ("Native Token Vault", contracts.native_token_vault_addr()),
         // Operational contracts
         ("Server Notifier", contracts.server_notifier_addr()),
         ("Verifier", contracts.verifier_addr()),
         ("Rollup DA Manager", contracts.l1_rollup_da_manager_addr()),
+        (
+            "L1 Wrapped Base Token Store",
+            l1_wrapped_base_token_store_addr,
+        ),
         // Bridge contracts
         ("L1 Nullifier", l1_nullifier_addr),
         ("Shared Bridge", shared_bridge_addr),
@@ -459,6 +599,9 @@ async fn query_ecosystem_owners<P: Provider + Clone>(
 }
 
 /// Query ownership for chain contracts.
+///
+/// Note: Diamond Proxy uses a custom admin pattern (getAdmin/getPendingAdmin)
+/// instead of the standard Ownable2Step (owner/pendingOwner).
 async fn query_chain_owners<P: Provider + Clone>(
     provider: &P,
     contracts: &ChainContracts,
@@ -472,16 +615,16 @@ async fn query_chain_owners<P: Provider + Clone>(
         .as_ref()
         .and_then(|l| l.validator_timelock_addr);
 
-    let contract_list: Vec<(&'static str, Option<Address>)> = vec![
+    // Standard Ownable2Step contracts (owner/pendingOwner)
+    let ownable_contracts: Vec<(&'static str, Option<Address>)> = vec![
         ("Chain Governance", contracts.governance_addr()),
         ("Chain Admin", contracts.chain_admin_addr()),
-        ("Diamond Proxy", contracts.diamond_proxy_addr()),
         ("Chain Proxy Admin", chain_proxy_admin_addr),
         ("Chain Verifier", chain_verifier_addr),
         ("Chain Validator Timelock", chain_validator_timelock_addr),
     ];
 
-    for (name, address) in contract_list {
+    for (name, address) in ownable_contracts {
         let (owner, pending_owner) = if let Some(addr) = address {
             let owner = query_owner(provider, addr, name).await;
             let pending = query_pending_owner(provider, addr, name).await;
@@ -498,6 +641,37 @@ async fn query_chain_owners<P: Provider + Clone>(
             address,
             owner,
             pending_owner,
+        });
+    }
+
+    // Diamond Proxy uses getAdmin()/getPendingAdmin() instead of owner()/pendingOwner()
+    let diamond_proxy_addr = contracts.diamond_proxy_addr();
+    let (admin, pending_admin) = if let Some(addr) = diamond_proxy_addr {
+        let admin = query_admin(provider, addr, "Diamond Proxy").await;
+        let pending = query_pending_admin(provider, addr, "Diamond Proxy").await;
+        (admin, pending)
+    } else {
+        (
+            OwnerQueryResult::NotConfigured,
+            OwnerQueryResult::NotConfigured,
+        )
+    };
+
+    results.push(ContractOwnership {
+        name: "Diamond Proxy (Admin)",
+        address: diamond_proxy_addr,
+        owner: admin,
+        pending_owner: pending_admin,
+    });
+
+    // L2 ConsensusRegistry - placeholder (requires L2 RPC URL)
+    let consensus_addr = contracts.l2.as_ref().and_then(|l2| l2.consensus_registry);
+    if consensus_addr.is_some() {
+        results.push(ContractOwnership {
+            name: "ConsensusRegistry (L2)",
+            address: consensus_addr,
+            owner: OwnerQueryResult::Err("L2 contract - requires --l2-rpc-url".to_string()),
+            pending_owner: OwnerQueryResult::Err("L2 contract".to_string()),
         });
     }
 
