@@ -25,6 +25,15 @@ use crate::ui;
 
 use contracts::verify_contracts;
 
+/// Result of a verification status check for display purposes.
+enum CheckResult {
+    Verified,
+    NotVerified,
+    Pending,
+    Unknown(String),
+    Error(String),
+}
+
 /// Arguments for `verify` command.
 ///
 /// Verifies deployed smart contracts on block explorers.
@@ -240,64 +249,85 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
     let mut verified_count = 0;
     let mut unverified_targets = Vec::new();
 
-    for target in &targets {
-        let spinner = cliclack::spinner();
-        spinner.start(format!(
-            "Checking {}...",
-            target.contract_type.display_name()
-        ));
+    let progress = cliclack::progress_bar(targets.len() as u64);
+    progress.start("Checking verification status...");
 
-        match explorer_client
+    let mut results: Vec<(String, CheckResult)> = Vec::new();
+
+    for target in &targets {
+        let name = target.contract_type.display_name().to_string();
+
+        let result = match explorer_client
             .check_verification_status(target.address)
             .await
         {
             Ok(VerificationStatus::Verified) => {
-                spinner.stop(format!(
-                    "{} → {}",
-                    target.contract_type.display_name(),
-                    ui::green("Verified")
-                ));
                 verified_count += 1;
+                CheckResult::Verified
             }
             Ok(VerificationStatus::NotVerified) => {
-                spinner.stop(format!(
-                    "{} → {}",
-                    target.contract_type.display_name(),
-                    ui::yellow("Not Verified")
-                ));
                 unverified_targets.push(target.clone());
+                CheckResult::NotVerified
             }
-            Ok(VerificationStatus::Pending) => {
-                spinner.stop(format!(
-                    "{} → {}",
-                    target.contract_type.display_name(),
-                    ui::cyan("Pending")
-                ));
-            }
+            Ok(VerificationStatus::Pending) => CheckResult::Pending,
             Ok(VerificationStatus::Unknown(msg)) => {
-                spinner.stop(format!(
-                    "{} → {}",
-                    target.contract_type.display_name(),
-                    ui::yellow(&format!("Unknown: {}", msg))
-                ));
                 unverified_targets.push(target.clone());
+                CheckResult::Unknown(msg)
             }
             Err(e) => {
-                spinner.stop(format!(
-                    "{} → {}",
-                    target.contract_type.display_name(),
-                    ui::red(&format!("Error: {}", e))
-                ));
-                // Treat errors as unverified
                 unverified_targets.push(target.clone());
+                CheckResult::Error(e.to_string())
             }
-        }
+        };
 
-        // Rate limit delay
+        results.push((name, result));
+        progress.inc(1);
         explorer_client.rate_limit_delay().await;
     }
 
-    // Summary of status check
+    progress.stop("Verification status check complete");
+
+    // Format results for display
+    let results_text = results
+        .iter()
+        .map(|(name, result)| match result {
+            CheckResult::Verified => {
+                format!("{}  {} → {}", ui::green("✓"), name, ui::green("Verified"))
+            }
+            CheckResult::NotVerified => {
+                format!(
+                    "{}  {} → {}",
+                    ui::yellow("✗"),
+                    name,
+                    ui::yellow("Not Verified")
+                )
+            }
+            CheckResult::Pending => {
+                format!("{}  {} → {}", ui::cyan("○"), name, ui::cyan("Pending"))
+            }
+            CheckResult::Unknown(msg) => {
+                format!(
+                    "{}  {} → {}",
+                    ui::yellow("?"),
+                    name,
+                    ui::yellow(format!("Unknown: {}", msg))
+                )
+            }
+            CheckResult::Error(msg) => {
+                format!(
+                    "{}  {} → {}",
+                    ui::red("✗"),
+                    name,
+                    ui::red(format!("Error: {}", msg))
+                )
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    ui::note("Verification Status", results_text)?;
+
+    // Summary
     ui::note(
         "Status Summary",
         format!(
