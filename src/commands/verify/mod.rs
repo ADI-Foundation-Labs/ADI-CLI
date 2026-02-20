@@ -233,6 +233,10 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
     }
 
     ui::info(format!("Found {} contracts to verify", targets.len()))?;
+    ui::info(ui::dim(
+        "Note: Excludes Create2 Factory, Multicall3 (external), L2 contracts, \
+         and Forge libraries (internal in v30).",
+    ))?;
 
     // Create explorer client for status checks
     let explorer_config = ExplorerConfig::new(

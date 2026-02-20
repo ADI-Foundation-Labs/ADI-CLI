@@ -129,6 +129,9 @@ pub enum ContractType {
 
     /// Server notifier proxy admin.
     ServerNotifierProxyAdmin,
+
+    /// L1 Wrapped Base Token Store.
+    L1WrappedBaseTokenStore,
 }
 
 impl ContractType {
@@ -189,6 +192,8 @@ impl ContractType {
             Self::DummyVectorX => "Dummy VectorX",
             // Server notifier proxy admin
             Self::ServerNotifierProxyAdmin => "Server Notifier Proxy Admin",
+            // L1 Wrapped Base Token Store
+            Self::L1WrappedBaseTokenStore => "L1 Wrapped Base Token Store",
         }
     }
 
@@ -328,6 +333,8 @@ impl ContractRegistry {
             ContractType::ServerNotifierProxyAdmin => {
                 "transparent-proxy/TransparentUpgradeableProxy.sol"
             }
+            // L1 Wrapped Base Token Store
+            ContractType::L1WrappedBaseTokenStore => "bridge/L1WrappedBaseTokenStore.sol",
         }
     }
 
@@ -388,6 +395,8 @@ impl ContractRegistry {
             ContractType::DummyVectorX => "DummyVectorX",
             // Server notifier proxy admin
             ContractType::ServerNotifierProxyAdmin => "TransparentUpgradeableProxy",
+            // L1 Wrapped Base Token Store
+            ContractType::L1WrappedBaseTokenStore => "L1WrappedBaseTokenStore",
         }
     }
 
@@ -580,6 +589,14 @@ impl ContractRegistry {
             if let Some(addr) = ctm.server_notifier_proxy_admin_addr {
                 targets.push(Self::build_target(
                     ContractType::ServerNotifierProxyAdmin,
+                    addr,
+                ));
+            }
+
+            // L1 Wrapped Base Token Store
+            if let Some(addr) = ctm.l1_wrapped_base_token_store {
+                targets.push(Self::build_target(
+                    ContractType::L1WrappedBaseTokenStore,
                     addr,
                 ));
             }
