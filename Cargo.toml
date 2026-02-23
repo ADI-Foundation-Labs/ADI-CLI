@@ -110,6 +110,14 @@ hex = { version = "0.4", default-features = false, features = ["std"] }
 # Testing
 tempfile = { version = "3", default-features = false }
 
+# S3 support
+aws-sdk-s3 = { version = "1", default-features = false, features = ["behavior-version-latest", "rt-tokio"] }
+aws-config = { version = "1", default-features = false, features = ["behavior-version-latest", "rt-tokio", "rustls"] }
+
+# Archive support
+tar = { version = "0.4", default-features = false }
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+
 # URL handling
 url = { version = "2", default-features = false, features = ["serde"] }
 
@@ -143,7 +151,7 @@ console = { workspace = true }
 # SDK packages
 adi-toolkit = { workspace = true }
 adi-ecosystem = { workspace = true }
-adi-state = { workspace = true }
+adi-state = { workspace = true, features = ["s3"] }
 adi-funding = { workspace = true }
 adi-types = { workspace = true }
 

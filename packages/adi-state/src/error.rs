@@ -77,4 +77,44 @@ pub enum StateError {
         /// Chain name that was not found.
         name: String,
     },
+
+    /// S3 upload failed.
+    #[cfg(feature = "s3")]
+    #[error("Failed to upload to S3 key '{key}': {reason}")]
+    S3UploadFailed {
+        /// S3 object key that failed to upload.
+        key: String,
+        /// Error description.
+        reason: String,
+    },
+
+    /// S3 download failed.
+    #[cfg(feature = "s3")]
+    #[error("Failed to download from S3 key '{key}': {reason}")]
+    S3DownloadFailed {
+        /// S3 object key that failed to download.
+        key: String,
+        /// Error description.
+        reason: String,
+    },
+
+    /// Archive creation failed.
+    #[cfg(feature = "s3")]
+    #[error("Failed to create archive from '{}': {reason}", .path.display())]
+    ArchiveCreateFailed {
+        /// Path that failed to archive.
+        path: PathBuf,
+        /// Error description.
+        reason: String,
+    },
+
+    /// Archive extraction failed.
+    #[cfg(feature = "s3")]
+    #[error("Failed to extract archive to '{}': {reason}", .path.display())]
+    ArchiveExtractFailed {
+        /// Path where extraction failed.
+        path: PathBuf,
+        /// Error description.
+        reason: String,
+    },
 }

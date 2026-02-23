@@ -12,6 +12,7 @@ mod ecosystem;
 pub mod helpers;
 mod init;
 mod owners;
+mod state;
 mod transfer;
 mod verify;
 mod version;
@@ -38,6 +39,8 @@ pub enum Commands {
     Owners(owners::OwnersArgs),
     /// Verify deployed smart contracts on block explorers
     Verify(verify::VerifyArgs),
+    /// Manage state synchronization with S3
+    State(state::StateArgs),
 }
 
 impl Commands {
@@ -53,6 +56,7 @@ impl Commands {
             Commands::Transfer(args) => transfer::run(args, context).await,
             Commands::Owners(args) => owners::run(&args, context).await,
             Commands::Verify(args) => verify::run(args, context).await,
+            Commands::State(args) => state::run(&args, context).await,
         }
     }
 }

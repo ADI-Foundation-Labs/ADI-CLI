@@ -1,0 +1,44 @@
+# MinIO local development setup for S3 state synchronization testing
+#
+# Usage:
+#   docker compose -f docker-compose.minio.yml up -d
+#
+# Web Console: http://localhost:9001
+# Login: minioadmin / minioadmin
+#
+# S3 API: http://localhost:9000
+# Bucket: adi-state (auto-created)
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: adi-minio
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web Console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  createbucket:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      mc mb myminio/adi-state --ignore-existing;
+      exit 0;
+      "
+
+volumes:
+  minio-data:

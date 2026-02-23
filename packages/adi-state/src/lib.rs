@@ -55,8 +55,14 @@ mod importer;
 mod manager;
 mod paths;
 
+#[cfg(feature = "s3")]
+pub mod s3;
+
 // Public re-exports
 pub use backend::{BackendType, FilesystemBackend, StateBackend};
+
+#[cfg(feature = "s3")]
+pub use backend::{create_s3_sync_backend, S3SyncBackend};
 pub use error::{Result, StateError};
 pub use exporter::{export_chain_state, export_ecosystem_state};
 pub use importer::import_ecosystem_state;

@@ -2,7 +2,13 @@
 
 mod filesystem;
 
+#[cfg(feature = "s3")]
+mod s3_sync;
+
 pub use filesystem::FilesystemBackend;
+
+#[cfg(feature = "s3")]
+pub use s3_sync::S3SyncBackend;
 
 use crate::error::Result;
 use adi_types::{
@@ -21,6 +27,10 @@ pub enum BackendType {
     /// Filesystem-based storage (default).
     #[default]
     Filesystem,
+    /// Filesystem with S3 sync on writes.
+    #[cfg(feature = "s3")]
+    #[serde(rename = "filesystem_s3_sync")]
+    FilesystemWithS3Sync,
 }
 
 /// Abstract state storage backend with typed operations.
@@ -238,6 +248,10 @@ pub trait StateBackend: Send + Sync {
 /// * `backend_type` - The type of backend to create.
 /// * `base_path` - Base path for the backend (interpretation depends on type).
 /// * `logger` - Logger for debug messages.
+///
+/// # Panics
+///
+/// Panics if `FilesystemWithS3Sync` is requested. Use `create_s3_sync_backend` instead.
 #[must_use]
 pub fn create_backend(
     backend_type: BackendType,
@@ -246,5 +260,34 @@ pub fn create_backend(
 ) -> Box<dyn StateBackend> {
     match backend_type {
         BackendType::Filesystem => Box::new(FilesystemBackend::new(base_path, logger)),
+        #[cfg(feature = "s3")]
+        BackendType::FilesystemWithS3Sync => {
+            // S3SyncBackend requires async initialization
+            // Use create_s3_sync_backend() instead
+            unreachable!("Use create_s3_sync_backend() for FilesystemWithS3Sync backend")
+        }
     }
+}
+
+/// Create an S3-synchronized backend.
+///
+/// # Arguments
+///
+/// * `base_path` - Ecosystem directory path.
+/// * `ecosystem_name` - Name for the S3 archive.
+/// * `config` - S3 configuration.
+/// * `logger` - Logger for debug messages.
+///
+/// # Errors
+///
+/// Returns error if S3 client initialization fails.
+#[cfg(feature = "s3")]
+pub async fn create_s3_sync_backend(
+    base_path: &Path,
+    ecosystem_name: &str,
+    config: crate::s3::S3Config,
+    logger: Arc<dyn Logger>,
+) -> crate::Result<Box<dyn StateBackend>> {
+    let backend = S3SyncBackend::new(base_path, ecosystem_name, config, logger).await?;
+    Ok(Box::new(backend))
 }

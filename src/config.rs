@@ -110,6 +110,49 @@ pub struct VerificationDefaults {
     pub api_key: Option<SecretString>,
 }
 
+/// S3 synchronization configuration.
+///
+/// Enables syncing ecosystem state to S3-compatible storage.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct S3Config {
+    /// Enable S3 synchronization.
+    /// Default: `false`
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// S3 bucket name.
+    /// Required when S3 sync is enabled.
+    #[serde(default)]
+    pub bucket: Option<String>,
+
+    /// AWS region (e.g., "us-east-1").
+    /// Default: `us-east-1`
+    #[serde(default)]
+    pub region: Option<String>,
+
+    /// Custom S3 endpoint URL (for MinIO, LocalStack, etc.).
+    /// When set, enables path-style addressing.
+    #[serde(default)]
+    pub endpoint_url: Option<Url>,
+
+    /// S3 key prefix for archives (e.g., "ecosystems/").
+    /// Archive will be stored as: `{prefix}{ecosystem_name}.tar.gz`
+    #[serde(default)]
+    pub key_prefix: Option<String>,
+
+    /// AWS access key ID.
+    /// Can be overridden with ADI__S3__ACCESS_KEY_ID or AWS_ACCESS_KEY_ID env var.
+    /// Note: This field is never serialized (skipped) for security.
+    #[serde(default, skip_serializing)]
+    pub access_key_id: Option<SecretString>,
+
+    /// AWS secret access key.
+    /// Can be overridden with ADI__S3__SECRET_ACCESS_KEY or AWS_SECRET_ACCESS_KEY env var.
+    /// Note: This field is never serialized (skipped) for security.
+    #[serde(default, skip_serializing)]
+    pub secret_access_key: Option<SecretString>,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     /// State directory path for storing ecosystem and chain data.
@@ -157,6 +200,11 @@ pub struct Config {
     /// Can be overridden with --gas-multiplier flag.
     #[serde(default = "default_gas_multiplier")]
     pub gas_multiplier: u64,
+
+    /// S3 synchronization configuration.
+    /// Enables syncing ecosystem state to S3-compatible storage.
+    #[serde(default)]
+    pub s3: S3Config,
 }
 
 impl Config {
