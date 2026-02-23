@@ -416,8 +416,74 @@ impl ContractRegistry {
         )
     }
 
+    /// Check if a contract type is available for verification in the toolkit.
+    ///
+    /// Some contracts don't exist in the current toolkit image:
+    /// - TransparentUpgradeableProxy: External OpenZeppelin contract
+    /// - RollupL1DAValidator: Not in v30.x toolkit
+    /// - BlobsRollupL1DAValidator: Not in v30.x toolkit
+    /// - AvailL1DAValidator: Not in v30.x toolkit
+    /// - DummyAvailBridge: Test contract, not in toolkit
+    /// - DummyVectorX: Test contract, not in toolkit
+    pub fn is_available(contract_type: ContractType) -> bool {
+        !matches!(
+            contract_type,
+            // External contracts (OpenZeppelin)
+            ContractType::TransparentProxyAdmin
+                | ContractType::ChainProxyAdmin
+                | ContractType::ServerNotifierProxyAdmin
+                // DA validators not in v30.x toolkit
+                | ContractType::RollupL1DaValidator
+                | ContractType::BlobsZkSyncOsL1DaValidator
+                | ContractType::AvailL1DaValidator
+                // Test contracts not in toolkit
+                | ContractType::DummyAvailBridge
+                | ContractType::DummyVectorX
+        )
+    }
+
+    /// Get the reason why a contract is unavailable for verification.
+    pub fn unavailable_reason(contract_type: ContractType) -> Option<&'static str> {
+        match contract_type {
+            ContractType::TransparentProxyAdmin
+            | ContractType::ChainProxyAdmin
+            | ContractType::ServerNotifierProxyAdmin => {
+                Some("External OpenZeppelin contract (verify separately)")
+            }
+            ContractType::RollupL1DaValidator
+            | ContractType::BlobsZkSyncOsL1DaValidator
+            | ContractType::AvailL1DaValidator => Some("Not available in v30.x toolkit"),
+            ContractType::DummyAvailBridge | ContractType::DummyVectorX => {
+                Some("Test contract, not in toolkit")
+            }
+            _ => None,
+        }
+    }
+
     /// Build verification target for a contract type and address.
-    pub fn build_target(contract_type: ContractType, address: Address) -> VerificationTarget {
+    /// Returns None if the contract is not available in the toolkit.
+    pub fn build_target(
+        contract_type: ContractType,
+        address: Address,
+    ) -> Option<VerificationTarget> {
+        if !Self::is_available(contract_type) {
+            return None;
+        }
+        Some(VerificationTarget::new(
+            contract_type,
+            address,
+            Self::source_path(contract_type),
+            Self::contract_name(contract_type),
+            Self::is_proxy(contract_type),
+        ))
+    }
+
+    /// Build verification target unconditionally (even if unavailable).
+    /// Used for listing all contracts regardless of toolkit availability.
+    pub fn build_target_unchecked(
+        contract_type: ContractType,
+        address: Address,
+    ) -> VerificationTarget {
         VerificationTarget::new(
             contract_type,
             address,
@@ -428,177 +494,166 @@ impl ContractRegistry {
     }
 
     /// Build all verification targets from ecosystem contracts.
+    /// Skips contracts that are unavailable in the toolkit.
     pub fn build_ecosystem_targets(contracts: &EcosystemContracts) -> Vec<VerificationTarget> {
         let mut targets = Vec::new();
 
+        // Helper macro to add target if available
+        macro_rules! add_target {
+            ($contract_type:expr, $addr:expr) => {
+                if let Some(target) = Self::build_target($contract_type, $addr) {
+                    targets.push(target);
+                }
+            };
+        }
+
         // Core ecosystem contracts
         if let Some(addr) = contracts.bridgehub_addr() {
-            targets.push(Self::build_target(ContractType::Bridgehub, addr));
+            add_target!(ContractType::Bridgehub, addr);
         }
         if let Some(core) = &contracts.core_ecosystem_contracts {
             if let Some(addr) = core.message_root_proxy_addr {
-                targets.push(Self::build_target(ContractType::MessageRoot, addr));
+                add_target!(ContractType::MessageRoot, addr);
             }
             if let Some(addr) = core.transparent_proxy_admin_addr {
-                targets.push(Self::build_target(
-                    ContractType::TransparentProxyAdmin,
-                    addr,
-                ));
+                add_target!(ContractType::TransparentProxyAdmin, addr);
             }
             if let Some(addr) = core.stm_deployment_tracker_proxy_addr {
-                targets.push(Self::build_target(ContractType::StmDeploymentTracker, addr));
+                add_target!(ContractType::StmDeploymentTracker, addr);
             }
             if let Some(addr) = core.native_token_vault_addr {
-                targets.push(Self::build_target(ContractType::NativeTokenVault, addr));
+                add_target!(ContractType::NativeTokenVault, addr);
             }
         }
 
         // Governance contracts
         if let Some(addr) = contracts.governance_addr() {
-            targets.push(Self::build_target(ContractType::Governance, addr));
+            add_target!(ContractType::Governance, addr);
         }
         if let Some(addr) = contracts.chain_admin_addr() {
-            targets.push(Self::build_target(ContractType::ChainAdmin, addr));
+            add_target!(ContractType::ChainAdmin, addr);
         }
 
         // ZkSync OS CTM contracts
         if let Some(ctm) = &contracts.zksync_os_ctm {
             if let Some(addr) = ctm.state_transition_proxy_addr {
-                targets.push(Self::build_target(ContractType::StateTransitionProxy, addr));
+                add_target!(ContractType::StateTransitionProxy, addr);
             }
             if let Some(addr) = ctm.validator_timelock_addr {
-                targets.push(Self::build_target(ContractType::ValidatorTimelock, addr));
+                add_target!(ContractType::ValidatorTimelock, addr);
             }
             if let Some(addr) = ctm.server_notifier_proxy_addr {
-                targets.push(Self::build_target(ContractType::ServerNotifier, addr));
+                add_target!(ContractType::ServerNotifier, addr);
             }
             if let Some(addr) = ctm.verifier_addr {
-                targets.push(Self::build_target(ContractType::Verifier, addr));
+                add_target!(ContractType::Verifier, addr);
             }
             if let Some(addr) = ctm.l1_rollup_da_manager {
-                targets.push(Self::build_target(ContractType::L1RollupDaManager, addr));
+                add_target!(ContractType::L1RollupDaManager, addr);
             }
             if let Some(addr) = ctm.l1_bytecodes_supplier_addr {
-                targets.push(Self::build_target(ContractType::L1BytecodesSupplier, addr));
+                add_target!(ContractType::L1BytecodesSupplier, addr);
             }
             if let Some(addr) = ctm.rollup_l1_da_validator_addr {
-                targets.push(Self::build_target(ContractType::RollupL1DaValidator, addr));
+                add_target!(ContractType::RollupL1DaValidator, addr);
             }
             if let Some(addr) = ctm.no_da_validium_l1_validator_addr {
-                targets.push(Self::build_target(
-                    ContractType::NoDaValidiumL1Validator,
-                    addr,
-                ));
+                add_target!(ContractType::NoDaValidiumL1Validator, addr);
             }
             if let Some(addr) = ctm.blobs_zksync_os_l1_da_validator_addr {
-                targets.push(Self::build_target(
-                    ContractType::BlobsZkSyncOsL1DaValidator,
-                    addr,
-                ));
+                add_target!(ContractType::BlobsZkSyncOsL1DaValidator, addr);
             }
             if let Some(addr) = ctm.avail_l1_da_validator_addr {
-                targets.push(Self::build_target(ContractType::AvailL1DaValidator, addr));
+                add_target!(ContractType::AvailL1DaValidator, addr);
             }
             if let Some(addr) = ctm.default_upgrade_addr {
-                targets.push(Self::build_target(ContractType::DefaultUpgrade, addr));
+                add_target!(ContractType::DefaultUpgrade, addr);
             }
             if let Some(addr) = ctm.genesis_upgrade_addr {
-                targets.push(Self::build_target(ContractType::GenesisUpgrade, addr));
+                add_target!(ContractType::GenesisUpgrade, addr);
             }
 
             // Diamond facets (extracted from diamond_cut_data)
             if let Some(addr) = ctm.admin_facet_addr {
-                targets.push(Self::build_target(ContractType::AdminFacet, addr));
+                add_target!(ContractType::AdminFacet, addr);
             }
             if let Some(addr) = ctm.executor_facet_addr {
-                targets.push(Self::build_target(ContractType::ExecutorFacet, addr));
+                add_target!(ContractType::ExecutorFacet, addr);
             }
             if let Some(addr) = ctm.mailbox_facet_addr {
-                targets.push(Self::build_target(ContractType::MailboxFacet, addr));
+                add_target!(ContractType::MailboxFacet, addr);
             }
             if let Some(addr) = ctm.getters_facet_addr {
-                targets.push(Self::build_target(ContractType::GettersFacet, addr));
+                add_target!(ContractType::GettersFacet, addr);
             }
             if let Some(addr) = ctm.diamond_init_addr {
-                targets.push(Self::build_target(ContractType::DiamondInit, addr));
+                add_target!(ContractType::DiamondInit, addr);
             }
 
             // Implementation contracts (read via EIP-1967)
             if let Some(addr) = ctm.bridgehub_impl_addr {
-                targets.push(Self::build_target(ContractType::BridgehubImpl, addr));
+                add_target!(ContractType::BridgehubImpl, addr);
             }
             if let Some(addr) = ctm.message_root_impl_addr {
-                targets.push(Self::build_target(ContractType::MessageRootImpl, addr));
+                add_target!(ContractType::MessageRootImpl, addr);
             }
             if let Some(addr) = ctm.native_token_vault_impl_addr {
-                targets.push(Self::build_target(ContractType::NativeTokenVaultImpl, addr));
+                add_target!(ContractType::NativeTokenVaultImpl, addr);
             }
             if let Some(addr) = ctm.stm_deployment_tracker_impl_addr {
-                targets.push(Self::build_target(
-                    ContractType::StmDeploymentTrackerImpl,
-                    addr,
-                ));
+                add_target!(ContractType::StmDeploymentTrackerImpl, addr);
             }
             if let Some(addr) = ctm.chain_type_manager_impl_addr {
-                targets.push(Self::build_target(ContractType::ChainTypeManagerImpl, addr));
+                add_target!(ContractType::ChainTypeManagerImpl, addr);
             }
             if let Some(addr) = ctm.server_notifier_impl_addr {
-                targets.push(Self::build_target(ContractType::ServerNotifierImpl, addr));
+                add_target!(ContractType::ServerNotifierImpl, addr);
             }
             if let Some(addr) = ctm.erc20_bridge_impl_addr {
-                targets.push(Self::build_target(ContractType::Erc20BridgeImpl, addr));
+                add_target!(ContractType::Erc20BridgeImpl, addr);
             }
             if let Some(addr) = ctm.shared_bridge_impl_addr {
-                targets.push(Self::build_target(ContractType::SharedBridgeImpl, addr));
+                add_target!(ContractType::SharedBridgeImpl, addr);
             }
             if let Some(addr) = ctm.l1_nullifier_impl_addr {
-                targets.push(Self::build_target(ContractType::L1NullifierImpl, addr));
+                add_target!(ContractType::L1NullifierImpl, addr);
             }
             if let Some(addr) = ctm.validator_timelock_impl_addr {
-                targets.push(Self::build_target(
-                    ContractType::ValidatorTimelockImpl,
-                    addr,
-                ));
+                add_target!(ContractType::ValidatorTimelockImpl, addr);
             }
 
             // Verifier components
             if let Some(addr) = ctm.verifier_fflonk_addr {
-                targets.push(Self::build_target(ContractType::VerifierFflonk, addr));
+                add_target!(ContractType::VerifierFflonk, addr);
             }
             if let Some(addr) = ctm.verifier_plonk_addr {
-                targets.push(Self::build_target(ContractType::VerifierPlonk, addr));
+                add_target!(ContractType::VerifierPlonk, addr);
             }
 
             // Bridge token contracts
             if let Some(addr) = ctm.bridged_standard_erc20_addr {
-                targets.push(Self::build_target(ContractType::BridgedStandardErc20, addr));
+                add_target!(ContractType::BridgedStandardErc20, addr);
             }
             if let Some(addr) = ctm.bridged_token_beacon_addr {
-                targets.push(Self::build_target(ContractType::BridgedTokenBeacon, addr));
+                add_target!(ContractType::BridgedTokenBeacon, addr);
             }
 
             // Avail test contracts
             if let Some(addr) = ctm.dummy_avail_bridge_addr {
-                targets.push(Self::build_target(ContractType::DummyAvailBridge, addr));
+                add_target!(ContractType::DummyAvailBridge, addr);
             }
             if let Some(addr) = ctm.dummy_vector_x_addr {
-                targets.push(Self::build_target(ContractType::DummyVectorX, addr));
+                add_target!(ContractType::DummyVectorX, addr);
             }
 
             // Server notifier proxy admin
             if let Some(addr) = ctm.server_notifier_proxy_admin_addr {
-                targets.push(Self::build_target(
-                    ContractType::ServerNotifierProxyAdmin,
-                    addr,
-                ));
+                add_target!(ContractType::ServerNotifierProxyAdmin, addr);
             }
 
             // L1 Wrapped Base Token Store
             if let Some(addr) = ctm.l1_wrapped_base_token_store {
-                targets.push(Self::build_target(
-                    ContractType::L1WrappedBaseTokenStore,
-                    addr,
-                ));
+                add_target!(ContractType::L1WrappedBaseTokenStore, addr);
             }
         }
 
@@ -606,16 +661,16 @@ impl ContractRegistry {
         if let Some(bridges) = &contracts.bridges {
             if let Some(erc20) = &bridges.erc20 {
                 if let Some(addr) = erc20.l1_address {
-                    targets.push(Self::build_target(ContractType::Erc20Bridge, addr));
+                    add_target!(ContractType::Erc20Bridge, addr);
                 }
             }
             if let Some(shared) = &bridges.shared {
                 if let Some(addr) = shared.l1_address {
-                    targets.push(Self::build_target(ContractType::SharedBridge, addr));
+                    add_target!(ContractType::SharedBridge, addr);
                 }
             }
             if let Some(addr) = bridges.l1_nullifier_addr {
-                targets.push(Self::build_target(ContractType::L1Nullifier, addr));
+                add_target!(ContractType::L1Nullifier, addr);
             }
         }
 
@@ -623,21 +678,30 @@ impl ContractRegistry {
     }
 
     /// Build verification targets from chain contracts.
+    /// Skips contracts that are unavailable in the toolkit.
     pub fn build_chain_targets(contracts: &ChainContracts) -> Vec<VerificationTarget> {
         let mut targets = Vec::new();
 
         if let Some(l1) = &contracts.l1 {
             if let Some(addr) = l1.diamond_proxy_addr {
-                targets.push(Self::build_target(ContractType::DiamondProxy, addr));
+                if let Some(target) = Self::build_target(ContractType::DiamondProxy, addr) {
+                    targets.push(target);
+                }
             }
             if let Some(addr) = l1.governance_addr {
-                targets.push(Self::build_target(ContractType::ChainGovernance, addr));
+                if let Some(target) = Self::build_target(ContractType::ChainGovernance, addr) {
+                    targets.push(target);
+                }
             }
             if let Some(addr) = l1.chain_admin_addr {
-                targets.push(Self::build_target(ContractType::ChainChainAdmin, addr));
+                if let Some(target) = Self::build_target(ContractType::ChainChainAdmin, addr) {
+                    targets.push(target);
+                }
             }
             if let Some(addr) = l1.chain_proxy_admin_addr {
-                targets.push(Self::build_target(ContractType::ChainProxyAdmin, addr));
+                if let Some(target) = Self::build_target(ContractType::ChainProxyAdmin, addr) {
+                    targets.push(target);
+                }
             }
         }
 
@@ -658,6 +722,7 @@ impl ContractRegistry {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
@@ -675,10 +740,27 @@ mod tests {
 
     #[test]
     fn test_forge_contract_path() {
-        let target = ContractRegistry::build_target(ContractType::Governance, Address::ZERO);
+        let target =
+            ContractRegistry::build_target(ContractType::Governance, Address::ZERO).unwrap();
         assert_eq!(
             target.forge_contract_path(),
             "governance/Governance.sol:Governance"
         );
+    }
+
+    #[test]
+    fn test_unavailable_contracts_skipped() {
+        // TransparentProxyAdmin should be unavailable
+        assert!(!ContractRegistry::is_available(
+            ContractType::TransparentProxyAdmin
+        ));
+        assert!(
+            ContractRegistry::build_target(ContractType::TransparentProxyAdmin, Address::ZERO)
+                .is_none()
+        );
+
+        // Governance should be available
+        assert!(ContractRegistry::is_available(ContractType::Governance));
+        assert!(ContractRegistry::build_target(ContractType::Governance, Address::ZERO).is_some());
     }
 }

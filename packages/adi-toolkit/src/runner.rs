@@ -283,7 +283,7 @@ impl ToolkitRunner {
         ));
 
         // Build the forge verify-contract command
-        // Working directory inside container is /deps/era-contracts/l1-contracts
+        // Working directory inside container is /deps/era-contracts/l1-contracts/contracts
         let chain_id_str = chain_id.to_string();
         let mut args: Vec<&str> = vec![
             "forge",
@@ -297,7 +297,9 @@ impl ToolkitRunner {
             "--etherscan-api-key",
             api_key,
             "--root",
-            "/deps/era-contracts/l1-contracts",
+            "/deps/era-contracts/l1-contracts/contracts",
+            "--compiler-version",
+            "0.8.28",
         ];
 
         if let Some(ctor_args) = constructor_args {
@@ -311,7 +313,7 @@ impl ToolkitRunner {
             &args,
             &temp_dir,
             protocol_version,
-            &[],
+            &[("CI", "true")], // Suppress interactive prompts like telemetry
             "forge-verify",
             &format!("Verifying {}...", address),
         )

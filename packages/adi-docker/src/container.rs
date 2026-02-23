@@ -6,11 +6,9 @@ use crate::stream::OutputStreamer;
 use adi_types::{LogCrateLogger, Logger};
 use bollard::container::{
     Config, CreateContainerOptions, RemoveContainerOptions, StartContainerOptions,
-    WaitContainerOptions,
 };
 use bollard::models::{HostConfig, Mount, MountTypeEnum};
 use bollard::Docker;
-use futures_util::StreamExt;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -217,21 +215,21 @@ impl ContainerManager {
     }
 
     async fn wait_for_exit(&self, container_id: &str) -> Result<i64> {
-        let mut wait_stream = self
+        // Use inspect_container to get exit code from container state
+        // This is more reliable than wait_container when the container has already exited
+        let inspect = self
             .docker
-            .wait_container(container_id, None::<WaitContainerOptions<String>>);
+            .inspect_container(container_id, None)
+            .await
+            .map_err(|e| DockerError::ContainerFailed {
+                exit_code: -1,
+                message: format!("Failed to inspect container: {}", e),
+            })?;
 
-        match wait_stream.next().await {
-            Some(Ok(response)) => Ok(response.status_code),
-            Some(Err(e)) => Err(DockerError::ContainerFailed {
-                exit_code: -1,
-                message: e.to_string(),
-            }),
-            None => Err(DockerError::ContainerFailed {
-                exit_code: -1,
-                message: "No wait response received".to_string(),
-            }),
-        }
+        // Get exit code from container state
+        let exit_code = inspect.state.and_then(|s| s.exit_code).unwrap_or(0);
+
+        Ok(exit_code)
     }
 
     async fn remove(&self, container_id: &str) -> Result<()> {

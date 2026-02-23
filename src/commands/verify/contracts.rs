@@ -71,29 +71,37 @@ pub async fn verify_contracts(
             }
         };
 
-    // Verify each contract sequentially
+    // Verify each contract sequentially with Ctrl+C handling
+    // No spinners - Docker's OutputStreamer handles display with 10-line sliding window
     for target in targets {
-        let spinner = cliclack::spinner();
-        spinner.start(format!(
-            "Verifying {} ({})...",
-            target.contract_type.display_name(),
-            &target.address.to_string()[..10]
-        ));
+        let result = tokio::select! {
+            biased;
 
-        let result = verify_single_contract(
-            &runner,
-            target,
-            explorer_url,
-            api_key,
-            chain_id,
-            version,
-            context,
-        )
-        .await;
+            _ = tokio::signal::ctrl_c() => {
+                context.logger().warning(&format!(
+                    "{} → Interrupted",
+                    target.contract_type.display_name()
+                ));
+                break;
+            }
 
+            verification_result = verify_single_contract(
+                &runner,
+                target,
+                explorer_url,
+                api_key,
+                chain_id,
+                version,
+                context,
+            ) => {
+                verification_result
+            }
+        };
+
+        // Show result after Docker completes (OutputStreamer already showed the streaming output)
         match &result.outcome {
             VerificationOutcome::Submitted { guid } => {
-                spinner.stop(format!(
+                context.logger().info(&format!(
                     "{} → {} (GUID: {})",
                     target.contract_type.display_name(),
                     ui::green("Submitted"),
@@ -101,28 +109,28 @@ pub async fn verify_contracts(
                 ));
             }
             VerificationOutcome::Confirmed => {
-                spinner.stop(format!(
+                context.logger().info(&format!(
                     "{} → {}",
                     target.contract_type.display_name(),
                     ui::green("Confirmed")
                 ));
             }
             VerificationOutcome::AlreadyVerified => {
-                spinner.stop(format!(
+                context.logger().info(&format!(
                     "{} → {}",
                     target.contract_type.display_name(),
                     ui::cyan("Already Verified")
                 ));
             }
             VerificationOutcome::Failed { reason } => {
-                spinner.stop(format!(
+                context.logger().error(&format!(
                     "{} → {}",
                     target.contract_type.display_name(),
                     ui::red(&format!("Failed: {}", reason))
                 ));
             }
             VerificationOutcome::Skipped { reason } => {
-                spinner.stop(format!(
+                context.logger().warning(&format!(
                     "{} → {}",
                     target.contract_type.display_name(),
                     ui::yellow(&format!("Skipped: {}", reason))
@@ -132,8 +140,14 @@ pub async fn verify_contracts(
 
         results.push(result);
 
-        // Rate limit delay
-        tokio::time::sleep(Duration::from_millis(VERIFICATION_DELAY_MS)).await;
+        // Interruptible rate limit delay
+        tokio::select! {
+            biased;
+            _ = tokio::signal::ctrl_c() => {
+                break;
+            }
+            _ = tokio::time::sleep(Duration::from_millis(VERIFICATION_DELAY_MS)) => {}
+        }
     }
 
     VerificationSummary::new(results)

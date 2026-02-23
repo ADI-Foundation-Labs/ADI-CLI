@@ -60,11 +60,14 @@ pub struct VerifyArgs {
     pub explorer: ExplorerType,
 
     /// Block explorer API URL.
+    /// For Etherscan: auto-detected (uses V2 API).
+    /// For Blockscout: use the /api endpoint (e.g., https://eth-sepolia.blockscout.com/api).
     /// Required for custom explorer type.
     #[arg(
         long,
         env = "ADI_EXPLORER_API_URL",
-        help = "Block explorer API URL (required for custom explorer)"
+        help = "Block explorer API URL.\n\
+                Blockscout: https://<instance>/api (NOT /api/eth-rpc or /api/v2)"
     )]
     pub explorer_url: Option<Url>,
 
@@ -235,7 +238,8 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
     ui::info(format!("Found {} contracts to verify", targets.len()))?;
     ui::info(ui::dim(
         "Note: Excludes Create2 Factory, Multicall3 (external), L2 contracts, \
-         and Forge libraries (internal in v30).",
+         Forge libraries (internal in v30), and contracts unavailable in toolkit \
+         (TransparentUpgradeableProxy, some DA validators).",
     ))?;
 
     // Create explorer client for status checks
@@ -257,39 +261,71 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
     progress.start("Checking verification status...");
 
     let mut results: Vec<(String, CheckResult)> = Vec::new();
+    let mut interrupted = false;
 
     for target in &targets {
+        if interrupted {
+            break;
+        }
+
         let name = target.contract_type.display_name().to_string();
 
-        let result = match explorer_client
-            .check_verification_status(target.address)
-            .await
-        {
-            Ok(VerificationStatus::Verified) => {
-                verified_count += 1;
-                CheckResult::Verified
+        let result = tokio::select! {
+            biased;
+
+            _ = tokio::signal::ctrl_c() => {
+                interrupted = true;
+                progress.stop("Interrupted by user");
+                break;
             }
-            Ok(VerificationStatus::NotVerified) => {
-                unverified_targets.push(target.clone());
-                CheckResult::NotVerified
-            }
-            Ok(VerificationStatus::Pending) => CheckResult::Pending,
-            Ok(VerificationStatus::Unknown(msg)) => {
-                unverified_targets.push(target.clone());
-                CheckResult::Unknown(msg)
-            }
-            Err(e) => {
-                unverified_targets.push(target.clone());
-                CheckResult::Error(e.to_string())
+
+            api_result = explorer_client.check_verification_status(target.address) => {
+                match api_result {
+                    Ok(VerificationStatus::Verified) => {
+                        verified_count += 1;
+                        CheckResult::Verified
+                    }
+                    Ok(VerificationStatus::NotVerified) => {
+                        unverified_targets.push(target.clone());
+                        CheckResult::NotVerified
+                    }
+                    Ok(VerificationStatus::Pending) => CheckResult::Pending,
+                    Ok(VerificationStatus::Unknown(msg)) => {
+                        unverified_targets.push(target.clone());
+                        CheckResult::Unknown(msg)
+                    }
+                    Err(e) => {
+                        unverified_targets.push(target.clone());
+                        CheckResult::Error(e.to_string())
+                    }
+                }
             }
         };
 
         results.push((name, result));
         progress.inc(1);
-        explorer_client.rate_limit_delay().await;
+
+        // Interruptible rate limit delay
+        tokio::select! {
+            biased;
+            _ = tokio::signal::ctrl_c() => {
+                interrupted = true;
+                progress.stop("Interrupted by user");
+                break;
+            }
+            _ = explorer_client.rate_limit_delay() => {}
+        }
     }
 
-    progress.stop("Verification status check complete");
+    if !interrupted {
+        progress.stop("Verification status check complete");
+    }
+
+    // Exit early if interrupted
+    if interrupted {
+        ui::outro_cancel("Verification interrupted by user")?;
+        return Ok(());
+    }
 
     // Format results for display
     let results_text = results
@@ -498,6 +534,26 @@ fn resolve_api_key(args: &VerifyArgs, context: &Context) -> Result<String> {
 /// Resolve explorer URL from args or defaults.
 fn resolve_explorer_url(args: &VerifyArgs, chain_id: u64) -> Result<Url> {
     if let Some(ref url) = args.explorer_url {
+        let url_str = url.as_str();
+
+        // Validate Blockscout URLs to catch common mistakes
+        if args.explorer == ExplorerType::Blockscout {
+            if url_str.contains("/api/eth-rpc") {
+                return Err(eyre::eyre!(
+                    "Invalid Blockscout URL: '/api/eth-rpc' is the JSON-RPC endpoint.\n\
+                     For contract verification, use the REST API endpoint instead.\n\
+                     Example: https://eth-sepolia.blockscout.com/api"
+                ));
+            }
+            if url_str.contains("/api/v2") {
+                return Err(eyre::eyre!(
+                    "Invalid Blockscout URL: '/api/v2' is the native REST API.\n\
+                     For contract verification, use the Etherscan-compatible endpoint.\n\
+                     Example: https://eth-sepolia.blockscout.com/api"
+                ));
+            }
+        }
+
         return Ok(url.clone());
     }
 
