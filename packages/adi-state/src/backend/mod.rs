@@ -8,7 +8,7 @@ mod s3_sync;
 pub use filesystem::FilesystemBackend;
 
 #[cfg(feature = "s3")]
-pub use s3_sync::S3SyncBackend;
+pub use s3_sync::{S3SyncBackend, S3SyncControl};
 
 use crate::error::Result;
 use adi_types::{
@@ -290,4 +290,65 @@ pub async fn create_s3_sync_backend(
 ) -> crate::Result<Box<dyn StateBackend>> {
     let backend = S3SyncBackend::new(base_path, ecosystem_name, config, logger).await?;
     Ok(Box::new(backend))
+}
+
+/// Create an S3-synchronized backend with custom event handler.
+///
+/// Use this to receive progress events for showing spinners or progress bars.
+///
+/// # Arguments
+///
+/// * `base_path` - Ecosystem directory path.
+/// * `ecosystem_name` - Name for the S3 archive.
+/// * `config` - S3 configuration.
+/// * `logger` - Logger for debug messages.
+/// * `event_handler` - Handler for receiving sync progress events.
+///
+/// # Errors
+///
+/// Returns error if S3 client initialization fails.
+#[cfg(feature = "s3")]
+pub async fn create_s3_sync_backend_with_handler(
+    base_path: &Path,
+    ecosystem_name: &str,
+    config: crate::s3::S3Config,
+    logger: Arc<dyn Logger>,
+    event_handler: Arc<dyn crate::s3::S3SyncEventHandler>,
+) -> crate::Result<Box<dyn StateBackend>> {
+    let backend =
+        S3SyncBackend::with_event_handler(base_path, ecosystem_name, config, logger, event_handler)
+            .await?;
+    Ok(Box::new(backend))
+}
+
+/// Create S3 sync backend with control handle for batch operations.
+///
+/// Returns both the backend (as `Arc<dyn StateBackend>`) and a control handle
+/// that allows disabling auto-sync and triggering manual sync.
+///
+/// # Arguments
+///
+/// * `base_path` - Ecosystem directory path.
+/// * `ecosystem_name` - Name for the S3 archive.
+/// * `config` - S3 configuration.
+/// * `logger` - Logger for debug messages.
+/// * `event_handler` - Handler for receiving sync progress events.
+///
+/// # Errors
+///
+/// Returns error if S3 client initialization fails.
+#[cfg(feature = "s3")]
+pub async fn create_s3_sync_backend_with_control(
+    base_path: &Path,
+    ecosystem_name: &str,
+    config: crate::s3::S3Config,
+    logger: Arc<dyn Logger>,
+    event_handler: Arc<dyn crate::s3::S3SyncEventHandler>,
+) -> crate::Result<(Arc<dyn StateBackend>, S3SyncControl)> {
+    let backend = Arc::new(
+        S3SyncBackend::with_event_handler(base_path, ecosystem_name, config, logger, event_handler)
+            .await?,
+    );
+    let control = S3SyncControl::new(Arc::clone(&backend));
+    Ok((backend, control))
 }

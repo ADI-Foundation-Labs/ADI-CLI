@@ -10,6 +10,8 @@ mod commands;
 mod config;
 mod context;
 mod error;
+#[cfg(feature = "s3")]
+mod s3_events;
 mod theme;
 mod ui;
 

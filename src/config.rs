@@ -120,6 +120,12 @@ pub struct S3Config {
     #[serde(default)]
     pub enabled: bool,
 
+    /// Tenant identifier for S3 key prefix.
+    /// Used as subfolder name in the bucket (e.g., "alice" → "alice/ecosystem.tar.gz").
+    /// Required when S3 sync is enabled.
+    #[serde(default)]
+    pub tenant_id: Option<String>,
+
     /// S3 bucket name.
     /// Required when S3 sync is enabled.
     #[serde(default)]

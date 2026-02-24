@@ -45,6 +45,15 @@ pub fn dim<D: std::fmt::Display>(val: D) -> console::StyledObject<D> {
     style(val).dim()
 }
 
+/// Bytes per megabyte (1024 * 1024 = 1,048,576).
+const BYTES_PER_MB: f64 = 1_048_576.0;
+
+/// Convert bytes to megabytes.
+#[must_use]
+pub fn bytes_to_mb(bytes: usize) -> f64 {
+    bytes as f64 / BYTES_PER_MB
+}
+
 /// CLI logger using cliclack for user-facing output.
 ///
 /// - `debug()` uses `cliclack::log::remark` (shown only when debug_enabled is true)

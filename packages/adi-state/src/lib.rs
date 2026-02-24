@@ -62,13 +62,15 @@ pub mod s3;
 pub use backend::{BackendType, FilesystemBackend, StateBackend};
 
 #[cfg(feature = "s3")]
-pub use backend::{create_s3_sync_backend, S3SyncBackend};
+pub use backend::{
+    create_s3_sync_backend, create_s3_sync_backend_with_handler, S3SyncBackend, S3SyncControl,
+};
 pub use error::{Result, StateError};
 pub use exporter::{export_chain_state, export_ecosystem_state};
 pub use importer::import_ecosystem_state;
 pub use manager::{ChainStateOps, EcosystemStateOps, StateManager};
 #[cfg(feature = "s3")]
-pub use s3::S3Config;
+pub use s3::{NoOpS3EventHandler, S3Config, S3SyncEvent, S3SyncEventHandler};
 
 // Path constants
 pub use paths::{

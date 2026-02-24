@@ -155,6 +155,11 @@ pub fn create_state_manager_with_context(ecosystem_name: &str, context: &Context
 pub fn to_state_s3_config(cli_config: &crate::config::S3Config) -> Result<adi_state::S3Config> {
     use secrecy::ExposeSecret;
 
+    let tenant_id = cli_config
+        .tenant_id
+        .clone()
+        .ok_or_else(|| eyre::eyre!("S3 tenant_id required when s3.enabled=true"))?;
+
     let bucket = cli_config
         .bucket
         .clone()
@@ -187,16 +192,30 @@ pub fn to_state_s3_config(cli_config: &crate::config::S3Config) -> Result<adi_st
             .clone()
             .unwrap_or_else(|| "us-east-1".to_string()),
         endpoint_url: cli_config.endpoint_url.as_ref().map(|u| u.to_string()),
+        tenant_id,
         access_key_id,
         secret_access_key,
     })
 }
 
-/// Create state manager with optional S3 sync based on config.
+/// Optional S3 sync control handle.
+#[cfg(feature = "s3")]
+pub type OptionalS3Control = Option<adi_state::S3SyncControl>;
+
+/// Optional S3 sync control handle (stub when S3 feature is disabled).
+#[cfg(not(feature = "s3"))]
+pub type OptionalS3Control = Option<()>;
+
+/// Create state manager with optional S3 sync and control handle.
 ///
-/// If `s3.enabled=true` in config, creates S3SyncBackend that automatically
-/// syncs state to S3 after every write operation.
-/// Otherwise, creates regular FilesystemBackend.
+/// If `s3.enabled=true` in config, creates S3SyncBackend with deferred sync mode.
+/// Use the returned `S3SyncControl` to disable auto-sync for batch operations
+/// and trigger manual sync when ready.
+///
+/// # Returns
+///
+/// Returns `(StateManager, Option<S3SyncControl>)`. The control handle is `Some`
+/// only when S3 sync is enabled.
 ///
 /// # Errors
 ///
@@ -204,28 +223,37 @@ pub fn to_state_s3_config(cli_config: &crate::config::S3Config) -> Result<adi_st
 pub async fn create_state_manager_with_s3(
     ecosystem_name: &str,
     context: &Context,
-) -> Result<StateManager> {
+) -> Result<(StateManager, OptionalS3Control)> {
     let ecosystem_path = context.config().state_dir.join(ecosystem_name);
 
     #[cfg(feature = "s3")]
     if context.config().s3.enabled {
+        use crate::s3_events::SpinnerS3EventHandler;
+
         let s3_config = to_state_s3_config(&context.config().s3)?;
-        return StateManager::with_s3_sync(
+        let event_handler = Arc::new(SpinnerS3EventHandler::new());
+
+        let (manager, control) = StateManager::with_s3_sync_and_control(
             &ecosystem_path,
             ecosystem_name,
             s3_config,
             Arc::clone(context.logger()),
+            event_handler,
         )
         .await
-        .wrap_err("Failed to initialize S3 sync backend");
+        .wrap_err("Failed to initialize S3 sync backend")?;
+
+        return Ok((manager, Some(control)));
     }
 
     // Fallback to filesystem backend
-    Ok(StateManager::with_backend_type_and_logger(
+    let manager = StateManager::with_backend_type_and_logger(
         context.config().state_backend.clone(),
         &ecosystem_path,
         Arc::clone(context.logger()),
-    ))
+    );
+
+    Ok((manager, None))
 }
 
 /// Resolve ecosystem name from optional arg or config.

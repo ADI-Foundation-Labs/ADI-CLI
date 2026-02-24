@@ -55,15 +55,30 @@ double_ended_iterator_last = "allow"
 
 [workspace.dependencies]
 # CLI
-clap = { version = "4", default-features = false, features = ["derive", "std", "color", "help", "usage", "error-context", "env"] }
+clap = { version = "4", default-features = false, features = [
+  "derive",
+  "std",
+  "color",
+  "help",
+  "usage",
+  "error-context",
+  "env",
+] }
 config = { version = "0.15", default-features = false, features = ["yaml"] }
 
 # Async
-tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "macros", "time", "io-util"] }
+tokio = { version = "1", default-features = false, features = [
+  "rt-multi-thread",
+  "macros",
+  "time",
+  "io-util",
+] }
 async-trait = { version = "0.1", default-features = false }
 
 # Error handling
-eyre = { version = "0.6", default-features = false, features = ["auto-install"] }
+eyre = { version = "0.6", default-features = false, features = [
+  "auto-install",
+] }
 thiserror = { version = "2", default-features = false }
 
 # Serialization
@@ -72,12 +87,17 @@ serde_yaml = { version = "0.9", default-features = false }
 
 # Logging
 log = { version = "0.4", default-features = false }
-env_logger = { version = "0.11", default-features = false, features = ["auto-color"] }
+env_logger = { version = "0.11", default-features = false, features = [
+  "auto-color",
+] }
 
 # Docker
 bollard = { version = "0.18" }
 docker_credential = { version = "1.3", default-features = false }
-futures-util = { version = "0.3", default-features = false, features = ["std", "async-await"] }
+futures-util = { version = "0.3", default-features = false, features = [
+  "std",
+  "async-await",
+] }
 
 # Version handling
 semver = { version = "1", default-features = false, features = ["serde"] }
@@ -93,37 +113,56 @@ colored = { version = "3", default-features = false }
 built = { version = "0.7", default-features = false, features = ["git2"] }
 
 # EVM types
-alloy-primitives = { version = "1.5", default-features = false, features = ["serde"] }
+alloy-primitives = { version = "1.5", default-features = false, features = [
+  "serde",
+] }
 secrecy = { version = "0.10", default-features = false, features = ["serde"] }
 
 # Alloy EVM stack
-alloy-provider = { version = "1.5", default-features = false, features = ["reqwest"] }
+alloy-provider = { version = "1.5", default-features = false, features = [
+  "reqwest",
+] }
 alloy-signer = { version = "1.5", default-features = false }
 alloy-signer-local = { version = "1.5", default-features = false }
 alloy-network = { version = "1.5", default-features = false }
-alloy-rpc-types = { version = "1.5", default-features = false, features = ["eth"] }
+alloy-rpc-types = { version = "1.5", default-features = false, features = [
+  "eth",
+] }
 alloy-contract = { version = "1.5", default-features = false }
 alloy-sol-types = { version = "1.5", default-features = false }
-alloy-transport-http = { version = "1.5", default-features = false, features = ["reqwest", "reqwest-rustls-tls"] }
+alloy-transport-http = { version = "1.5", default-features = false, features = [
+  "reqwest",
+  "reqwest-rustls-tls",
+] }
 hex = { version = "0.4", default-features = false, features = ["std"] }
 
 # Testing
 tempfile = { version = "3", default-features = false }
 
 # S3 support
-aws-sdk-s3 = { version = "1", default-features = false, features = ["behavior-version-latest", "rt-tokio"] }
-aws-sdk-sts = { version = "1", default-features = false, features = ["behavior-version-latest", "rt-tokio"] }
-aws-config = { version = "1", default-features = false, features = ["behavior-version-latest", "rt-tokio", "rustls"] }
+aws-sdk-s3 = { version = "1", default-features = false, features = [
+  "behavior-version-latest",
+  "rt-tokio",
+] }
+aws-config = { version = "1", default-features = false, features = [
+  "behavior-version-latest",
+  "rt-tokio",
+  "rustls",
+] }
 
 # Archive support
 tar = { version = "0.4", default-features = false }
-flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+flate2 = { version = "1", default-features = false, features = [
+  "rust_backend",
+] }
 
 # URL handling
 url = { version = "2", default-features = false, features = ["serde"] }
 
 # HTTP client
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = [
+  "rustls-tls",
+] }
 
 # Internal packages
 adi-docker = { path = "packages/adi-docker" }
@@ -152,6 +191,7 @@ env_logger = { workspace = true }
 dirs = { workspace = true }
 cliclack = { workspace = true }
 console = { workspace = true }
+async-trait = { workspace = true }
 
 # SDK packages
 adi-toolkit = { workspace = true }

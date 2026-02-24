@@ -895,7 +895,8 @@ fn resolve_chain_name(args: &DeployArgs, context: &Context) -> Result<String> {
 
 /// Create state manager for the ecosystem with optional S3 sync.
 async fn create_state_manager(ecosystem_name: &str, context: &Context) -> Result<StateManager> {
-    create_state_manager_with_s3(ecosystem_name, context).await
+    let (state_manager, _control) = create_state_manager_with_s3(ecosystem_name, context).await?;
+    Ok(state_manager)
 }
 
 /// Validate that ecosystem state exists.

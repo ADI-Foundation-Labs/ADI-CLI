@@ -5,12 +5,14 @@
 use crate::backend::{FilesystemBackend, StateBackend};
 use crate::error::Result;
 use crate::s3::{create_tar_gz, S3Client, S3Config};
+use crate::s3::{NoOpS3EventHandler, S3SyncEvent, S3SyncEventHandler};
 use adi_types::{
     Apps, ChainContracts, ChainMetadata, EcosystemContracts, EcosystemMetadata, Erc20Deployments,
     InitialDeployments, Logger, Wallets,
 };
 use async_trait::async_trait;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 /// Filesystem backend with S3 synchronization.
@@ -23,10 +25,12 @@ pub struct S3SyncBackend {
     base_path: PathBuf,
     ecosystem_name: String,
     logger: Arc<dyn Logger>,
+    event_handler: Arc<dyn S3SyncEventHandler>,
+    auto_sync: AtomicBool,
 }
 
 impl S3SyncBackend {
-    /// Create a new S3-synchronized backend.
+    /// Create a new S3-synchronized backend with no-op event handler.
     ///
     /// # Arguments
     ///
@@ -44,8 +48,38 @@ impl S3SyncBackend {
         config: S3Config,
         logger: Arc<dyn Logger>,
     ) -> Result<Self> {
+        Self::with_event_handler(
+            base_path,
+            ecosystem_name,
+            config,
+            logger,
+            Arc::new(NoOpS3EventHandler),
+        )
+        .await
+    }
+
+    /// Create a new S3-synchronized backend with custom event handler.
+    ///
+    /// # Arguments
+    ///
+    /// * `base_path` - Ecosystem directory path
+    /// * `ecosystem_name` - Name for the S3 archive
+    /// * `config` - S3 configuration
+    /// * `logger` - Logger instance
+    /// * `event_handler` - Handler for receiving sync progress events
+    ///
+    /// # Errors
+    ///
+    /// Returns error if S3 client initialization fails.
+    pub async fn with_event_handler(
+        base_path: &Path,
+        ecosystem_name: &str,
+        config: S3Config,
+        logger: Arc<dyn Logger>,
+        event_handler: Arc<dyn S3SyncEventHandler>,
+    ) -> Result<Self> {
         let inner = FilesystemBackend::new(base_path, Arc::clone(&logger));
-        let s3_client = S3Client::new(config).await?;
+        let s3_client = S3Client::new(config, Arc::clone(&logger)).await?;
 
         Ok(Self {
             inner,
@@ -53,22 +87,114 @@ impl S3SyncBackend {
             base_path: base_path.to_path_buf(),
             ecosystem_name: ecosystem_name.to_string(),
             logger,
+            event_handler,
+            auto_sync: AtomicBool::new(true),
         })
     }
 
-    /// Sync current state to S3.
+    /// Enable or disable automatic sync after write operations.
+    pub fn set_auto_sync(&self, enabled: bool) {
+        self.auto_sync.store(enabled, Ordering::SeqCst);
+    }
+
+    /// Force sync to S3 regardless of auto_sync setting.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if archive creation or S3 upload fails.
+    pub async fn sync_now(&self) -> Result<()> {
+        self.do_sync_to_s3().await
+    }
+
+    /// Sync current state to S3 if auto_sync is enabled.
     async fn sync_to_s3(&self) -> Result<()> {
-        self.logger.debug("Syncing state to S3...");
+        if !self.auto_sync.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+        self.do_sync_to_s3().await
+    }
+
+    /// Perform actual sync to S3.
+    async fn do_sync_to_s3(&self) -> Result<()> {
+        // Emit start event
+        self.event_handler
+            .on_event(S3SyncEvent::SyncStarted {
+                ecosystem_name: self.ecosystem_name.clone(),
+            })
+            .await;
+
+        self.logger.debug(&format!(
+            "Creating archive from {}",
+            self.base_path.display()
+        ));
 
         // Create tar.gz archive
         let archive_data = create_tar_gz(&self.base_path).await?;
 
+        // Emit archive created event
+        self.event_handler
+            .on_event(S3SyncEvent::ArchiveCreated {
+                size_bytes: archive_data.len(),
+            })
+            .await;
+
         // Upload to S3
         let key = format!("{}.tar.gz", self.ecosystem_name);
+        self.logger.debug(&format!(
+            "Uploading to S3: {}{}",
+            self.s3_client.key_prefix(),
+            key
+        ));
+
         self.s3_client.upload(&key, archive_data).await?;
+
+        // Emit upload complete event
+        let full_key = format!("{}{}", self.s3_client.key_prefix(), key);
+        self.event_handler
+            .on_event(S3SyncEvent::UploadComplete { key: full_key })
+            .await;
+
+        // Emit sync complete event
+        self.event_handler.on_event(S3SyncEvent::SyncComplete).await;
 
         self.logger.debug("State synced to S3 successfully");
         Ok(())
+    }
+}
+
+/// Control handle for S3 sync operations.
+///
+/// Allows disabling auto-sync for batch operations and
+/// triggering manual sync when ready.
+#[derive(Clone)]
+pub struct S3SyncControl {
+    backend: Arc<S3SyncBackend>,
+}
+
+impl S3SyncControl {
+    /// Create control handle from backend.
+    pub fn new(backend: Arc<S3SyncBackend>) -> Self {
+        Self { backend }
+    }
+
+    /// Disable automatic sync after each write.
+    pub fn disable_auto_sync(&self) {
+        self.backend.set_auto_sync(false);
+    }
+
+    /// Enable automatic sync after each write.
+    #[allow(dead_code)]
+    pub fn enable_auto_sync(&self) {
+        self.backend.set_auto_sync(true);
+    }
+
+    /// Manually trigger sync to S3.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if archive creation or S3 upload fails.
+    pub async fn sync_now(&self) -> Result<()> {
+        self.backend.sync_now().await
     }
 }
 
