@@ -2,12 +2,15 @@
 //!
 //! Provides a simplified interface for uploading and downloading
 //! ecosystem state archives to/from S3-compatible storage.
+//!
+//! Key prefix is automatically determined from IAM identity (username or role name).
 
 use crate::error::{Result, StateError};
 use aws_config::BehaviorVersion;
 use aws_sdk_s3::config::{Credentials, Region};
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::Client;
+use aws_sdk_sts::Client as StsClient;
 
 /// Configuration for S3 synchronization.
 #[derive(Clone, Debug)]
@@ -18,8 +21,6 @@ pub struct S3Config {
     pub region: String,
     /// Optional custom endpoint (for MinIO, LocalStack, etc.).
     pub endpoint_url: Option<String>,
-    /// Key prefix for archives.
-    pub key_prefix: String,
     /// AWS access key ID.
     pub access_key_id: String,
     /// AWS secret access key.
@@ -35,6 +36,9 @@ pub struct S3Client {
 
 impl S3Client {
     /// Create a new S3 client from configuration.
+    ///
+    /// The key prefix is automatically determined from the IAM identity
+    /// (username for IAM users, role name for assumed roles).
     ///
     /// # Arguments
     ///
@@ -59,6 +63,12 @@ impl S3Client {
             .load()
             .await;
 
+        // Auto-detect IAM identity for key prefix
+        let key_prefix = get_iam_identity(&sdk_config)
+            .await
+            .map(|name| format!("{}/", name))
+            .unwrap_or_default();
+
         // Build S3 client config from SDK config
         let mut s3_config_builder =
             aws_sdk_s3::config::Builder::from(&sdk_config).region(Region::new(config.region));
@@ -75,13 +85,19 @@ impl S3Client {
         Ok(Self {
             client,
             bucket: config.bucket,
-            key_prefix: config.key_prefix,
+            key_prefix,
         })
     }
 
     /// Get the full S3 key with prefix.
     fn full_key(&self, key: &str) -> String {
         format!("{}{}", self.key_prefix, key)
+    }
+
+    /// Get the current key prefix (for debugging/logging).
+    #[must_use]
+    pub fn key_prefix(&self) -> &str {
+        &self.key_prefix
     }
 
     /// Upload data to S3.
@@ -186,5 +202,80 @@ impl S3Client {
                 }
             }
         }
+    }
+}
+
+/// Get IAM identity (username or role name) from STS GetCallerIdentity.
+///
+/// Returns `None` if identity cannot be determined.
+async fn get_iam_identity(sdk_config: &aws_config::SdkConfig) -> Option<String> {
+    let sts = StsClient::new(sdk_config);
+
+    let identity = sts.get_caller_identity().send().await.ok()?;
+    let arn = identity.arn()?;
+
+    parse_identity_from_arn(arn)
+}
+
+/// Parse identity name from AWS ARN.
+///
+/// Supported ARN formats:
+/// - IAM User: `arn:aws:iam::123456789012:user/alice` → `alice`
+/// - IAM Role: `arn:aws:sts::123456789012:assumed-role/role-name/session` → `role-name`
+/// - Root: `arn:aws:iam::123456789012:root` → `root`
+fn parse_identity_from_arn(arn: &str) -> Option<String> {
+    let parts: Vec<&str> = arn.split(':').collect();
+    let resource = parts.get(5)?;
+
+    if resource.starts_with("user/") {
+        // IAM User: user/alice or user/admins/alice → alice (last part)
+        resource.rsplit('/').next().map(String::from)
+    } else if resource.starts_with("assumed-role/") {
+        // Assumed Role: assumed-role/role-name/session-name → role-name
+        let role_parts: Vec<&str> = resource.split('/').collect();
+        role_parts.get(1).map(|s| (*s).to_string())
+    } else if *resource == "root" {
+        Some("root".to_string())
+    } else {
+        // Fallback: use last part after /
+        resource.rsplit('/').next().map(String::from)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_iam_user_arn() {
+        let arn = "arn:aws:iam::123456789012:user/alice";
+        assert_eq!(parse_identity_from_arn(arn), Some("alice".to_string()));
+    }
+
+    #[test]
+    fn test_parse_iam_user_with_path() {
+        let arn = "arn:aws:iam::123456789012:user/admins/alice";
+        assert_eq!(parse_identity_from_arn(arn), Some("alice".to_string()));
+    }
+
+    #[test]
+    fn test_parse_assumed_role_arn() {
+        let arn = "arn:aws:sts::123456789012:assumed-role/deploy-role/session-name";
+        assert_eq!(
+            parse_identity_from_arn(arn),
+            Some("deploy-role".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_root_arn() {
+        let arn = "arn:aws:iam::123456789012:root";
+        assert_eq!(parse_identity_from_arn(arn), Some("root".to_string()));
+    }
+
+    #[test]
+    fn test_parse_invalid_arn() {
+        assert_eq!(parse_identity_from_arn("invalid"), None);
+        assert_eq!(parse_identity_from_arn(""), None);
     }
 }

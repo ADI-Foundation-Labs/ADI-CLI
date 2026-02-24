@@ -135,11 +135,6 @@ pub struct S3Config {
     #[serde(default)]
     pub endpoint_url: Option<Url>,
 
-    /// S3 key prefix for archives (e.g., "ecosystems/").
-    /// Archive will be stored as: `{prefix}{ecosystem_name}.tar.gz`
-    #[serde(default)]
-    pub key_prefix: Option<String>,
-
     /// AWS access key ID.
     /// Can be overridden with ADI__S3__ACCESS_KEY_ID or AWS_ACCESS_KEY_ID env var.
     /// Note: This field is never serialized (skipped) for security.

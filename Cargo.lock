@@ -113,6 +113,7 @@ dependencies = [
  "async-trait",
  "aws-config",
  "aws-sdk-s3",
+ "aws-sdk-sts",
  "flate2",
  "log",
  "serde",

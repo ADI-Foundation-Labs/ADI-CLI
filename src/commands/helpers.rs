@@ -187,7 +187,6 @@ pub fn to_state_s3_config(cli_config: &crate::config::S3Config) -> Result<adi_st
             .clone()
             .unwrap_or_else(|| "us-east-1".to_string()),
         endpoint_url: cli_config.endpoint_url.as_ref().map(|u| u.to_string()),
-        key_prefix: cli_config.key_prefix.clone().unwrap_or_default(),
         access_key_id,
         secret_access_key,
     })
