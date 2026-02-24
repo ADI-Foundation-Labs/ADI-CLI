@@ -146,6 +146,89 @@ pub fn create_state_manager_with_context(ecosystem_name: &str, context: &Context
     )
 }
 
+/// Convert CLI S3Config to adi-state S3Config.
+///
+/// # Errors
+///
+/// Returns error if required fields are missing when S3 is enabled.
+#[cfg(feature = "s3")]
+pub fn to_state_s3_config(cli_config: &crate::config::S3Config) -> Result<adi_state::S3Config> {
+    use secrecy::ExposeSecret;
+
+    let bucket = cli_config
+        .bucket
+        .clone()
+        .ok_or_else(|| eyre::eyre!("S3 bucket required when s3.enabled=true"))?;
+
+    let access_key_id = cli_config
+        .access_key_id
+        .as_ref()
+        .map(|s| s.expose_secret().to_string())
+        .or_else(|| std::env::var("AWS_ACCESS_KEY_ID").ok())
+        .ok_or_else(|| {
+            eyre::eyre!("S3 access_key_id required: set in config or AWS_ACCESS_KEY_ID env var")
+        })?;
+
+    let secret_access_key = cli_config
+        .secret_access_key
+        .as_ref()
+        .map(|s| s.expose_secret().to_string())
+        .or_else(|| std::env::var("AWS_SECRET_ACCESS_KEY").ok())
+        .ok_or_else(|| {
+            eyre::eyre!(
+                "S3 secret_access_key required: set in config or AWS_SECRET_ACCESS_KEY env var"
+            )
+        })?;
+
+    Ok(adi_state::S3Config {
+        bucket,
+        region: cli_config
+            .region
+            .clone()
+            .unwrap_or_else(|| "us-east-1".to_string()),
+        endpoint_url: cli_config.endpoint_url.as_ref().map(|u| u.to_string()),
+        key_prefix: cli_config.key_prefix.clone().unwrap_or_default(),
+        access_key_id,
+        secret_access_key,
+    })
+}
+
+/// Create state manager with optional S3 sync based on config.
+///
+/// If `s3.enabled=true` in config, creates S3SyncBackend that automatically
+/// syncs state to S3 after every write operation.
+/// Otherwise, creates regular FilesystemBackend.
+///
+/// # Errors
+///
+/// Returns error if S3 is enabled but initialization fails.
+pub async fn create_state_manager_with_s3(
+    ecosystem_name: &str,
+    context: &Context,
+) -> Result<StateManager> {
+    let ecosystem_path = context.config().state_dir.join(ecosystem_name);
+
+    #[cfg(feature = "s3")]
+    if context.config().s3.enabled {
+        let s3_config = to_state_s3_config(&context.config().s3)?;
+        return StateManager::with_s3_sync(
+            &ecosystem_path,
+            ecosystem_name,
+            s3_config,
+            Arc::clone(context.logger()),
+        )
+        .await
+        .wrap_err("Failed to initialize S3 sync backend");
+    }
+
+    // Fallback to filesystem backend
+    Ok(StateManager::with_backend_type_and_logger(
+        context.config().state_backend.clone(),
+        &ecosystem_path,
+        Arc::clone(context.logger()),
+    ))
+}
+
 /// Resolve ecosystem name from optional arg or config.
 pub fn resolve_ecosystem_name(arg_value: Option<&String>, config: &Config) -> Result<String> {
     arg_value

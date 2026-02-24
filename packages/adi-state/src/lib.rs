@@ -67,6 +67,8 @@ pub use error::{Result, StateError};
 pub use exporter::{export_chain_state, export_ecosystem_state};
 pub use importer::import_ecosystem_state;
 pub use manager::{ChainStateOps, EcosystemStateOps, StateManager};
+#[cfg(feature = "s3")]
+pub use s3::S3Config;
 
 // Path constants
 pub use paths::{

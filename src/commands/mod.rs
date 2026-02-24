@@ -12,6 +12,7 @@ mod ecosystem;
 pub mod helpers;
 mod init;
 mod owners;
+#[cfg(feature = "s3")]
 mod state;
 mod transfer;
 mod verify;
@@ -40,6 +41,7 @@ pub enum Commands {
     /// Verify deployed smart contracts on block explorers
     Verify(verify::VerifyArgs),
     /// Manage state synchronization with S3
+    #[cfg(feature = "s3")]
     State(state::StateArgs),
 }
 
@@ -56,6 +58,7 @@ impl Commands {
             Commands::Transfer(args) => transfer::run(args, context).await,
             Commands::Owners(args) => owners::run(&args, context).await,
             Commands::Verify(args) => verify::run(args, context).await,
+            #[cfg(feature = "s3")]
             Commands::State(args) => state::run(&args, context).await,
         }
     }

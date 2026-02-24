@@ -6,9 +6,13 @@ mod ecosystem;
 pub use chain::ChainStateOps;
 pub use ecosystem::EcosystemStateOps;
 
+#[cfg(feature = "s3")]
+use crate::backend::create_s3_sync_backend;
 use crate::backend::{create_backend, BackendType, StateBackend};
 use crate::error::Result;
 use crate::paths;
+#[cfg(feature = "s3")]
+use crate::s3::S3Config;
 use adi_types::{LogCrateLogger, Logger};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -124,6 +128,48 @@ impl StateManager {
             base_path: ecosystem_path.to_path_buf(),
             logger,
         }
+    }
+
+    /// Create a state manager with S3 synchronization.
+    ///
+    /// Creates an S3SyncBackend that automatically syncs state to S3
+    /// after every write operation.
+    ///
+    /// # Arguments
+    ///
+    /// * `ecosystem_path` - Path to the ecosystem directory.
+    /// * `ecosystem_name` - Name of the ecosystem (used for S3 archive key).
+    /// * `s3_config` - S3 configuration for the sync backend.
+    /// * `logger` - Custom logger implementation.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if S3 client initialization fails.
+    #[cfg(feature = "s3")]
+    pub async fn with_s3_sync(
+        ecosystem_path: &Path,
+        ecosystem_name: &str,
+        s3_config: S3Config,
+        logger: Arc<dyn Logger>,
+    ) -> Result<Self> {
+        logger.debug(&format!(
+            "Creating StateManager with S3 sync backend at {}",
+            ecosystem_path.display()
+        ));
+
+        let backend = create_s3_sync_backend(
+            ecosystem_path,
+            ecosystem_name,
+            s3_config,
+            Arc::clone(&logger),
+        )
+        .await?;
+
+        Ok(Self {
+            backend: Arc::from(backend),
+            base_path: ecosystem_path.to_path_buf(),
+            logger,
+        })
     }
 
     /// Get a reference to the logger.

@@ -132,6 +132,10 @@ adi-types = { path = "packages/adi-types" }
 adi-state = { path = "packages/adi-state" }
 adi-funding = { path = "packages/adi-funding" }
 
+[features]
+default = ["s3"]
+s3 = ["adi-state/s3"]
+
 [lints]
 workspace = true
 
@@ -151,7 +155,7 @@ console = { workspace = true }
 # SDK packages
 adi-toolkit = { workspace = true }
 adi-ecosystem = { workspace = true }
-adi-state = { workspace = true, features = ["s3"] }
+adi-state = { workspace = true }
 adi-funding = { workspace = true }
 adi-types = { workspace = true }
 

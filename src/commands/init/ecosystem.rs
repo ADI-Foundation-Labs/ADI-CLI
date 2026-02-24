@@ -1,12 +1,13 @@
 //! Ecosystem initialization command implementation.
 
 use adi_ecosystem::{build_ecosystem_create_args, verify_ecosystem_created, EcosystemConfig};
-use adi_state::{import_ecosystem_state, StateManager};
+use adi_state::import_ecosystem_state;
 use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
 use std::sync::Arc;
 use tempfile::TempDir;
 
 use super::InitArgs;
+use crate::commands::helpers::create_state_manager_with_s3;
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
 use crate::ui;
@@ -53,11 +54,9 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     // 3. Check if ecosystem state already exists
     let state_dir = &context.config().state_dir;
     let ecosystem_path = state_dir.join(&config.name);
-    let state_manager = StateManager::with_backend_type_and_logger(
-        context.config().state_backend.clone(),
-        &ecosystem_path,
-        Arc::clone(context.logger()),
-    );
+    let state_manager = create_state_manager_with_s3(&config.name, context)
+        .await
+        .wrap_err("Failed to create state manager")?;
 
     if state_manager.exists().await? {
         // Show files that will be deleted

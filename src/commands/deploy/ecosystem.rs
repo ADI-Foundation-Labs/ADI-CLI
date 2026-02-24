@@ -25,6 +25,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use url::Url;
 
+use crate::commands::helpers::create_state_manager_with_s3;
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
 use crate::ui;
@@ -159,7 +160,7 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     let chain_name = resolve_chain_name(&args, context)?;
 
     // 3. Create state manager and validate ecosystem exists
-    let state_manager = create_state_manager(&ecosystem_name, context)?;
+    let state_manager = create_state_manager(&ecosystem_name, context).await?;
     validate_ecosystem_exists(&state_manager, &ecosystem_name).await?;
 
     // 4. Validate chain exists
@@ -892,14 +893,9 @@ fn resolve_chain_name(args: &DeployArgs, context: &Context) -> Result<String> {
         .ok_or_else(|| eyre::eyre!("Chain name required: use --chain-name or set in config"))
 }
 
-/// Create state manager for the ecosystem.
-fn create_state_manager(ecosystem_name: &str, context: &Context) -> Result<StateManager> {
-    let ecosystem_path = context.config().state_dir.join(ecosystem_name);
-    Ok(StateManager::with_backend_type_and_logger(
-        context.config().state_backend.clone(),
-        &ecosystem_path,
-        std::sync::Arc::clone(context.logger()),
-    ))
+/// Create state manager for the ecosystem with optional S3 sync.
+async fn create_state_manager(ecosystem_name: &str, context: &Context) -> Result<StateManager> {
+    create_state_manager_with_s3(ecosystem_name, context).await
 }
 
 /// Validate that ecosystem state exists.
