@@ -289,6 +289,34 @@ ownership:
 # Recommended: 200 for Anvil, 300 for Sepolia/mainnet.
 gas_multiplier: 120
 
+# OPTIONAL: S3 synchronization for state backup and sharing
+# When enabled, ecosystem state is automatically synced to S3 after changes
+# s3:
+#   # Enable S3 synchronization
+#   # Default: false
+#   enabled: true
+#
+#   # Tenant identifier - used as S3 key prefix (subfolder name)
+#   # Required when S3 is enabled
+#   # Example: "alice" → archives stored at "alice/ecosystem-name.tar.gz"
+#   tenant_id: my-tenant
+#
+#   # S3 bucket name
+#   # Required when S3 is enabled
+#   bucket: my-adi-state-bucket
+#
+#   # AWS region
+#   # Default: us-east-1
+#   region: us-east-1
+#
+#   # Custom S3 endpoint for S3-compatible services (MinIO, LocalStack)
+#   # Omit for AWS S3
+#   # endpoint_url: http://localhost:9000
+#
+#   # SECURITY: Use environment variables instead of storing in config
+#   # access_key_id: ...
+#   # secret_access_key: ...
+
 # OPTIONAL: Override Docker toolkit image settings
 # toolkit:
 #   # Use a custom image tag instead of protocol version-derived tag
@@ -306,6 +334,11 @@ For sensitive data like private keys, use environment variables instead of confi
 | `ADI_RPC_URL`              | Settlement layer RPC endpoint. Useful for switching networks without editing config.                             |
 | `ADI_CONFIG`               | Path to an alternative config file.                                                                              |
 | `ADI__TOOLKIT__IMAGE_TAG`  | Override Docker image tag for toolkit containers (e.g., `latest` or `custom-build`).                             |
+| `AWS_ACCESS_KEY_ID`        | AWS access key for S3 synchronization.                                                                           |
+| `AWS_SECRET_ACCESS_KEY`    | AWS secret key for S3 synchronization.                                                                           |
+| `ADI__S3__ENABLED`         | Enable S3 sync (`true`/`false`).                                                                                 |
+| `ADI__S3__TENANT_ID`       | Tenant identifier for S3 key prefix.                                                                             |
+| `ADI__S3__BUCKET`          | S3 bucket name.                                                                                                  |
 | `RUST_LOG`                 | Logging verbosity: `error`, `warn`, `info`, `debug`, `trace`                                                     |
 
 You can also override any config value using the `ADI__` prefix with double underscores as path separators:
@@ -680,6 +713,76 @@ The CLI persists all ecosystem state in structured YAML files under `~/.adi_cli/
 **contracts.yaml** appears after deployment, containing the addresses of all deployed contracts. This file is essential for interacting with your ecosystem programmatically.
 
 **genesis.json** is the protocol genesis configuration. The CLI copies your provided genesis file into each ecosystem directory for reference.
+
+### S3 State Synchronization
+
+The CLI supports synchronizing ecosystem state to S3-compatible storage services (AWS S3, MinIO, LocalStack). This enables:
+
+- **Backup** — Automatically backup state after each operation
+- **Sharing** — Share state across machines or team members
+- **Disaster recovery** — Restore state from S3 if local files are lost
+
+#### How It Works
+
+When S3 sync is enabled (`s3.enabled: true`), the CLI automatically:
+1. Creates a compressed tar.gz archive of the ecosystem state directory
+2. Uploads it to S3 after any write operation (init, deploy)
+3. Uses `tenant_id` as the key prefix for multi-tenant bucket isolation
+
+Archive location: `s3://{bucket}/{tenant_id}/{ecosystem-name}.tar.gz`
+
+#### Configuration
+
+Add to your `~/.adi.yml`:
+
+```yaml
+s3:
+  enabled: true
+  tenant_id: alice           # Your unique identifier
+  bucket: company-state      # S3 bucket name
+  region: us-east-1          # AWS region (default)
+  # endpoint_url: http://localhost:9000  # For MinIO/LocalStack
+```
+
+Set credentials via environment variables:
+
+```bash
+export AWS_ACCESS_KEY_ID="AKIA..."
+export AWS_SECRET_ACCESS_KEY="..."
+```
+
+#### Manual Sync Commands
+
+```bash
+# Manually sync current state to S3
+adi state sync --ecosystem-name my-ecosystem
+
+# Restore state from S3
+adi state restore --ecosystem-name my-ecosystem
+
+# Force restore (overwrite local state)
+adi state restore --ecosystem-name my-ecosystem --force
+```
+
+#### Using with MinIO (Local Development)
+
+For local development, you can use MinIO as an S3-compatible storage:
+
+```bash
+# Start MinIO
+docker run -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
+```
+
+Configure in `~/.adi.yml`:
+
+```yaml
+s3:
+  enabled: true
+  tenant_id: dev
+  bucket: adi-state
+  endpoint_url: http://localhost:9000
+  # For MinIO, set credentials via env vars or config
+```
 
 ## Docker Architecture
 
