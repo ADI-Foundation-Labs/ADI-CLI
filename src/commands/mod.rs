@@ -12,6 +12,7 @@ mod ecosystem;
 pub mod helpers;
 mod init;
 mod owners;
+mod server_params;
 #[cfg(feature = "s3")]
 mod state;
 mod transfer;
@@ -40,6 +41,8 @@ pub enum Commands {
     Owners(owners::OwnersArgs),
     /// Verify deployed smart contracts on block explorers
     Verify(verify::VerifyArgs),
+    /// Display server parameters for Docker Compose configuration
+    ServerParams(server_params::ServerParamsArgs),
     /// Manage state synchronization with S3
     #[cfg(feature = "s3")]
     State(state::StateArgs),
@@ -58,6 +61,7 @@ impl Commands {
             Commands::Transfer(args) => transfer::run(args, context).await,
             Commands::Owners(args) => owners::run(&args, context).await,
             Commands::Verify(args) => verify::run(args, context).await,
+            Commands::ServerParams(args) => server_params::run(&args, context).await,
             #[cfg(feature = "s3")]
             Commands::State(args) => state::run(&args, context).await,
         }

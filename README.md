@@ -7,178 +7,41 @@
 
 ## Table of Contents
 
-- [Features](#features)
-- [Architecture](#architecture)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Usage Guide](#usage-guide)
 - [State Management](#state-management)
 - [Docker Architecture](#docker-architecture)
+- [Architecture](#architecture)
+- [Features](#features)
 - [Development](#development)
-
-## Features
-
-### SDK-first Design
-
-The core logic lives in 6 independent library crates that can be imported and used programmatically. This means you can build your own tooling on top of the same battle-tested code that powers the CLI, or integrate ecosystem management into larger automation pipelines.
-
-### Docker Orchestration
-
-All blockchain tooling (zkstack, forge, cast, era-contracts) runs inside versioned Docker containers. This eliminates "works on my machine" problems by ensuring everyone uses identical tool versions. The CLI automatically pulls the correct toolkit image based on your specified protocol version.
-
-### Multi-network Support
-
-Deploy your ecosystem to any supported network: use `localhost` with Anvil for rapid local development, `sepolia` for testnet validation, or `mainnet` for production deployment. The CLI handles network-specific configurations automatically.
-
-### Plan-then-Execute Funding
-
-Before transferring any funds, the CLI shows you exactly what will happen. The dry-run mode displays which wallets will receive how much ETH, allowing you to verify the funding plan before committing real transactions.
-
-### Abstract State Backend
-
-Ecosystem state is stored in a structured format with a pluggable backend system. The default filesystem backend uses YAML files, but the architecture supports adding database backends in the future without changing the CLI interface.
-
-### Ownership Management
-
-ZkSync ecosystem contracts use the Ownable2Step pattern for secure ownership transfers. The CLI automates the acceptance of pending ownership transfers across multiple contracts, handling different acceptance methods (direct calls, multicall, governance scheduling) transparently.
-
-### Custom Gas Token Support
-
-Configure your chain to use any ERC20 token as the base token for gas payments, with configurable price ratios. By default, chains use native ETH.
-
-## Architecture
-
-The following diagram shows how adi-cli orchestrates ecosystem deployment. The CLI binary runs on your host machine, reading configuration from `~/.adi.yml` and persisting state to `~/.adi_cli/state/`. When operations require blockchain tooling, the CLI communicates with the Docker daemon via the bollard crate to spin up ephemeral toolkit containers. These containers mount the state directory, execute the required operations (like running zkstack or forge commands), and are automatically removed when complete.
-
-```mermaid
-flowchart TB
-    subgraph Host["Host Machine"]
-        CLI["adi-cli binary"]
-
-        subgraph Packages["SDK Packages"]
-            TOOLKIT["adi-toolkit"]
-            ECO["adi-ecosystem"]
-            STATE["adi-state"]
-            FUNDING["adi-funding"]
-            DOCKER["adi-docker"]
-            TYPES["adi-types"]
-        end
-
-        CONFIG["~/.adi.yml"]
-        STATEDIR["~/.adi_cli/state/"]
-
-        CLI --> Packages
-        CLI --> CONFIG
-        CLI --> STATEDIR
-
-        TOOLKIT --> DOCKER
-        ECO --> TYPES
-        STATE --> TYPES
-        FUNDING --> TYPES
-    end
-
-    subgraph DockerDaemon["Docker Daemon"]
-        CONTAINER["adi-toolkit:v{VERSION}"]
-
-        subgraph Tools["Bundled Tools"]
-            ZKSTACK["zkstack CLI"]
-            FORGE["forge"]
-            CAST["cast"]
-            CONTRACTS["era-contracts"]
-        end
-
-        CONTAINER --> Tools
-    end
-
-    DOCKER -->|"Docker API (bollard)"| DockerDaemon
-    CONTAINER -.->|"Volume mount"| STATEDIR
-```
-
-### Package Responsibilities
-
-**adi-types** serves as the foundation layer, providing shared domain types used across all other packages. Types like `L1Network`, `Wallet`, `EcosystemMetadata`, and `ChainContracts` are defined here to ensure consistency. Having no internal dependencies makes it the stable base that other packages can safely import.
-
-**adi-docker** is a pure Docker SDK built on the bollard crate. It handles low-level container operations: connecting to the Docker daemon, pulling images, creating and starting containers, streaming output, and cleanup. This package knows nothing about ZkSync—it's a generic Docker orchestration layer.
-
-**adi-toolkit** sits above adi-docker and adds protocol awareness. It knows about toolkit image naming conventions, protocol versions, and how to construct the right container configurations for running zkstack, forge, or cast commands. When you specify `--protocol-version v30.0.2`, this package translates that into the correct Docker image tag.
-
-**adi-ecosystem** contains domain logic for ZkSync ecosystem management. Importantly, it has no Docker dependencies—all operations are expressed as data transformations and command-line argument builders. This separation means the ecosystem logic can be tested without containers and reused in contexts where Docker isn't available.
-
-**adi-state** manages persistent storage through an abstract backend interface. The `StateBackend` trait defines operations like reading and writing ecosystem metadata, wallet information, and contract addresses. The default `FilesystemBackend` serializes everything to YAML files, but the trait-based design allows swapping in a database backend later.
-
-**adi-funding** handles wallet funding with a plan-then-execute pattern. It builds a funding plan by checking current balances and calculating required transfers, presents this plan for review, and only executes when confirmed. This package also includes Anvil auto-detection for seamless local development.
 
 ## Prerequisites
 
-### Required
-
-**Rust (2021 edition)** — Install via [rustup](https://rustup.rs/):
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-**Docker** — Must be installed and running. The CLI communicates with the Docker daemon to pull and run toolkit containers. Verify Docker is working:
-```bash
-docker ps
-```
-
-**Protocol genesis.json** — Each protocol version has an associated genesis file that defines the initial state of your ecosystem. You must download this file before initializing an ecosystem.
-
-To obtain the genesis file:
-1. Identify your target protocol version (e.g., `v30.0.2`)
-2. Download the corresponding genesis.json from the ZkSync protocol releases
-3. Place it in your state directory: `~/.adi_cli/state/genesis.json`
-
-```bash
-mkdir -p ~/.adi_cli/state
-
-# Download genesis.json for protocol v30.0.2
-curl -o ~/.adi_cli/state/genesis.json \
-  https://raw.githubusercontent.com/matter-labs/zksync-os-server/48650acecd1182c56c0f6d86f3c471f8d72159c6/genesis/genesis.json
-```
-
-### Optional
-
-**[Task](https://taskfile.dev/)** — A task runner that provides convenient shortcuts for common operations. Install if you prefer running `task build` instead of `cargo build`.
+- **Rust** — [Install via rustup](https://rustup.rs/)
+- **Docker** — [Install Docker](https://www.docker.com/get-started/)
 
 ## Installation
 
-### Building from Source
-
-Clone the repository and build the release binary:
-
 ```bash
-git clone <repository-url>
-cd adi-cli
-
-# Build optimized release binary (LTO enabled, ~60 seconds)
-cargo build --release
-
-# The binary is at ./target/release/adi
-# Optionally copy to a directory in your PATH
-cp ./target/release/adi ~/.local/bin/
+CARGO_NET_GIT_FETCH_WITH_CLI=true cargo install --git ssh://git@gitlab.sre.ideasoft.io/adi-foundation/adi-chain/cli.git
 ```
 
-### Using Task
-
-If you have Task installed:
-
-```bash
-task build           # Development build
-task build:release   # Optimized release build
-task check           # fmt:check + lint + test
-```
-
-### Verifying Installation
-
-Confirm the CLI is working:
+Verify installation:
 
 ```bash
 adi version
 ```
 
-You should see the version number and git commit hash.
+### Building from Source
+
+```bash
+git clone ssh://git@gitlab.sre.ideasoft.io/adi-foundation/adi-chain/cli.git adi-cli
+cd adi-cli
+cargo build --release
+cp ./target/release/adi ~/.local/bin/
+```
 
 ## Configuration
 
@@ -908,6 +771,98 @@ Tag behavior in `build:docker:internal`:
 
 - `LOAD=true`: `TAG_SUFFIX=""` (clean tags like `v30.0.2`)
 - `LOAD=false`: `TAG_SUFFIX=-<ref>-<arch>-<sha>` (for pushed branch/commit tracking)
+
+## Architecture
+
+The following diagram shows how adi-cli orchestrates ecosystem deployment. The CLI binary runs on your host machine, reading configuration from `~/.adi.yml` and persisting state to `~/.adi_cli/state/`. When operations require blockchain tooling, the CLI communicates with the Docker daemon via the bollard crate to spin up ephemeral toolkit containers. These containers mount the state directory, execute the required operations (like running zkstack or forge commands), and are automatically removed when complete.
+
+```mermaid
+flowchart TB
+    subgraph Host["Host Machine"]
+        CLI["adi-cli binary"]
+
+        subgraph Packages["SDK Packages"]
+            TOOLKIT["adi-toolkit"]
+            ECO["adi-ecosystem"]
+            STATE["adi-state"]
+            FUNDING["adi-funding"]
+            DOCKER["adi-docker"]
+            TYPES["adi-types"]
+        end
+
+        CONFIG["~/.adi.yml"]
+        STATEDIR["~/.adi_cli/state/"]
+
+        CLI --> Packages
+        CLI --> CONFIG
+        CLI --> STATEDIR
+
+        TOOLKIT --> DOCKER
+        ECO --> TYPES
+        STATE --> TYPES
+        FUNDING --> TYPES
+    end
+
+    subgraph DockerDaemon["Docker Daemon"]
+        CONTAINER["adi-toolkit:v{VERSION}"]
+
+        subgraph Tools["Bundled Tools"]
+            ZKSTACK["zkstack CLI"]
+            FORGE["forge"]
+            CAST["cast"]
+            CONTRACTS["era-contracts"]
+        end
+
+        CONTAINER --> Tools
+    end
+
+    DOCKER -->|"Docker API (bollard)"| DockerDaemon
+    CONTAINER -.->|"Volume mount"| STATEDIR
+```
+
+### Package Responsibilities
+
+**adi-types** serves as the foundation layer, providing shared domain types used across all other packages. Types like `L1Network`, `Wallet`, `EcosystemMetadata`, and `ChainContracts` are defined here to ensure consistency. Having no internal dependencies makes it the stable base that other packages can safely import.
+
+**adi-docker** is a pure Docker SDK built on the bollard crate. It handles low-level container operations: connecting to the Docker daemon, pulling images, creating and starting containers, streaming output, and cleanup. This package knows nothing about ZkSync—it's a generic Docker orchestration layer.
+
+**adi-toolkit** sits above adi-docker and adds protocol awareness. It knows about toolkit image naming conventions, protocol versions, and how to construct the right container configurations for running zkstack, forge, or cast commands. When you specify `--protocol-version v30.0.2`, this package translates that into the correct Docker image tag.
+
+**adi-ecosystem** contains domain logic for ZkSync ecosystem management. Importantly, it has no Docker dependencies—all operations are expressed as data transformations and command-line argument builders. This separation means the ecosystem logic can be tested without containers and reused in contexts where Docker isn't available.
+
+**adi-state** manages persistent storage through an abstract backend interface. The `StateBackend` trait defines operations like reading and writing ecosystem metadata, wallet information, and contract addresses. The default `FilesystemBackend` serializes everything to YAML files, but the trait-based design allows swapping in a database backend later.
+
+**adi-funding** handles wallet funding with a plan-then-execute pattern. It builds a funding plan by checking current balances and calculating required transfers, presents this plan for review, and only executes when confirmed. This package also includes Anvil auto-detection for seamless local development.
+
+## Features
+
+### SDK-first Design
+
+The core logic lives in 6 independent library crates that can be imported and used programmatically. This means you can build your own tooling on top of the same battle-tested code that powers the CLI, or integrate ecosystem management into larger automation pipelines.
+
+### Docker Orchestration
+
+All blockchain tooling (zkstack, forge, cast, era-contracts) runs inside versioned Docker containers. This eliminates "works on my machine" problems by ensuring everyone uses identical tool versions. The CLI automatically pulls the correct toolkit image based on your specified protocol version.
+
+### Multi-network Support
+
+Deploy your ecosystem to any supported network: use `localhost` with Anvil for rapid local development, `sepolia` for testnet validation, or `mainnet` for production deployment. The CLI handles network-specific configurations automatically.
+
+### Plan-then-Execute Funding
+
+Before transferring any funds, the CLI shows you exactly what will happen. The dry-run mode displays which wallets will receive how much ETH, allowing you to verify the funding plan before committing real transactions.
+
+### Abstract State Backend
+
+Ecosystem state is stored in a structured format with a pluggable backend system. The default filesystem backend uses YAML files, but the architecture supports adding database backends in the future without changing the CLI interface.
+
+### Ownership Management
+
+ZkSync ecosystem contracts use the Ownable2Step pattern for secure ownership transfers. The CLI automates the acceptance of pending ownership transfers across multiple contracts, handling different acceptance methods (direct calls, multicall, governance scheduling) transparently.
+
+### Custom Gas Token Support
+
+Configure your chain to use any ERC20 token as the base token for gas payments, with configurable price ratios. By default, chains use native ETH.
 
 ## Development
 
