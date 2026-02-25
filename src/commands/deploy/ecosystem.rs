@@ -8,7 +8,7 @@
 use adi_ecosystem::verification::{
     apply_implementations, parse_diamond_cut_data, read_all_implementations,
 };
-use adi_ecosystem::{add_validator_roles, DeployedContracts};
+use adi_ecosystem::{add_validator_roles, configure_l3_da, DeployedContracts};
 use adi_funding::{
     build_funding_target_statuses, is_localhost_rpc, normalize_rpc_url, AnvilFunder,
     AnvilFundingTarget, DefaultAmounts, FundingConfig, FundingError, FundingExecutor,
@@ -136,6 +136,13 @@ pub struct DeployArgs {
         help = "Protocol version for toolkit image (e.g., v30.0.2)"
     )]
     pub protocol_version: Option<String>,
+
+    /// Deploy as L3 chain (disables blobs, uses calldata DA)
+    #[arg(
+        long,
+        help = "Deploy as L3 chain (disables blobs, uses calldata DA on L2 settlement layer)"
+    )]
+    pub l3: bool,
 }
 
 /// Execute the ecosystem deploy command.
@@ -244,6 +251,8 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     .await?;
 
     // 11. Display funding plan with current balances (unified Anvil-style display)
+    let spinner = cliclack::spinner();
+    spinner.start("Checking wallet balances...");
     let target_statuses = build_funding_target_statuses(
         executor.provider(),
         &funding_config,
@@ -252,6 +261,7 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     )
     .await
     .wrap_err("Failed to get funding target statuses")?;
+    spinner.stop("Wallet balances checked");
 
     display_funding_plan(
         funder_address,
@@ -260,11 +270,14 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     )?;
 
     // 12. Build funding plan
+    let spinner = cliclack::spinner();
+    spinner.start("Building funding plan...");
     let plan_result = FundingPlanBuilder::new(executor.provider(), &funding_config, funder_address)
         .with_ecosystem_wallets(&ecosystem_wallets)
         .with_chain_wallets(&chain_wallets)
         .build()
         .await;
+    spinner.stop("Funding plan ready");
 
     let plan = match plan_result {
         Ok(p) => Some(p),
@@ -394,10 +407,13 @@ async fn run_anvil_funding(
         ))));
 
     // Get funding targets with current balances
+    let spinner = cliclack::spinner();
+    spinner.start("Checking wallet balances...");
     let targets = funder
         .get_funding_targets(&ecosystem_wallets, &chain_wallets)
         .await
         .wrap_err("Failed to check wallet balances")?;
+    spinner.stop("Wallet balances checked");
 
     // Display current balances and funding plan
     display_anvil_funding_plan(&targets)?;
@@ -770,6 +786,33 @@ async fn run_ecosystem_deployment(
         ui::green(tx_hashes.len())
     ))?;
 
+    // Configure L3 DA mode if requested (disables blobs, uses calldata)
+    let is_l3 = resolve_l3_mode(args, context);
+    if is_l3 {
+        ui::section("Configuring L3 DA Mode")?;
+
+        let l1_da_validator = get_l1_da_validator_address(state_manager, chain_name)
+            .await
+            .wrap_err("Failed to get L1 DA validator address")?;
+
+        let tx_hash = configure_l3_da(
+            &normalized_rpc,
+            deployed.chain_admin,
+            deployed.diamond_proxy,
+            l1_da_validator,
+            &governor_key,
+            validator_gas_multiplier,
+            context.logger().as_ref(),
+        )
+        .await
+        .wrap_err("Failed to configure L3 DA mode")?;
+
+        ui::success(format!(
+            "L3 DA mode configured (calldata): {}",
+            ui::green(tx_hash)
+        ))?;
+    }
+
     // Final success message
     ui::note(
         "Deployment Summary",
@@ -971,6 +1014,61 @@ fn resolve_funder_key(args: &DeployArgs, context: &Context) -> Result<SecretStri
 fn resolve_gas_multiplier(args: &DeployArgs, context: &Context) -> u64 {
     args.gas_multiplier
         .unwrap_or_else(|| context.config().gas_multiplier)
+}
+
+/// Resolve L3 mode from args or config.
+///
+/// Priority: CLI arg > config file
+fn resolve_l3_mode(args: &DeployArgs, context: &Context) -> bool {
+    args.l3 || context.config().ecosystem.l3
+}
+
+/// Get L1 DA validator address from state.
+///
+/// Looks in chain contracts first (l1.rollup_l1_da_validator_addr),
+/// then falls back to ecosystem contracts (ecosystem_contracts.rollup_l1_da_validator_addr
+/// or zksync_os_ctm.rollup_l1_da_validator_addr).
+async fn get_l1_da_validator_address(
+    state_manager: &StateManager,
+    chain_name: &str,
+) -> Result<Address> {
+    // Try chain contracts first
+    let chain_contracts = state_manager
+        .chain(chain_name)
+        .contracts()
+        .await
+        .wrap_err("Failed to load chain contracts")?;
+
+    if let Some(l1) = &chain_contracts.l1 {
+        if let Some(addr) = l1.rollup_l1_da_validator_addr {
+            return Ok(addr);
+        }
+    }
+
+    // Fall back to chain's ecosystem_contracts reference
+    if let Some(eco) = &chain_contracts.ecosystem_contracts {
+        if let Some(addr) = eco.rollup_l1_da_validator_addr {
+            return Ok(addr);
+        }
+    }
+
+    // Try ecosystem-level contracts
+    let eco_contracts = state_manager
+        .ecosystem()
+        .contracts()
+        .await
+        .wrap_err("Failed to load ecosystem contracts")?;
+
+    if let Some(ctm) = &eco_contracts.zksync_os_ctm {
+        if let Some(addr) = ctm.rollup_l1_da_validator_addr {
+            return Ok(addr);
+        }
+    }
+
+    Err(eyre::eyre!(
+        "L1 DA validator address not found in state. \
+         Ensure deployment completed successfully."
+    ))
 }
 
 /// Build FundingConfig from ecosystem metadata.

@@ -39,6 +39,14 @@ pub struct EcosystemConfig {
 
     /// Enable EVM emulator.
     pub evm_emulator: bool,
+
+    /// Deploy as L3 chain (uses calldata DA instead of blobs).
+    ///
+    /// When enabled, the deployment will configure the chain to use
+    /// calldata-based pubdata instead of EIP-4844 blobs. Required for
+    /// L3 chains deploying on L2 settlement layers.
+    #[serde(default)]
+    pub l3: bool,
 }
 
 fn default_base_token_address() -> Address {
@@ -57,6 +65,7 @@ impl Default for EcosystemConfig {
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
             evm_emulator: false,
+            l3: false,
         }
     }
 }
@@ -137,6 +146,13 @@ impl EcosystemConfigBuilder {
         self
     }
 
+    /// Set L3 deployment flag.
+    #[must_use]
+    pub fn l3(mut self, enabled: bool) -> Self {
+        self.config.l3 = enabled;
+        self
+    }
+
     /// Build the config.
     #[must_use]
     pub fn build(self) -> EcosystemConfig {
@@ -166,6 +182,7 @@ mod tests {
         assert_eq!(config.prover_mode, ProverMode::NoProofs);
         assert_eq!(config.base_token_address, ETH_TOKEN_ADDRESS);
         assert!(!config.evm_emulator);
+        assert!(!config.l3);
     }
 
     #[test]

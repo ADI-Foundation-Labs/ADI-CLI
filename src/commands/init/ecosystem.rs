@@ -265,6 +265,7 @@ fn build_ecosystem_config(args: &InitArgs, defaults: &EcosystemConfig) -> Ecosys
             .base_token_price_denominator
             .unwrap_or(defaults.base_token_price_denominator),
         evm_emulator: args.evm_emulator.unwrap_or(defaults.evm_emulator),
+        l3: defaults.l3,
     }
 }
 
