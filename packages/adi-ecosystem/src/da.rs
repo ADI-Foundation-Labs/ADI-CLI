@@ -160,7 +160,7 @@ pub async fn configure_l3_da(
     let calldata = build_set_da_validator_pair_multicall_calldata(
         diamond_proxy,
         l1_da_validator,
-        PubdataSource::PubdataKeccak256,
+        PubdataSource::BlobsAndPubdataKeccak256,
     );
 
     let green = Style::new().green();

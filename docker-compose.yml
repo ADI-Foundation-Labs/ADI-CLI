@@ -27,11 +27,11 @@ services:
       #
       # run command: `adi server-params`
 
-      genesis_bytecode_supplier_address: "0xf528c8811e93986e51d6822bddc024bc2a2ccffe"
+      genesis_bytecode_supplier_address: "0x9FCBe7dD5aa25c63A7cC3810EE38873d9eC6ED7c"
       genesis_genesis_input_path: "/genesis/genesis.json"
       l1_sender_max_fee_per_blob_gas_gwei: 15
 
-      genesis_bridgehub_address: "0xd589d5E89Be45101e40640C69BD552179a4dF327"
+      genesis_bridgehub_address: "0x076e1622cb6181b05aEC9B4aB7B1fFe6020834f5"
       genesis_chain_id: 222
 
       prover_api_object_store_file_backed_base_path: "/shared"
@@ -45,9 +45,9 @@ services:
       batcher_batch_timeout: "10s"
       batcher_blocks_per_batch_limit: 10
 
-      l1_sender_operator_commit_pk: "0x2584b35bbe8643a59d486c7a15530653a97e371db23bbf7a3c6526996c6199fe"
-      l1_sender_operator_prove_pk: "0x7c192caf50335d654d5f7de152adff6abad5700b356cb2d52ab475c64d18a0b2"
-      l1_sender_operator_execute_pk: "0x7630acdaa6d84ccf58ad8d5fddc4a45b5bccdd8a792fd1ea93c3d4bbfd36f51e"
+      l1_sender_operator_commit_pk: "0xa1f4a74ca5af0fd874a8cb68bb7c3c1c38be37072f8ef744bdfad7bec38df2f8"
+      l1_sender_operator_prove_pk: "0x8af75ce9d789be73bab5e31959d8dc6f3100aa5ae15c886e79a11305aecdb170"
+      l1_sender_operator_execute_pk: "0x56a97ee9fb652352c21a4b48b6aa5624a6d6cd269a91b0f4c9d48b739dbc6c27"
       l1_sender_max_fee_per_gas_gwei: 1500
       l1_sender_max_priority_fee_per_gas_gwei: 1500
 
