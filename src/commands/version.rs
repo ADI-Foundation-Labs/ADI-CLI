@@ -7,11 +7,11 @@ include!(concat!(env!("OUT_DIR"), "/built.rs"));
 /// ANSI reset code.
 const RESET: &str = "\x1b[0m";
 
-/// Gradient start color: Blue (#5B8DEE).
-const START_RGB: (u8, u8, u8) = (91, 141, 238);
+/// Gradient top color: Orange (#FF6B35).
+const TOP_RGB: (u8, u8, u8) = (255, 107, 53);
 
-/// Gradient end color: Purple (#A855F7).
-const END_RGB: (u8, u8, u8) = (168, 85, 247);
+/// Gradient bottom color: Blue (#3B82F6).
+const BOTTOM_RGB: (u8, u8, u8) = (59, 130, 246);
 
 /// Build the version subtitle with version and commit.
 fn build_subtitle() -> String {
@@ -43,28 +43,18 @@ fn lerp(start: u8, end: u8, t: f32) -> u8 {
     result
 }
 
-/// Apply horizontal gradient to a line of text.
-fn gradient_line(text: &str) -> String {
-    let chars: Vec<char> = text.chars().collect();
-    let len = chars.len();
-    if len == 0 {
-        return String::new();
-    }
+/// Apply a single color to a line of text.
+fn color_line(text: &str, rgb: (u8, u8, u8)) -> String {
+    format!("\x1b[38;2;{};{};{}m{}{}", rgb.0, rgb.1, rgb.2, text, RESET)
+}
 
-    let mut result = String::with_capacity(len * 20);
-    for (i, ch) in chars.iter().enumerate() {
-        let t = if len > 1 {
-            i as f32 / (len - 1) as f32
-        } else {
-            0.0
-        };
-        let r = lerp(START_RGB.0, END_RGB.0, t);
-        let g = lerp(START_RGB.1, END_RGB.1, t);
-        let b = lerp(START_RGB.2, END_RGB.2, t);
-        result.push_str(&format!("\x1b[38;2;{r};{g};{b}m{ch}"));
-    }
-    result.push_str(RESET);
-    result
+/// Get interpolated color for vertical gradient (0.0 = top, 1.0 = bottom).
+fn vertical_gradient_color(t: f32) -> (u8, u8, u8) {
+    (
+        lerp(TOP_RGB.0, BOTTOM_RGB.0, t),
+        lerp(TOP_RGB.1, BOTTOM_RGB.1, t),
+        lerp(TOP_RGB.2, BOTTOM_RGB.2, t),
+    )
 }
 
 /// Print the ASCII logo with gradient and version info.
@@ -73,7 +63,30 @@ fn print_logo() {
     let centered_subtitle = center(&subtitle, 78);
 
     // Logo lines (will be padded to 78 chars)
+    // Symmetric diamond with triangle + dot inside
     let logo_lines = [
+        "                                    ▄",
+        "                                   ▄█▄",
+        "                                  ▄███▄",
+        "                                 ▄█████▄",
+        "                                ▄███████▄",
+        "                               ▄████ ████▄",
+        "                              ▄████   ████▄",
+        "                             ▄████     ████▄",
+        "                            ▄████ ▄███▄ ████▄",
+        "                           ▄████  ▀███▀  ████▄",
+        "                          ▄████           ████▄",
+        "                          ▀███████████████████▀",
+        "                            ▀███████████████▀",
+        "                             ▀█████████████▀",
+        "                              ▀███████████▀",
+        "                               ▀█████████▀",
+        "                                ▀███████▀",
+        "                                 ▀█████▀",
+        "                                  ▀███▀",
+        "                                   ▀█▀",
+        "                                    ▀",
+        "",
         "                 █████╗ ██████╗ ██╗      ██████╗██╗     ██╗",
         "                ██╔══██╗██╔══██╗██║     ██╔════╝██║     ██║",
         "                ███████║██║  ██║██║     ██║     ██║     ██║",
@@ -82,12 +95,19 @@ fn print_logo() {
         "                ╚═╝  ╚═╝╚═════╝ ╚═╝      ╚═════╝╚══════╝╚═╝",
     ];
 
-    // Apply gradient and pad each line to exactly 78 chars
+    // Apply vertical gradient (orange top -> blue bottom)
+    let line_count = logo_lines.len();
     let gradient_lines: Vec<String> = logo_lines
         .iter()
-        .map(|l| {
+        .enumerate()
+        .map(|(i, l)| {
+            let t = if line_count > 1 {
+                i as f32 / (line_count - 1) as f32
+            } else {
+                0.0
+            };
             let padded = format!("{:<78}", l);
-            gradient_line(&padded)
+            color_line(&padded, vertical_gradient_color(t))
         })
         .collect();
 
