@@ -105,6 +105,12 @@ ecosystem:
   # Default: false
   evm_emulator: false
 
+  # Deploy as L3 chain (settling on L2 instead of L1)
+  # When enabled, blobs are disabled and calldata DA is used
+  # Required for chains settling on ZKsync-based L2s
+  # Default: false
+  l3: false
+
 # Default values for wallet funding during deployment
 funding:
   # RPC endpoint for the settlement layer
@@ -387,6 +393,30 @@ adi deploy -p v30.0.2 --skip-deployment
 # Only deploy contracts (wallets already funded)
 adi deploy -p v30.0.2 --skip-funding
 ```
+
+**Deploying L3 chains:**
+
+When deploying a chain that settles on an L2 (making it an L3), you must enable L3 mode. This is required because ZKsync OS on L2 settlement layers does not support EIP-4844 blobs—instead, the chain uses calldata-based data availability.
+
+What L3 mode does:
+- Disables blob-based pubdata (EIP-4844)
+- Configures calldata-based data availability
+- Sends a transaction to set the DA validator pair on the Diamond proxy
+
+Enable L3 mode via CLI flag:
+
+```bash
+adi deploy -p v30.0.2 --l3
+```
+
+Or via configuration file (`~/.adi.yml`):
+
+```yaml
+ecosystem:
+  l3: true
+```
+
+The CLI flag `--l3` takes precedence over the config file setting.
 
 ### Step 4: Accept Ownership Transfers
 
