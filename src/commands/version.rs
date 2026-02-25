@@ -57,14 +57,31 @@ fn vertical_gradient_color(t: f32) -> (u8, u8, u8) {
     )
 }
 
+/// Apply gradient to a set of lines.
+fn apply_gradient(lines: &[&str]) -> Vec<String> {
+    let line_count = lines.len();
+    lines
+        .iter()
+        .enumerate()
+        .map(|(i, l)| {
+            let t = if line_count > 1 {
+                i as f32 / (line_count - 1) as f32
+            } else {
+                0.0
+            };
+            let padded = format!("{:<78}", l);
+            color_line(&padded, vertical_gradient_color(t))
+        })
+        .collect()
+}
+
 /// Print the ASCII logo with gradient and version info.
 fn print_logo() {
     let subtitle = build_subtitle();
     let centered_subtitle = center(&subtitle, 78);
 
-    // Logo lines (will be padded to 78 chars)
-    // Symmetric diamond with triangle + dot inside
-    let logo_lines = [
+    // Diamond logo (separate gradient)
+    let diamond_lines = [
         "                                    ▄",
         "                                   ▄█▄",
         "                                  ▄███▄",
@@ -87,7 +104,10 @@ fn print_logo() {
         "                                  ▀███▀",
         "                                   ▀█▀",
         "                                    ▀",
-        "",
+    ];
+
+    // Text logo (separate gradient)
+    let text_lines = [
         "                 █████╗ ██████╗ ██╗      ██████╗██╗     ██╗",
         "                ██╔══██╗██╔══██╗██║     ██╔════╝██║     ██║",
         "                ███████║██║  ██║██║     ██║     ██║     ██║",
@@ -96,26 +116,17 @@ fn print_logo() {
         "                ╚═╝  ╚═╝╚═════╝ ╚═╝      ╚═════╝╚══════╝╚═╝",
     ];
 
-    // Apply vertical gradient (orange top -> blue bottom)
-    let line_count = logo_lines.len();
-    let gradient_lines: Vec<String> = logo_lines
-        .iter()
-        .enumerate()
-        .map(|(i, l)| {
-            let t = if line_count > 1 {
-                i as f32 / (line_count - 1) as f32
-            } else {
-                0.0
-            };
-            let padded = format!("{:<78}", l);
-            color_line(&padded, vertical_gradient_color(t))
-        })
-        .collect();
+    let diamond_gradient = apply_gradient(&diamond_lines);
+    let text_gradient = apply_gradient(&text_lines);
 
     println!();
     println!("╭──────────────────────────────────────────────────────────────────────────────╮");
     println!("│                                                                              │");
-    for line in &gradient_lines {
+    for line in &diamond_gradient {
+        println!("│{line}│");
+    }
+    println!("│{:78}│", "");
+    for line in &text_gradient {
         println!("│{line}│");
     }
     println!("│                                                                              │");
