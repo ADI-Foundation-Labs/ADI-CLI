@@ -184,12 +184,15 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     let rpc_url = resolve_rpc_url(&args, context)?;
 
     // Display deployment info
+    let is_l3 = resolve_l3_mode(&args, context);
+    let chain_type = if is_l3 { "L3" } else { "L2" };
     ui::note(
         "Deployment target",
         format!(
-            "Ecosystem: {}\nChain: {}\nSettlement layer RPC: {}",
+            "Ecosystem: {}\nChain: {} ({})\nSettlement layer RPC: {}",
             ui::green(&ecosystem_name),
             ui::green(&chain_name),
+            ui::green(chain_type),
             ui::green(&rpc_url)
         ),
     )?;
@@ -497,9 +500,10 @@ fn display_anvil_funding_plan(targets: &[AnvilFundingTarget]) -> Result<()> {
         } else {
             format!("{}", ui::green("✓ Already funded"))
         };
+        let label = format!("{} {}", target.source.prefix(), target.role);
         lines.push(format!(
             "{:20} {} ETH (current: {} ETH) {}",
-            target.role.to_string(),
+            label,
             ui::green(&required),
             current,
             status
@@ -536,9 +540,10 @@ fn display_funding_plan(
         } else {
             format!("{}", ui::green("✓ Already funded"))
         };
+        let label = format!("{} {}", target.source.prefix(), target.role);
         lines.push(format!(
             "{:20} {} ETH (current: {} ETH) {}",
-            target.role.to_string(),
+            label,
             ui::green(&required),
             current,
             status

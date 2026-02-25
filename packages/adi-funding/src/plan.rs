@@ -1,7 +1,7 @@
 //! Funding plan calculation and validation.
 
 use crate::balance::{get_token_balance, get_token_decimals, get_token_symbol, get_wallet_balance};
-use crate::config::{FundingConfig, FundingTarget, FundingTargetStatus, WalletRole};
+use crate::config::{FundingConfig, FundingTarget, FundingTargetStatus, WalletRole, WalletSource};
 use crate::error::{FundingError, Result};
 use crate::provider::FundingProvider;
 use crate::transfer::{estimate_eth_transfer_gas, estimate_token_transfer_gas, Transfer};
@@ -82,13 +82,14 @@ impl<'a> FundingPlanBuilder<'a> {
     ///
     /// This automatically adds all wallets present in the Wallets struct
     /// with their corresponding default funding amounts.
-    pub fn with_wallets(mut self, wallets: &Wallets) -> Self {
+    pub fn with_wallets(mut self, wallets: &Wallets, source: WalletSource) -> Self {
         let amounts = &self.config.default_amounts;
 
         // Add deployer if present
         if let Some(w) = &wallets.deployer {
             self.targets.push(FundingTarget::new(
                 WalletRole::Deployer,
+                source,
                 w.address,
                 amounts.deployer_eth,
             ));
@@ -98,6 +99,7 @@ impl<'a> FundingPlanBuilder<'a> {
         if let Some(w) = &wallets.governor {
             self.targets.push(FundingTarget::new(
                 WalletRole::Governor,
+                source,
                 w.address,
                 amounts.governor_eth,
             ));
@@ -107,6 +109,7 @@ impl<'a> FundingPlanBuilder<'a> {
         if let Some(w) = &wallets.operator {
             self.targets.push(FundingTarget::new(
                 WalletRole::Operator,
+                source,
                 w.address,
                 amounts.operator_eth,
             ));
@@ -116,6 +119,7 @@ impl<'a> FundingPlanBuilder<'a> {
         if let Some(w) = &wallets.blob_operator {
             self.targets.push(FundingTarget::new(
                 WalletRole::BlobOperator,
+                source,
                 w.address,
                 amounts.blob_operator_eth,
             ));
@@ -125,6 +129,7 @@ impl<'a> FundingPlanBuilder<'a> {
         if let Some(w) = &wallets.prove_operator {
             self.targets.push(FundingTarget::new(
                 WalletRole::ProveOperator,
+                source,
                 w.address,
                 amounts.prove_operator_eth,
             ));
@@ -134,6 +139,7 @@ impl<'a> FundingPlanBuilder<'a> {
         if let Some(w) = &wallets.execute_operator {
             self.targets.push(FundingTarget::new(
                 WalletRole::ExecuteOperator,
+                source,
                 w.address,
                 amounts.execute_operator_eth,
             ));
@@ -144,6 +150,7 @@ impl<'a> FundingPlanBuilder<'a> {
             if !amounts.fee_account_eth.is_zero() {
                 self.targets.push(FundingTarget::new(
                     WalletRole::FeeAccount,
+                    source,
                     w.address,
                     amounts.fee_account_eth,
                 ));
@@ -155,6 +162,7 @@ impl<'a> FundingPlanBuilder<'a> {
             if !amounts.token_multiplier_setter_eth.is_zero() {
                 self.targets.push(FundingTarget::new(
                     WalletRole::TokenMultiplierSetter,
+                    source,
                     w.address,
                     amounts.token_multiplier_setter_eth,
                 ));
@@ -177,6 +185,7 @@ impl<'a> FundingPlanBuilder<'a> {
         if let Some(w) = &wallets.deployer {
             self.targets.push(FundingTarget::new(
                 WalletRole::Deployer,
+                WalletSource::Ecosystem,
                 w.address,
                 amounts.deployer_eth,
             ));
@@ -185,6 +194,7 @@ impl<'a> FundingPlanBuilder<'a> {
         if let Some(w) = &wallets.governor {
             self.targets.push(FundingTarget::new(
                 WalletRole::Governor,
+                WalletSource::Ecosystem,
                 w.address,
                 amounts.governor_eth,
             ));
@@ -209,6 +219,7 @@ impl<'a> FundingPlanBuilder<'a> {
         if let Some(w) = &wallets.governor {
             self.targets.push(FundingTarget::new(
                 WalletRole::Governor,
+                WalletSource::Chain,
                 w.address,
                 amounts.governor_eth,
             ));
@@ -217,6 +228,7 @@ impl<'a> FundingPlanBuilder<'a> {
         if let Some(w) = &wallets.operator {
             self.targets.push(FundingTarget::new(
                 WalletRole::Operator,
+                WalletSource::Chain,
                 w.address,
                 amounts.operator_eth,
             ));
@@ -225,6 +237,7 @@ impl<'a> FundingPlanBuilder<'a> {
         if let Some(w) = &wallets.prove_operator {
             self.targets.push(FundingTarget::new(
                 WalletRole::ProveOperator,
+                WalletSource::Chain,
                 w.address,
                 amounts.prove_operator_eth,
             ));
@@ -233,6 +246,7 @@ impl<'a> FundingPlanBuilder<'a> {
         if let Some(w) = &wallets.execute_operator {
             self.targets.push(FundingTarget::new(
                 WalletRole::ExecuteOperator,
+                WalletSource::Chain,
                 w.address,
                 amounts.execute_operator_eth,
             ));
@@ -432,6 +446,7 @@ pub async fn build_funding_target_statuses(
     if let Some(w) = &ecosystem_wallets.deployer {
         targets.push(FundingTarget::new(
             WalletRole::Deployer,
+            WalletSource::Ecosystem,
             w.address,
             amounts.deployer_eth,
         ));
@@ -439,6 +454,7 @@ pub async fn build_funding_target_statuses(
     if let Some(w) = &ecosystem_wallets.governor {
         targets.push(FundingTarget::new(
             WalletRole::Governor,
+            WalletSource::Ecosystem,
             w.address,
             amounts.governor_eth,
         ));
@@ -448,6 +464,7 @@ pub async fn build_funding_target_statuses(
     if let Some(w) = &chain_wallets.governor {
         targets.push(FundingTarget::new(
             WalletRole::Governor,
+            WalletSource::Chain,
             w.address,
             amounts.governor_eth,
         ));
@@ -455,6 +472,7 @@ pub async fn build_funding_target_statuses(
     if let Some(w) = &chain_wallets.operator {
         targets.push(FundingTarget::new(
             WalletRole::Operator,
+            WalletSource::Chain,
             w.address,
             amounts.operator_eth,
         ));
@@ -462,6 +480,7 @@ pub async fn build_funding_target_statuses(
     if let Some(w) = &chain_wallets.prove_operator {
         targets.push(FundingTarget::new(
             WalletRole::ProveOperator,
+            WalletSource::Chain,
             w.address,
             amounts.prove_operator_eth,
         ));
@@ -469,6 +488,7 @@ pub async fn build_funding_target_statuses(
     if let Some(w) = &chain_wallets.execute_operator {
         targets.push(FundingTarget::new(
             WalletRole::ExecuteOperator,
+            WalletSource::Chain,
             w.address,
             amounts.execute_operator_eth,
         ));
@@ -503,6 +523,7 @@ pub async fn build_funding_target_statuses(
 
         statuses.push(FundingTargetStatus {
             role: target.role,
+            source: target.source,
             address: target.address,
             required_eth: target.eth_amount,
             required_token: target.token_amount,

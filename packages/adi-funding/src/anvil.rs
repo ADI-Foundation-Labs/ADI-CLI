@@ -5,7 +5,7 @@
 //! funds wallets that need more ETH.
 
 use crate::balance::get_eth_balance;
-use crate::config::{DefaultAmounts, WalletRole};
+use crate::config::{DefaultAmounts, WalletRole, WalletSource};
 use crate::error::{FundingError, Result};
 use crate::events::{FundingEvent, FundingEventHandler, NoOpEventHandler};
 use crate::provider::FundingProvider;
@@ -41,6 +41,8 @@ pub struct AnvilFundingResult {
 pub struct AnvilFundingTarget {
     /// Wallet role (deployer, governor, operator, etc.).
     pub role: WalletRole,
+    /// Wallet source (ecosystem or chain).
+    pub source: WalletSource,
     /// Wallet address.
     pub address: Address,
     /// Required funding amount.
@@ -151,11 +153,13 @@ impl AnvilFunder {
         // Helper to create target with balance check
         let check_and_add = |targets: &mut Vec<AnvilFundingTarget>,
                              role: WalletRole,
+                             source: WalletSource,
                              address: Address,
                              amount: U256,
                              balance: U256| {
             targets.push(AnvilFundingTarget {
                 role,
+                source,
                 address,
                 amount,
                 current_balance: balance,
@@ -169,6 +173,7 @@ impl AnvilFunder {
             check_and_add(
                 &mut targets,
                 WalletRole::Deployer,
+                WalletSource::Ecosystem,
                 w.address,
                 self.amounts.deployer_eth,
                 balance,
@@ -179,6 +184,7 @@ impl AnvilFunder {
             check_and_add(
                 &mut targets,
                 WalletRole::Governor,
+                WalletSource::Ecosystem,
                 w.address,
                 self.amounts.governor_eth,
                 balance,
@@ -193,6 +199,7 @@ impl AnvilFunder {
             check_and_add(
                 &mut targets,
                 WalletRole::Governor,
+                WalletSource::Chain,
                 w.address,
                 self.amounts.governor_eth,
                 balance,
@@ -203,6 +210,7 @@ impl AnvilFunder {
             check_and_add(
                 &mut targets,
                 WalletRole::Operator,
+                WalletSource::Chain,
                 w.address,
                 self.amounts.operator_eth,
                 balance,
@@ -213,6 +221,7 @@ impl AnvilFunder {
             check_and_add(
                 &mut targets,
                 WalletRole::ProveOperator,
+                WalletSource::Chain,
                 w.address,
                 self.amounts.prove_operator_eth,
                 balance,
@@ -223,6 +232,7 @@ impl AnvilFunder {
             check_and_add(
                 &mut targets,
                 WalletRole::ExecuteOperator,
+                WalletSource::Chain,
                 w.address,
                 self.amounts.execute_operator_eth,
                 balance,

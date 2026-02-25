@@ -121,11 +121,32 @@ impl std::fmt::Display for WalletRole {
     }
 }
 
+/// Source of a wallet (ecosystem-level or chain-level).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WalletSource {
+    /// Ecosystem-level wallet.
+    Ecosystem,
+    /// Chain-level wallet.
+    Chain,
+}
+
+impl WalletSource {
+    /// Returns a short prefix for display.
+    pub fn prefix(&self) -> &'static str {
+        match self {
+            Self::Ecosystem => "eco",
+            Self::Chain => "chain",
+        }
+    }
+}
+
 /// Target funding requirement for a single wallet.
 #[derive(Clone, Debug)]
 pub struct FundingTarget {
     /// Wallet role.
     pub role: WalletRole,
+    /// Wallet source (ecosystem or chain).
+    pub source: WalletSource,
     /// Target wallet address.
     pub address: Address,
     /// Required ETH amount (in wei).
@@ -136,9 +157,10 @@ pub struct FundingTarget {
 
 impl FundingTarget {
     /// Create a new funding target.
-    pub fn new(role: WalletRole, address: Address, eth_amount: U256) -> Self {
+    pub fn new(role: WalletRole, source: WalletSource, address: Address, eth_amount: U256) -> Self {
         Self {
             role,
+            source,
             address,
             eth_amount,
             token_amount: None,
@@ -160,6 +182,8 @@ impl FundingTarget {
 pub struct FundingTargetStatus {
     /// Wallet role (deployer, governor, operator, etc.).
     pub role: WalletRole,
+    /// Wallet source (ecosystem or chain).
+    pub source: WalletSource,
     /// Wallet address.
     pub address: Address,
     /// Required ETH amount (in wei).

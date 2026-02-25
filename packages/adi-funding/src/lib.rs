@@ -102,7 +102,9 @@ pub use balance::{
     get_eth_balance, get_token_balance, get_token_decimals, get_token_symbol, get_wallet_balance,
     WalletBalance,
 };
-pub use config::{DefaultAmounts, FundingConfig, FundingTarget, FundingTargetStatus, WalletRole};
+pub use config::{
+    DefaultAmounts, FundingConfig, FundingTarget, FundingTargetStatus, WalletRole, WalletSource,
+};
 pub use error::{FundingError, Result};
 pub use events::{
     FundingEvent, FundingEventHandler, LoggingEventHandler, NoOpEventHandler, SpinnerEventHandler,

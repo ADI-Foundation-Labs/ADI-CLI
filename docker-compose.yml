@@ -1,0 +1,58 @@
+version: "3.8"
+services:
+  server:
+    image: ghcr.io/matter-labs/zksync-os-server:v0.13.0
+    container_name: server
+    platform: linux/amd64
+    restart: unless-stopped
+    # network_mode: host
+    user: "0:0"
+    working_dir: /app
+    ports:
+      - "3050:3050"
+    environment:
+      # This flags make from server an External Node
+      # sequencer_block_replay_download_address: "127.0.0.1:3153"
+      # general_main_node_rpc_url: "http://127.0.0.1:3998"
+
+      # sequencer_max_blocks_to_produce: 0
+      sequencer_base_fee_override: "0x174876E8000"
+      sequencer_pubdata_price_override: "0x1"
+      sequencer_native_price_override: "0x989680"
+      sequencer_block_dump_path: "/chain/db/block_dumps"
+
+      general_rocks_db_path: "/chain/db/node1"
+      general_l1_rpc_url: "https://rpc.ab.testnet.adifoundation.ai"
+
+      genesis_bytecode_supplier_address: "0xf528c8811e93986e51d6822bddc024bc2a2ccffe"
+      genesis_genesis_input_path: "/genesis/genesis.json"
+      l1_sender_max_fee_per_blob_gas_gwei: 15
+
+      genesis_bridgehub_address: "0x13d77d77c3999fc413ce25b9001ee4739c93a033"
+      genesis_chain_id: 222
+
+      prover_api_object_store_file_backed_base_path: "/shared"
+      prover_api_component_enabled: "false"
+      prover_api_fake_fri_provers_enabled: "true"
+      prover_api_fake_snark_provers_enabled: "true"
+      prover_api_address: "0.0.0.0:3320"
+      prover_input_generator_app_bin_unpack_path: "/chain/db/app_bins"
+      prover_input_generator_maximum_in_flight_blocks: 120
+
+      batcher_batch_timeout: "10s"
+      batcher_blocks_per_batch_limit: 10
+
+      l1_sender_operator_commit_pk: 0xf96d8fea2e46f07308aa105b7b1aa45fe2b0815b521bbfff902164442a255ccc
+      l1_sender_operator_prove_pk: 0x3e2ac2ed5a33f69c25d8a03e3c6ef6cab4332978b268f26a5cd6b9f71843779c
+      l1_sender_operator_execute_pk: 0x263a2cb2dc58493952595b13d83a8914540ee75a2283855bd06697de1f4d3719
+      l1_sender_max_fee_per_gas_gwei: 11
+      l1_sender_max_priority_fee_per_gas_gwei: 4
+
+      l1_sender_fusaka_upgrade_timestamp: 1771883505
+      #      l1_sender_pubdata_mode: "Calldata"
+
+      RUST_LOG: "info,zksync_os_server=debug,zksync_os_sequencer=info,zksync_os_merkle_tree=info,zksync_os_priority_tree=info"
+    volumes:
+      - ./state/volumes/chain:/chain
+      - ./state/volumes/shared:/shared
+      - ./state/l3eco/chains/adi/configs/genesis.json:/genesis/genesis.json:ro
