@@ -655,12 +655,21 @@ async fn run_ecosystem_deployment(
         resolve_protocol_version(args.protocol_version.as_ref(), context.config())?;
     let protocol_version = ProtocolVersion::parse(&protocol_version_str)
         .map_err(|e| eyre::eyre!("Invalid protocol version '{}': {}", protocol_version_str, e))?;
+    // Determine if ecosystem contracts already exist
+    let deploy_ecosystem = !ecosystem_contracts_deployed(state_manager).await?;
+
     // Run zkstack ecosystem init
     ui::info(format!(
         "Protocol version: {}",
         ui::green(&protocol_version)
     ))?;
-    ui::section("Deploying Ecosystem Contracts")?;
+
+    if deploy_ecosystem {
+        ui::section("Deploying Ecosystem Contracts")?;
+    } else {
+        ui::section("Deploying Chain Contracts")?;
+        ui::info("Ecosystem contracts already exist, deploying chain only")?;
+    }
 
     let runner = ToolkitRunner::with_config_and_logger(
         context.toolkit_config(),
@@ -704,7 +713,12 @@ async fn run_ecosystem_deployment(
         Some(estimated * u128::from(gas_multiplier) / 100)
     };
 
-    ui::info("Running zkstack ecosystem init...")?;
+    let init_msg = if deploy_ecosystem {
+        "Running zkstack ecosystem init..."
+    } else {
+        "Running zkstack chain init..."
+    };
+    ui::info(init_msg)?;
 
     let exit_code = runner
         .run_zkstack_ecosystem_init(
@@ -712,6 +726,8 @@ async fn run_ecosystem_deployment(
             rpc_url.as_str(),
             gas_price_wei,
             &protocol_version.to_semver(),
+            deploy_ecosystem,
+            chain_name,
         )
         .await
         .wrap_err("Failed to run zkstack ecosystem init")?;
@@ -723,7 +739,12 @@ async fn run_ecosystem_deployment(
         ));
     }
 
-    ui::success("Ecosystem contracts deployed successfully!")?;
+    let success_msg = if deploy_ecosystem {
+        "Ecosystem contracts deployed successfully!"
+    } else {
+        "Chain contracts deployed successfully!"
+    };
+    ui::success(success_msg)?;
 
     // Enrich ecosystem contracts with facet and implementation addresses
     enrich_ecosystem_contracts(context, state_manager, rpc_url).await?;
@@ -1386,4 +1407,19 @@ fn is_config_file(path: &Path) -> bool {
         path.extension().and_then(|s| s.to_str()),
         Some("yaml" | "yml" | "json")
     )
+}
+
+/// Check if ecosystem contracts have already been deployed.
+///
+/// Returns `true` if contracts.yaml exists and contains bridgehub_proxy_addr,
+/// indicating ecosystem contracts were deployed in a previous run.
+async fn ecosystem_contracts_deployed(state_manager: &StateManager) -> Result<bool> {
+    if !state_manager.ecosystem().contracts_exist().await? {
+        return Ok(false);
+    }
+
+    match state_manager.ecosystem().contracts().await {
+        Ok(contracts) => Ok(contracts.bridgehub_addr().is_some()),
+        Err(_) => Ok(false),
+    }
 }

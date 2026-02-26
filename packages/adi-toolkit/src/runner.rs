@@ -321,31 +321,54 @@ impl ToolkitRunner {
     }
 
     /// Execute `zkstack ecosystem init` with foundry.toml permission fix.
+    ///
+    /// # Arguments
+    ///
+    /// * `ecosystem_dir` - Path to the ecosystem directory
+    /// * `l1_rpc_url` - Settlement layer RPC URL
+    /// * `gas_price_wei` - Optional gas price in wei (uses default if None)
+    /// * `protocol_version` - Protocol version for toolkit image selection
+    /// * `deploy_ecosystem` - Whether to deploy ecosystem contracts:
+    ///   - `true` for first-time deployment (creates Bridgehub, Governance, etc.)
+    ///   - `false` when adding a chain to an existing ecosystem
+    /// * `chain_name` - Name of the chain to initialize/deploy
     pub async fn run_zkstack_ecosystem_init(
         &self,
         ecosystem_dir: &Path,
         l1_rpc_url: &str,
         gas_price_wei: Option<u128>,
         protocol_version: &Version,
+        deploy_ecosystem: bool,
+        chain_name: &str,
     ) -> Result<i64> {
         self.logger.debug(&format!(
-            "Running zkstack ecosystem init (ecosystem_dir: {}, rpc: {})",
+            "Running zkstack ecosystem init (ecosystem_dir: {}, rpc: {}, deploy_ecosystem: {})",
             ecosystem_dir.display(),
-            l1_rpc_url
+            l1_rpc_url,
+            deploy_ecosystem
         ));
 
         let foundry_fix = r#"sed -i.bak 's/{ access = "read", path = "\.\.\/l1-contracts\/script-out\/" }/{ access = "read-write", path = "..\/l1-contracts\/script-out\/" }/' /deps/zksync-era/contracts/l1-contracts/foundry.toml"#;
 
-        let mut zkstack_args = String::from(
+        let mut zkstack_args = format!(
             "zkstack ecosystem init \
              --verbose \
              --zksync-os \
              --ignore-prerequisites \
              --observability false \
-             --deploy-ecosystem true \
+             --deploy-ecosystem {} \
              --deploy-erc20 false \
-             --deploy-paymaster false",
+             --deploy-paymaster false \
+             --chain {}",
+            deploy_ecosystem, chain_name
         );
+
+        // When not deploying ecosystem, point to existing contracts config
+        if !deploy_ecosystem {
+            // In container, ecosystem_dir is mounted as /workspace
+            // zkstack expects path to ecosystem root where configs/contracts.yaml exists
+            zkstack_args.push_str(" --ecosystem-contracts-path /workspace/configs/contracts.yaml");
+        }
 
         if let Some(gas_price) = gas_price_wei {
             zkstack_args.push_str(&format!(" -a --with-gas-price -a {}", gas_price));
@@ -374,10 +397,23 @@ exit [lindex $result 3]'"#,
             zkstack = zkstack_args
         );
 
-        self.logger
-            .debug("Fixing foundry.toml permissions and deploying ecosystem contracts");
+        let deploy_msg = if deploy_ecosystem {
+            "deploying ecosystem + chain contracts"
+        } else {
+            "deploying chain contracts only"
+        };
+        self.logger.debug(&format!(
+            "Fixing foundry.toml permissions and {}",
+            deploy_msg
+        ));
 
         let shell_command = vec!["sh", "-c", &shell_cmd];
+
+        let label = if deploy_ecosystem {
+            "Deploying ecosystem contracts..."
+        } else {
+            "Deploying chain contracts..."
+        };
 
         self.run_command(
             &shell_command,
@@ -385,7 +421,7 @@ exit [lindex $result 3]'"#,
             protocol_version,
             &[("CI", "true")],
             "deploy",
-            "Deploying ecosystem contracts...",
+            label,
         )
         .await
     }
