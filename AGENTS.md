@@ -72,6 +72,7 @@ cargo test               # Run tests
 - `adi ecosystem` - Display ecosystem and chain information with deployed contracts
 - `adi owners` - Display owners of deployed L1 contracts
 - `adi init` - Initialize new ecosystem configuration
+- `adi add` - Add a new chain to an existing ecosystem
 - `adi deploy` - Deploy ecosystem contracts to settlement layer
 - `adi accept` - Accept pending ownership transfers for deployed contracts
 - `adi transfer` - Accept ownership and transfer to a new owner address

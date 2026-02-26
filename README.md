@@ -287,6 +287,70 @@ adi init \
 
 After initialization, check `~/.adi_cli/state/<ecosystem-name>/` to see the generated files, including `configs/wallets.yaml` with your new wallet addresses.
 
+### Step 2.5: Add Additional Chains (Optional)
+
+If you need multiple chains in your ecosystem, use the `add` command to create additional chains before deploying. Each chain has its own configuration, wallets, and chain ID.
+
+**What this command does:**
+1. Validates the protocol version matches your ecosystem
+2. Checks if a chain with the same name already exists
+3. Exports current ecosystem state to a temporary directory
+4. Runs zkstack inside a container to generate new chain files
+5. Imports the new chain state into your ecosystem
+
+**Required argument:**
+- `--protocol-version, -p` — Must match the version used for `init`
+
+**Optional arguments (fall back to config file values):**
+
+| Flag                             | Description                                    |
+| -------------------------------- | ---------------------------------------------- |
+| `--ecosystem-name`               | Target ecosystem name                          |
+| `--chain-name`                   | Name for the new chain (must be unique)        |
+| `--chain-id`                     | Unique numeric chain identifier                |
+| `--prover-mode`                  | `no-proofs` for testing, `gpu` for production  |
+| `--base-token-address`           | Custom ERC20 token address for gas payments    |
+| `--base-token-price-nominator`   | Price ratio numerator                          |
+| `--base-token-price-denominator` | Price ratio denominator                        |
+| `--evm-emulator`                 | Enable EVM bytecode emulator                   |
+| `--yes, -y`                      | Skip confirmation prompt                       |
+| `--force, -f`                    | Overwrite if chain already exists              |
+
+**Example: Add a second chain using config defaults**
+
+```bash
+# Uses chain settings from ~/.adi.yml
+adi add -p v30.0.2
+```
+
+**Example: Add a chain with custom parameters**
+
+```bash
+adi add \
+  --protocol-version v30.0.2 \
+  --chain-name second-chain \
+  --chain-id 272 \
+  --prover-mode no-proofs
+```
+
+**Example: Add chain non-interactively (for scripts)**
+
+```bash
+adi add -p v30.0.2 --chain-name api-chain --chain-id 273 --yes
+```
+
+**Handling existing chains:**
+
+If a chain with the same name exists, the CLI will prompt for confirmation. Use `--force` to overwrite without prompting:
+
+```bash
+adi add -p v30.0.2 --chain-name existing-chain --force
+```
+
+After adding chains, they appear in `~/.adi_cli/state/<ecosystem-name>/chains/<chain-name>/`.
+
+> **Note:** The `add` command only creates chain configuration. Use `deploy` to deploy all chains to the settlement layer.
+
 ### Step 3: Deploy Ecosystem Contracts
 
 The `deploy` command funds your ecosystem wallets and deploys the smart contracts to the settlement layer. This is a two-phase process: funding and deployment.
