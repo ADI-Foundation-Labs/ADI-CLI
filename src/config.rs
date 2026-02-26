@@ -166,6 +166,12 @@ pub struct Config {
     #[serde(default)]
     pub debug: bool,
 
+    /// Default protocol version for toolkit Docker image.
+    /// Used by init, add, and deploy commands when --protocol-version is not provided.
+    /// Can be overridden with --protocol-version or ADI__PROTOCOL_VERSION env var.
+    #[serde(default)]
+    pub protocol_version: Option<String>,
+
     /// Default ecosystem configuration values.
     /// These can be overridden by CLI flags.
     #[serde(default)]

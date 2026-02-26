@@ -290,3 +290,16 @@ pub fn resolve_new_owner(arg_value: Option<Address>, config: &Config) -> Result<
         .or(config.ownership.new_owner)
         .ok_or_else(|| eyre::eyre!("New owner required: use --new-owner or set in config"))
 }
+
+/// Resolve protocol version from optional arg or config.
+pub fn resolve_protocol_version(arg_value: Option<&String>, config: &Config) -> Result<String> {
+    arg_value
+        .cloned()
+        .or_else(|| config.protocol_version.clone())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            eyre::eyre!(
+                "Protocol version required: use --protocol-version or set protocol_version in config"
+            )
+        })
+}

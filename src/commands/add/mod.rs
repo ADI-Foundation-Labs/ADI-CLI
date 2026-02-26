@@ -15,14 +15,15 @@ pub use chain::run;
 /// Creates chain configuration with ZkStack.yaml and wallets.
 /// Requires an initialized ecosystem (run `adi init` first).
 ///
-/// All arguments except `protocol_version` are optional and will fall back
-/// to values from the config file (.adi.yml) if not provided.
+/// All arguments are optional and will fall back to values from the config file
+/// (.adi.yml) if not provided.
 #[derive(Clone, Args, Debug, Serialize, Deserialize)]
 pub struct AddArgs {
     /// Protocol version for the toolkit Docker image (e.g., v30.0.2).
     /// Determines which zkstack version to use for chain creation.
+    /// Falls back to config file if not provided.
     #[arg(long, short = 'p')]
-    pub protocol_version: String,
+    pub protocol_version: Option<String>,
 
     /// Ecosystem name (falls back to config file if not provided).
     #[arg(

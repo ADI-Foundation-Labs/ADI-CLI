@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tempfile::TempDir;
 
 use super::InitArgs;
-use crate::commands::helpers::create_state_manager_with_s3;
+use crate::commands::helpers::{create_state_manager_with_s3, resolve_protocol_version};
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
 use crate::ui;
@@ -30,8 +30,10 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     context.logger().debug("Starting ecosystem initialization");
 
     // 1. Parse and validate protocol version
+    let protocol_version_str =
+        resolve_protocol_version(args.protocol_version.as_ref(), context.config())?;
     let version =
-        ProtocolVersion::parse(&args.protocol_version).wrap_err("Invalid protocol version")?;
+        ProtocolVersion::parse(&protocol_version_str).wrap_err("Invalid protocol version")?;
     // 2. Merge CLI args with config defaults (CLI > Config)
     let config_defaults = &context.config().ecosystem;
     let config = build_ecosystem_config(args, config_defaults);

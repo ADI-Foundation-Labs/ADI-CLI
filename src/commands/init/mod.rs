@@ -15,14 +15,15 @@ pub use ecosystem::run;
 /// Generates ZkStack.yaml, wallet keys, and chain config in the state directory.
 /// Requires genesis.json in state dir (download from protocol version URL).
 ///
-/// All arguments except `protocol_version` are optional and will fall back
-/// to values from the config file (.adi.yml) if not provided.
+/// All arguments are optional and will fall back to values from the config file
+/// (.adi.yml) if not provided.
 #[derive(Clone, Args, Debug, Serialize, Deserialize)]
 pub struct InitArgs {
     /// Protocol version for the toolkit Docker image (e.g., v29.0.11).
     /// Determines which era-contracts and zkstack version to use.
+    /// Falls back to config file if not provided.
     #[arg(long, short = 'p')]
-    pub protocol_version: String,
+    pub protocol_version: Option<String>,
 
     /// Ecosystem name (used for directory name and identification)
     #[arg(

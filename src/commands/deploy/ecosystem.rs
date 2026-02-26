@@ -25,7 +25,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use url::Url;
 
-use crate::commands::helpers::create_state_manager_with_s3;
+use crate::commands::helpers::{create_state_manager_with_s3, resolve_protocol_version};
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
 use crate::ui;
@@ -651,12 +651,9 @@ async fn run_ecosystem_deployment(
     chain_wallets: &Wallets,
 ) -> Result<()> {
     // Validate protocol version is provided for deployment
-    let protocol_version_str = args.protocol_version.as_ref().ok_or_else(|| {
-        eyre::eyre!(
-            "Protocol version required for deployment. Use --protocol-version (e.g., v30.0.2)"
-        )
-    })?;
-    let protocol_version = ProtocolVersion::parse(protocol_version_str)
+    let protocol_version_str =
+        resolve_protocol_version(args.protocol_version.as_ref(), context.config())?;
+    let protocol_version = ProtocolVersion::parse(&protocol_version_str)
         .map_err(|e| eyre::eyre!("Invalid protocol version '{}': {}", protocol_version_str, e))?;
     // Run zkstack ecosystem init
     ui::info(format!(

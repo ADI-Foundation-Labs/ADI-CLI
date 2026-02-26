@@ -69,6 +69,10 @@ state_dir: ~/.adi_cli/state
 # Default: false (can also use -d flag)
 debug: false
 
+# Default protocol version for toolkit Docker image
+# Used by init, add, and deploy when --protocol-version is not provided
+protocol_version: v30.0.2
+
 # State storage backend (currently only "filesystem" is supported)
 # Default: filesystem
 state_backend: filesystem
@@ -202,6 +206,7 @@ For sensitive data like private keys, use environment variables instead of confi
 | `ADI_PRIVATE_KEY`          | Private key (hex) for accepting ownership as new owner. Used by the `accept` command.                            |
 | `ADI_RPC_URL`              | Settlement layer RPC endpoint. Useful for switching networks without editing config.                             |
 | `ADI_CONFIG`               | Path to an alternative config file.                                                                              |
+| `ADI__PROTOCOL_VERSION`    | Default protocol version for init, add, and deploy commands (e.g., `v30.0.2`).                                   |
 | `ADI__TOOLKIT__IMAGE_TAG`  | Override Docker image tag for toolkit containers (e.g., `latest` or `custom-build`).                             |
 | `AWS_ACCESS_KEY_ID`        | AWS access key for S3 synchronization.                                                                           |
 | `AWS_SECRET_ACCESS_KEY`    | AWS secret key for S3 synchronization.                                                                           |

@@ -7,7 +7,9 @@ use std::sync::Arc;
 use tempfile::TempDir;
 
 use super::AddArgs;
-use crate::commands::helpers::{create_state_manager_with_s3, resolve_ecosystem_name};
+use crate::commands::helpers::{
+    create_state_manager_with_s3, resolve_ecosystem_name, resolve_protocol_version,
+};
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
 use crate::ui;
@@ -32,8 +34,10 @@ pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
     context.logger().debug("Starting chain addition");
 
     // 1. Parse and validate protocol version
+    let protocol_version_str =
+        resolve_protocol_version(args.protocol_version.as_ref(), context.config())?;
     let version =
-        ProtocolVersion::parse(&args.protocol_version).wrap_err("Invalid protocol version")?;
+        ProtocolVersion::parse(&protocol_version_str).wrap_err("Invalid protocol version")?;
 
     // 2. Resolve ecosystem name from args or config
     let ecosystem_name = resolve_ecosystem_name(args.ecosystem_name.as_ref(), context.config())?;
