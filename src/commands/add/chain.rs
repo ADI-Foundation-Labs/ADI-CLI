@@ -90,14 +90,21 @@ pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
                 ui::yellow(&chain_config.name)
             ))?;
 
-            let confirm = ui::confirm("Overwrite existing chain?")
-                .initial_value(false)
+            // Require typing chain name to confirm deletion
+            let prompt = format!(
+                "Type '{}' to confirm deletion and overwrite",
+                ui::green(&chain_config.name)
+            );
+            let user_input: String = ui::input(prompt)
                 .interact()
-                .wrap_err("Failed to read confirmation")?;
+                .wrap_err("Failed to read user input")?;
 
-            if !confirm {
-                ui::outro_cancel("Cancelled")?;
-                return Ok(());
+            if user_input != chain_config.name {
+                return Err(eyre::eyre!(
+                    "Confirmation failed: expected '{}', got '{}'",
+                    chain_config.name,
+                    user_input
+                ));
             }
 
             // Delete existing chain state
