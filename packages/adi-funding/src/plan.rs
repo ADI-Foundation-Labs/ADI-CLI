@@ -297,6 +297,27 @@ impl<'a> FundingPlanBuilder<'a> {
             None => None,
         };
 
+        // Pre-flight check: calculate minimum ETH needed (transfers only, no gas)
+        // This catches obvious "funder is way short" cases before expensive gas estimation
+        let mut min_eth_needed = U256::ZERO;
+        for target in &self.targets {
+            let current = get_wallet_balance(self.provider, target.address, None)
+                .await?
+                .eth_balance;
+            if current < target.eth_amount {
+                min_eth_needed += target.eth_amount - current;
+            }
+        }
+
+        // Early validation: funder must have at least the transfer amounts
+        if funder_eth < min_eth_needed {
+            return Err(FundingError::InsufficientEthBalance {
+                have: funder_eth,
+                need: min_eth_needed,
+                gas_estimate: U256::ZERO, // Gas not yet calculated
+            });
+        }
+
         // Get token symbol and decimals if token is configured
         let (token_symbol, token_decimals) = match self.config.token_address {
             Some(token) => {

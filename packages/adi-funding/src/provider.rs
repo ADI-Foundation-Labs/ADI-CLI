@@ -100,6 +100,16 @@ impl FundingProvider {
                 ));
             }
 
+            // Detect "LackOfFundForMaxFee" from ZkSync RPC
+            if error_str.contains("LackOfFundForMaxFee") {
+                let value = tx.value.unwrap_or_default();
+                return FundingError::GasEstimationFailed(format!(
+                    "Funder has insufficient balance to simulate transfer of {} wei. \
+                     Top up the funder wallet and try again.",
+                    value
+                ));
+            }
+
             FundingError::GasEstimationFailed(error_str)
         })
     }
