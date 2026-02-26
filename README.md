@@ -254,18 +254,23 @@ The `init` command creates the foundational configuration for your ZkSync ecosys
 4. Imports the generated state into your state directory
 5. Generates cryptographic keys for all ecosystem wallets
 
-**Required argument:**
-- `--protocol-version, -p` — The ZkSync protocol version (e.g., `v30.0.2`). This determines which toolkit image to use and ensures compatibility.
+**All arguments are optional** and fall back to values in `~/.adi.yml`:
 
-**Common optional arguments:**
+| Flag                 | Description                                            |
+| -------------------- | ------------------------------------------------------ |
+| `--protocol-version` | Protocol version (e.g., `v30.0.2`)                     |
+| `--ecosystem-name`   | Override the ecosystem name from config                |
+| `--l1-network`       | Settlement layer: `localhost`, `sepolia`, or `mainnet` |
+| `--chain-name`       | Name for the initial chain                             |
+| `--chain-id`         | Unique numeric chain identifier                        |
+| `--prover-mode`      | `no-proofs` for testing, `gpu` for production          |
 
-| Flag               | Description                                            |
-| ------------------ | ------------------------------------------------------ |
-| `--ecosystem-name` | Override the ecosystem name from config                |
-| `--l1-network`     | Settlement layer: `localhost`, `sepolia`, or `mainnet` |
-| `--chain-name`     | Name for the initial chain                             |
-| `--chain-id`       | Unique numeric chain identifier                        |
-| `--prover-mode`    | `no-proofs` for testing, `gpu` for production          |
+**Example: Using config file defaults**
+
+```bash
+# With protocol_version set in ~/.adi.yml, no flags needed
+adi init
+```
 
 **Example: Local development ecosystem**
 
@@ -303,13 +308,11 @@ If you need multiple chains in your ecosystem, use the `add` command to create a
 4. Runs zkstack inside a container to generate new chain files
 5. Imports the new chain state into your ecosystem
 
-**Required argument:**
-- `--protocol-version, -p` — Must match the version used for `init`
-
-**Optional arguments (fall back to config file values):**
+**All arguments are optional** and fall back to values in `~/.adi.yml`:
 
 | Flag                             | Description                                    |
 | -------------------------------- | ---------------------------------------------- |
+| `--protocol-version, -p`         | Protocol version (should match `init`)         |
 | `--ecosystem-name`               | Target ecosystem name                          |
 | `--chain-name`                   | Name for the new chain (must be unique)        |
 | `--chain-id`                     | Unique numeric chain identifier                |
@@ -324,8 +327,8 @@ If you need multiple chains in your ecosystem, use the `add` command to create a
 **Example: Add a second chain using config defaults**
 
 ```bash
-# Uses chain settings from ~/.adi.yml
-adi add -p v30.0.2
+# Uses all settings from ~/.adi.yml (including protocol_version)
+adi add
 ```
 
 **Example: Add a chain with custom parameters**
@@ -341,7 +344,8 @@ adi add \
 **Example: Add chain non-interactively (for scripts)**
 
 ```bash
-adi add -p v30.0.2 --chain-name api-chain --chain-id 273 --yes
+# With protocol_version in config
+adi add --chain-name api-chain --chain-id 273 --yes
 ```
 
 **Handling existing chains:**
@@ -349,7 +353,7 @@ adi add -p v30.0.2 --chain-name api-chain --chain-id 273 --yes
 If a chain with the same name exists, the CLI will prompt for confirmation. Use `--force` to overwrite without prompting:
 
 ```bash
-adi add -p v30.0.2 --chain-name existing-chain --force
+adi add --chain-name existing-chain --force
 ```
 
 After adding chains, they appear in `~/.adi_cli/state/<ecosystem-name>/chains/<chain-name>/`.
