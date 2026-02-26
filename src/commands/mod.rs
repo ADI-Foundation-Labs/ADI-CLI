@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{context::Context, error::Result};
 
 mod accept;
+mod add;
 mod config;
 mod deploy;
 mod ecosystem;
@@ -31,6 +32,8 @@ pub enum Commands {
     Ecosystem(ecosystem::EcosystemArgs),
     /// Initialize ecosystem configuration (run before deploy)
     Init(init::InitArgs),
+    /// Add a new chain to an existing ecosystem
+    Add(add::AddArgs),
     /// Deploy smart contracts to the settlement layer (L1)
     Deploy(deploy::DeployArgs),
     /// Accept pending ownership transfers for deployed contracts
@@ -56,6 +59,7 @@ impl Commands {
             Commands::Config => config::run(context).await,
             Commands::Ecosystem(args) => ecosystem::run(&args, context).await,
             Commands::Init(args) => init::run(&args, context).await,
+            Commands::Add(args) => add::run(&args, context).await,
             Commands::Deploy(args) => deploy::run(args, context).await,
             Commands::Accept(args) => accept::run(args, context).await,
             Commands::Transfer(args) => transfer::run(args, context).await,

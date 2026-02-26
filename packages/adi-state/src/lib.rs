@@ -67,7 +67,7 @@ pub use backend::{
 };
 pub use error::{Result, StateError};
 pub use exporter::{export_chain_state, export_ecosystem_state};
-pub use importer::import_ecosystem_state;
+pub use importer::{import_chain_state, import_ecosystem_state};
 pub use manager::{ChainStateOps, EcosystemStateOps, StateManager};
 #[cfg(feature = "s3")]
 pub use s3::{NoOpS3EventHandler, S3Config, S3SyncEvent, S3SyncEventHandler};

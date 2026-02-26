@@ -66,6 +66,47 @@ pub async fn import_ecosystem_state(
     Ok(())
 }
 
+/// Import only chain state from a source directory.
+///
+/// This is used when adding a new chain to an existing ecosystem.
+/// It reads chain YAML files from the source directory and stores them
+/// through the StateManager backend.
+///
+/// # Arguments
+///
+/// * `state_manager` - StateManager configured with target backend.
+/// * `source_dir` - Directory containing zkstack output.
+/// * `ecosystem_name` - Name of the ecosystem.
+/// * `chain_name` - Name of the chain to import.
+///
+/// # Errors
+///
+/// Returns error if reading or creating state fails.
+pub async fn import_chain_state(
+    state_manager: &StateManager,
+    source_dir: &Path,
+    ecosystem_name: &str,
+    chain_name: &str,
+) -> Result<()> {
+    let logger = state_manager.logger();
+    let ecosystem_dir = source_dir.join(ecosystem_name);
+    logger.info(&format!(
+        "Importing chain '{}' state from {}",
+        chain_name,
+        ecosystem_dir.display()
+    ));
+
+    // Import chain-level files only
+    import_chain_metadata(state_manager, &ecosystem_dir, chain_name, logger).await?;
+    import_chain_wallets(state_manager, &ecosystem_dir, chain_name, logger).await?;
+
+    logger.success(&format!(
+        "Chain '{}' state imported successfully",
+        chain_name
+    ));
+    Ok(())
+}
+
 async fn import_ecosystem_metadata(
     state_manager: &StateManager,
     ecosystem_dir: &Path,

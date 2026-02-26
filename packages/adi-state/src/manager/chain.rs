@@ -163,6 +163,24 @@ impl ChainStateOps {
         Ok(exists)
     }
 
+    /// Delete the entire chain directory and all its contents.
+    ///
+    /// This removes the chain metadata, wallets, contracts, and all other files.
+    /// Use with caution as this operation cannot be undone.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if deletion fails.
+    pub async fn delete(&self) -> Result<()> {
+        let key = paths::chain_dir(&self.chain_name);
+        self.logger
+            .debug(&format!("Deleting chain '{}' directory", self.chain_name));
+        self.backend.delete_dir(&key).await?;
+        self.logger
+            .debug(&format!("Chain '{}' deleted successfully", self.chain_name));
+        Ok(())
+    }
+
     // ========== CREATE OPERATIONS ==========
 
     /// Create chain metadata (chains/{name}/ZkStack.yaml).

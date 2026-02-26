@@ -55,8 +55,8 @@ mod verify;
 pub mod verification;
 
 // Public re-exports
-pub use commands::{build_ecosystem_create_args, ERA_CONTRACTS_PATH};
-pub use config::{EcosystemConfig, EcosystemConfigBuilder};
+pub use commands::{build_chain_create_args, build_ecosystem_create_args, ERA_CONTRACTS_PATH};
+pub use config::{ChainConfig, ChainConfigBuilder, EcosystemConfig, EcosystemConfigBuilder};
 pub use da::{configure_l3_da, PubdataSource};
 pub use deploy::{add_validator_roles, DeployedContracts};
 pub use error::{EcosystemError, Result};
@@ -71,4 +71,4 @@ pub use ownership::{
 };
 pub use types::{L1Network, ProverMode};
 pub use validator::{build_add_validator_roles_calldata, ValidatorRoles};
-pub use verify::verify_ecosystem_created;
+pub use verify::{verify_chain_created, verify_ecosystem_created};
