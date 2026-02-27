@@ -20,7 +20,7 @@ const VERIFICATION_DELAY_MS: u64 = 200;
 pub async fn verify_contracts(
     targets: &[VerificationTarget],
     explorer_url: &Url,
-    api_key: &str,
+    api_key: Option<&str>,
     chain_id: u64,
     protocol_version: &str,
     context: &Context,
@@ -158,7 +158,7 @@ async fn verify_single_contract(
     runner: &ToolkitRunner,
     target: &VerificationTarget,
     explorer_url: &Url,
-    api_key: &str,
+    api_key: Option<&str>,
     chain_id: u64,
     protocol_version: ProtocolVersion,
     context: &Context,

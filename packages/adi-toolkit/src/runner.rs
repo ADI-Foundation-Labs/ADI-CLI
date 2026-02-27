@@ -263,7 +263,7 @@ impl ToolkitRunner {
     /// * `contract_path` - Path to contract in format "path/to/Contract.sol:ContractName"
     /// * `chain_id` - Chain ID for the network
     /// * `verifier_url` - Block explorer API URL
-    /// * `api_key` - Block explorer API key
+    /// * `api_key` - Block explorer API key (optional for public explorers like Blockscout)
     /// * `constructor_args` - Optional constructor arguments (hex-encoded)
     /// * `protocol_version` - Protocol version for toolkit image selection
     #[allow(clippy::too_many_arguments)]
@@ -273,7 +273,7 @@ impl ToolkitRunner {
         contract_path: &str,
         chain_id: u64,
         verifier_url: &str,
-        api_key: &str,
+        api_key: Option<&str>,
         constructor_args: Option<&str>,
         protocol_version: &Version,
     ) -> Result<i64> {
@@ -294,13 +294,16 @@ impl ToolkitRunner {
             &chain_id_str,
             "--verifier-url",
             verifier_url,
-            "--etherscan-api-key",
-            api_key,
             "--root",
             "/deps/era-contracts/l1-contracts/contracts",
             "--compiler-version",
             "0.8.28",
         ];
+
+        if let Some(key) = api_key {
+            args.push("--etherscan-api-key");
+            args.push(key);
+        }
 
         if let Some(ctor_args) = constructor_args {
             args.push("--constructor-args");

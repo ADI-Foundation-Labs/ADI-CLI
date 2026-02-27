@@ -209,7 +209,7 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
     let chain_id = resolve_chain_id(&args, context).await?;
 
     // Resolve explorer configuration
-    let api_key = resolve_api_key(&args, context)?;
+    let api_key = resolve_api_key(&args, context);
     let explorer_url = resolve_explorer_url(&args, chain_id)?;
 
     ui::note(
@@ -246,7 +246,7 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
     let explorer_config = ExplorerConfig::new(
         args.explorer,
         explorer_url.clone(),
-        Some(api_key.clone()),
+        api_key.clone(),
         chain_id,
     );
     let explorer_client = ExplorerClient::new(explorer_config, Arc::clone(context.logger()));
@@ -435,7 +435,7 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
     let summary = verify_contracts(
         &targets_to_verify,
         &explorer_url,
-        &api_key,
+        api_key.as_deref(),
         chain_id,
         &args
             .protocol_version
@@ -516,19 +516,18 @@ async fn resolve_chain_id(args: &VerifyArgs, context: &Context) -> Result<u64> {
 }
 
 /// Resolve API key from args, env, or config.
-fn resolve_api_key(args: &VerifyArgs, context: &Context) -> Result<String> {
+/// Returns None if no API key is provided (optional for public explorers).
+fn resolve_api_key(args: &VerifyArgs, context: &Context) -> Option<String> {
     if let Some(ref key) = args.api_key {
-        return Ok(key.clone());
+        return Some(key.clone());
     }
 
     if let Some(ref key) = context.config().verification.api_key {
         use secrecy::ExposeSecret;
-        return Ok(key.expose_secret().to_string());
+        return Some(key.expose_secret().to_string());
     }
 
-    Err(eyre::eyre!(
-        "API key required. Provide --api-key or set ADI_EXPLORER_API_KEY"
-    ))
+    None
 }
 
 /// Resolve explorer URL from args or defaults.
