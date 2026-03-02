@@ -110,6 +110,29 @@ pub struct VerificationDefaults {
     pub api_key: Option<SecretString>,
 }
 
+/// Predefined operator keys (private keys only, address derived).
+///
+/// These keys override randomly generated keys after init.
+/// All fields are optional — only specified keys are overridden.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct OperatorKeysConfig {
+    /// Operator private key.
+    #[serde(default, skip_serializing)]
+    pub operator: Option<SecretString>,
+
+    /// Blob operator private key.
+    #[serde(default, skip_serializing)]
+    pub blob_operator: Option<SecretString>,
+
+    /// Prove operator private key.
+    #[serde(default, skip_serializing)]
+    pub prove_operator: Option<SecretString>,
+
+    /// Execute operator private key.
+    #[serde(default, skip_serializing)]
+    pub execute_operator: Option<SecretString>,
+}
+
 /// S3 synchronization configuration.
 ///
 /// Enables syncing ecosystem state to S3-compatible storage.
@@ -212,6 +235,11 @@ pub struct Config {
     /// Enables syncing ecosystem state to S3-compatible storage.
     #[serde(default)]
     pub s3: S3Config,
+
+    /// Predefined operator keys (private keys).
+    /// Override randomly generated keys after init.
+    #[serde(default)]
+    pub operator_keys: OperatorKeysConfig,
 }
 
 impl Config {

@@ -3,8 +3,11 @@
 use adi_ecosystem::{
     build_ecosystem_create_args, normalize_name, verify_ecosystem_created, EcosystemConfig,
 };
-use adi_state::import_ecosystem_state;
+use adi_state::{import_ecosystem_state, StateManager};
 use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
+use adi_types::{Wallet, Wallets};
+use alloy_signer_local::PrivateKeySigner;
+use secrecy::{ExposeSecret, SecretString};
 use std::sync::Arc;
 use tempfile::TempDir;
 
@@ -192,6 +195,9 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
         .await
         .wrap_err("Failed to import ecosystem state")?;
 
+    // 9.5. Override operator keys if configured
+    apply_operator_key_overrides(&state_manager, &chain_name, args, context).await?;
+
     // 10. Validate imported state
     ui::info("Validating imported state...")?;
     let metadata = state_manager
@@ -296,4 +302,83 @@ async fn download_genesis(url: &str, dest: &std::path::Path) -> Result<()> {
     std::fs::write(dest, &content).wrap_err("Failed to write genesis.json to disk")?;
 
     Ok(())
+}
+
+/// Apply predefined operator key overrides after ecosystem import.
+///
+/// If operator keys are configured via CLI args, ENV, or config file,
+/// this function updates the generated wallets with the predefined keys.
+/// Priority: CLI args > Config (ENV already merged by config crate).
+async fn apply_operator_key_overrides(
+    state_manager: &StateManager,
+    chain_name: &str,
+    args: &InitArgs,
+    context: &Context,
+) -> Result<()> {
+    let config_keys = &context.config().operator_keys;
+
+    // Build Wallets with only operator keys set
+    // Priority: CLI args > Config (ENV already merged by config crate)
+    let partial = Wallets {
+        operator: key_to_wallet(args.operator_key.as_ref().or(config_keys.operator.as_ref()))?,
+        blob_operator: key_to_wallet(
+            args.blob_operator_key
+                .as_ref()
+                .or(config_keys.blob_operator.as_ref()),
+        )?,
+        prove_operator: key_to_wallet(
+            args.prove_operator_key
+                .as_ref()
+                .or(config_keys.prove_operator.as_ref()),
+        )?,
+        execute_operator: key_to_wallet(
+            args.execute_operator_key
+                .as_ref()
+                .or(config_keys.execute_operator.as_ref()),
+        )?,
+        ..Default::default()
+    };
+
+    // Check if any overrides exist
+    let has_overrides = partial.operator.is_some()
+        || partial.blob_operator.is_some()
+        || partial.prove_operator.is_some()
+        || partial.execute_operator.is_some();
+
+    if has_overrides {
+        ui::info("Applying predefined operator keys...")?;
+
+        // Update ecosystem-level wallets (uses existing merge_wallets)
+        state_manager
+            .ecosystem()
+            .update_wallets(&partial)
+            .await
+            .wrap_err("Failed to update ecosystem operator keys")?;
+
+        // Update chain-level wallets
+        state_manager
+            .chain(chain_name)
+            .update_wallets(&partial)
+            .await
+            .wrap_err("Failed to update chain operator keys")?;
+
+        ui::success("Operator keys updated")?;
+    }
+
+    Ok(())
+}
+
+/// Convert private key to Wallet (derive address from key).
+fn key_to_wallet(key: Option<&SecretString>) -> Result<Option<Wallet>> {
+    key.map(wallet_from_private_key).transpose()
+}
+
+/// Create a Wallet from a private key, deriving the address.
+fn wallet_from_private_key(key: &SecretString) -> Result<Wallet> {
+    let signer: PrivateKeySigner = key
+        .expose_secret()
+        .parse()
+        .wrap_err("Invalid private key")?;
+
+    Ok(Wallet::new(signer.address(), key.clone()))
 }

@@ -5,6 +5,7 @@ mod ecosystem;
 use adi_ecosystem::{L1Network, ProverMode};
 use alloy_primitives::Address;
 use clap::Args;
+use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 
 pub use ecosystem::run;
@@ -86,6 +87,26 @@ pub struct InitArgs {
         help = "Enable EVM bytecode emulator for running unmodified Ethereum contracts"
     )]
     pub evm_emulator: Option<bool>,
+
+    /// Override operator private key (address derived automatically)
+    #[arg(long, env = "ADI_OPERATOR_KEY")]
+    #[serde(skip)]
+    pub operator_key: Option<SecretString>,
+
+    /// Override blob operator private key (address derived automatically)
+    #[arg(long, env = "ADI_BLOB_OPERATOR_KEY")]
+    #[serde(skip)]
+    pub blob_operator_key: Option<SecretString>,
+
+    /// Override prove operator private key (address derived automatically)
+    #[arg(long, env = "ADI_PROVE_OPERATOR_KEY")]
+    #[serde(skip)]
+    pub prove_operator_key: Option<SecretString>,
+
+    /// Override execute operator private key (address derived automatically)
+    #[arg(long, env = "ADI_EXECUTE_OPERATOR_KEY")]
+    #[serde(skip)]
+    pub execute_operator_key: Option<SecretString>,
 
     /// Force reinitialization without confirmation prompt
     #[arg(

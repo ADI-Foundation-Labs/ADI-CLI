@@ -194,28 +194,41 @@ gas_multiplier: 120
 # toolkit:
 #   # Use a custom image tag instead of protocol version-derived tag
 #   image_tag: "latest"
+
+# OPTIONAL: Predefined operator keys
+# Use this to override randomly generated operator keys during init.
+# Only private keys are needed — addresses are derived automatically.
+# operator_keys:
+#   operator: "0x..."
+#   blob_operator: "0x..."
+#   prove_operator: "0x..."
+#   execute_operator: "0x..."
 ```
 
 ### Environment Variables
 
 For sensitive data like private keys, use environment variables instead of config files:
 
-| Variable                   | Purpose                                                                                                          |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `ADI_FUNDER_KEY`           | Private key (hex) of the wallet that funds ecosystem wallets. This is the only wallet you need to fund manually. |
-| `ADI_PRIVATE_KEY`          | Private key (hex) for accepting ownership as new owner. Used by the `accept` command.                            |
-| `ADI_RPC_URL`              | Settlement layer RPC endpoint. Useful for switching networks without editing config.                             |
-| `ADI_EXPLORER_URL`         | Block explorer API URL for contract verification during deploy and scan commands.                                |
-| `ADI_EXPLORER_API_KEY`     | Block explorer API key for contract verification (optional for public explorers).                                |
-| `ADI_CONFIG`               | Path to an alternative config file.                                                                              |
-| `ADI__PROTOCOL_VERSION`    | Default protocol version for init, add, and deploy commands (e.g., `v30.0.2`).                                   |
-| `ADI__TOOLKIT__IMAGE_TAG`  | Override Docker image tag for toolkit containers (e.g., `latest` or `custom-build`).                             |
-| `AWS_ACCESS_KEY_ID`        | AWS access key for S3 synchronization.                                                                           |
-| `AWS_SECRET_ACCESS_KEY`    | AWS secret key for S3 synchronization.                                                                           |
-| `ADI__S3__ENABLED`         | Enable S3 sync (`true`/`false`).                                                                                 |
-| `ADI__S3__TENANT_ID`       | Tenant identifier for S3 key prefix.                                                                             |
-| `ADI__S3__BUCKET`          | S3 bucket name.                                                                                                  |
-| `RUST_LOG`                 | Logging verbosity: `error`, `warn`, `info`, `debug`, `trace`                                                     |
+| Variable                            | Purpose                                                                                                          |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `ADI_FUNDER_KEY`                    | Private key (hex) of the wallet that funds ecosystem wallets. This is the only wallet you need to fund manually. |
+| `ADI_PRIVATE_KEY`                   | Private key (hex) for accepting ownership as new owner. Used by the `accept` command.                            |
+| `ADI_RPC_URL`                       | Settlement layer RPC endpoint. Useful for switching networks without editing config.                             |
+| `ADI_EXPLORER_URL`                  | Block explorer API URL for contract verification during deploy and scan commands.                                |
+| `ADI_EXPLORER_API_KEY`              | Block explorer API key for contract verification (optional for public explorers).                                |
+| `ADI_CONFIG`                        | Path to an alternative config file.                                                                              |
+| `ADI__PROTOCOL_VERSION`             | Default protocol version for init, add, and deploy commands (e.g., `v30.0.2`).                                   |
+| `ADI__TOOLKIT__IMAGE_TAG`           | Override Docker image tag for toolkit containers (e.g., `latest` or `custom-build`).                             |
+| `ADI_OPERATOR_KEY`                  | Override operator private key during init (address derived automatically).                                       |
+| `ADI_BLOB_OPERATOR_KEY`             | Override blob operator private key during init.                                                                  |
+| `ADI_PROVE_OPERATOR_KEY`            | Override prove operator private key during init.                                                                 |
+| `ADI_EXECUTE_OPERATOR_KEY`          | Override execute operator private key during init.                                                               |
+| `AWS_ACCESS_KEY_ID`                 | AWS access key for S3 synchronization.                                                                           |
+| `AWS_SECRET_ACCESS_KEY`             | AWS secret key for S3 synchronization.                                                                           |
+| `ADI__S3__ENABLED`                  | Enable S3 sync (`true`/`false`).                                                                                 |
+| `ADI__S3__TENANT_ID`                | Tenant identifier for S3 key prefix.                                                                             |
+| `ADI__S3__BUCKET`                   | S3 bucket name.                                                                                                  |
+| `RUST_LOG`                          | Logging verbosity: `error`, `warn`, `info`, `debug`, `trace`                                                     |
 
 You can also override any config value using the `ADI__` prefix with double underscores as path separators:
 
@@ -258,14 +271,18 @@ The `init` command creates the foundational configuration for your ZkSync ecosys
 
 **All arguments are optional** and fall back to values in `~/.adi.yml`:
 
-| Flag                 | Description                                            |
-| -------------------- | ------------------------------------------------------ |
-| `--protocol-version` | Protocol version (e.g., `v30.0.2`)                     |
-| `--ecosystem-name`   | Override the ecosystem name from config                |
-| `--l1-network`       | Settlement layer: `localhost`, `sepolia`, or `mainnet` |
-| `--chain-name`       | Name for the initial chain                             |
-| `--chain-id`         | Unique numeric chain identifier                        |
-| `--prover-mode`      | `no-proofs` for testing, `gpu` for production          |
+| Flag                    | Description                                            |
+| ----------------------- | ------------------------------------------------------ |
+| `--protocol-version`    | Protocol version (e.g., `v30.0.2`)                     |
+| `--ecosystem-name`      | Override the ecosystem name from config                |
+| `--l1-network`          | Settlement layer: `localhost`, `sepolia`, or `mainnet` |
+| `--chain-name`          | Name for the initial chain                             |
+| `--chain-id`            | Unique numeric chain identifier                        |
+| `--prover-mode`         | `no-proofs` for testing, `gpu` for production          |
+| `--operator-key`        | Override operator private key (address derived)        |
+| `--blob-operator-key`   | Override blob operator private key                     |
+| `--prove-operator-key`  | Override prove operator private key                    |
+| `--execute-operator-key`| Override execute operator private key                  |
 
 **Example: Using config file defaults**
 
@@ -296,6 +313,30 @@ adi init \
   --chain-name testnet-chain \
   --chain-id 271
 ```
+
+**Example: Using predefined operator keys**
+
+If you need specific operator keys (e.g., for key management or HSM integration), you can override them during init:
+
+```bash
+# Via CLI flags
+adi init \
+  --protocol-version v30.0.2 \
+  --operator-key 0x... \
+  --blob-operator-key 0x...
+
+# Or via environment variables
+export ADI_OPERATOR_KEY="0x..."
+export ADI_BLOB_OPERATOR_KEY="0x..."
+adi init -p v30.0.2
+
+# Or via config file (~/.adi.yml)
+# operator_keys:
+#   operator: "0x..."
+#   blob_operator: "0x..."
+```
+
+The CLI generates random keys first, then overrides them with your predefined keys. Only private keys are needed — addresses are derived automatically.
 
 After initialization, check `~/.adi_cli/state/<ecosystem-name>/` to see the generated files, including `configs/wallets.yaml` with your new wallet addresses.
 
