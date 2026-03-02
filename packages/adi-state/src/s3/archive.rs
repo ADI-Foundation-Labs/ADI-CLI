@@ -111,6 +111,7 @@ fn extract_tar_gz_sync(archive_data: &[u8], target_dir: &Path) -> Result<()> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use std::fs;
