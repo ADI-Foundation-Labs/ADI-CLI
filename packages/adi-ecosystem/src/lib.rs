@@ -72,3 +72,21 @@ pub use ownership::{
 pub use types::{L1Network, ProverMode};
 pub use validator::{build_add_validator_roles_calldata, ValidatorRoles};
 pub use verify::{verify_chain_created, verify_ecosystem_created};
+
+/// Normalize ecosystem/chain name to match zkstack convention.
+///
+/// zkstack replaces hyphens with underscores in ecosystem and chain names.
+/// This function applies the same normalization so our paths match zkstack's output.
+///
+/// # Example
+///
+/// ```rust
+/// use adi_ecosystem::normalize_name;
+///
+/// assert_eq!(normalize_name("my-ecosystem"), "my_ecosystem");
+/// assert_eq!(normalize_name("my_ecosystem"), "my_ecosystem");
+/// ```
+#[must_use]
+pub fn normalize_name(name: &str) -> String {
+    name.replace('-', "_")
+}

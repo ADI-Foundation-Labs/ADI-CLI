@@ -1,6 +1,8 @@
 //! Ecosystem initialization command implementation.
 
-use adi_ecosystem::{build_ecosystem_create_args, verify_ecosystem_created, EcosystemConfig};
+use adi_ecosystem::{
+    build_ecosystem_create_args, normalize_name, verify_ecosystem_created, EcosystemConfig,
+};
 use adi_state::import_ecosystem_state;
 use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
 use std::sync::Arc;
@@ -180,9 +182,13 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
         .wrap_err("Ecosystem verification failed")?;
 
     // 9. Import state from temp dir through StateManager
+    // zkstack normalizes names (- → _), so we need to use the same normalization
+    let ecosystem_name = normalize_name(&config.name);
+    let chain_name = normalize_name(&config.chain_name);
+
     ui::info(format!("State directory: {}", state_dir.display()))?;
     ui::info("Importing ecosystem state through backend...")?;
-    import_ecosystem_state(&state_manager, &temp_path, &config.name, &config.chain_name)
+    import_ecosystem_state(&state_manager, &temp_path, &ecosystem_name, &chain_name)
         .await
         .wrap_err("Failed to import ecosystem state")?;
 

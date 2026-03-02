@@ -248,7 +248,7 @@ impl Config {
         }
 
         // 4. Environment variables ADI__* (highest overall priority)
-        builder
+        let mut config: Self = builder
             .add_source(
                 config::Environment::with_prefix("ADI")
                     .separator("__")
@@ -257,7 +257,12 @@ impl Config {
             .build()
             .wrap_err("Failed to build config")?
             .try_deserialize()
-            .wrap_err("Failed to deserialize config")
+            .wrap_err("Failed to deserialize config")?;
+
+        // Expand ~ in state_dir to user's home directory
+        config.state_dir = expand_tilde(&config.state_dir);
+
+        Ok(config)
     }
 }
 
@@ -279,4 +284,17 @@ fn default_state_dir() -> PathBuf {
     dirs::home_dir()
         .map(|h| h.join(DEFAULT_STATE_DIR))
         .unwrap_or_else(|| PathBuf::from("/home/user").join(DEFAULT_STATE_DIR))
+}
+
+/// Expand tilde (~) to home directory in a path.
+///
+/// If the path starts with `~`, it is replaced with the user's home directory.
+/// Otherwise, the path is returned unchanged.
+fn expand_tilde(path: &Path) -> PathBuf {
+    if let Ok(stripped) = path.strip_prefix("~") {
+        if let Some(home) = dirs::home_dir() {
+            return home.join(stripped);
+        }
+    }
+    path.to_path_buf()
 }
