@@ -3,7 +3,9 @@
 //! This module contains common utilities used across multiple commands,
 //! reducing code duplication.
 
-use adi_ecosystem::{OwnershipResult, OwnershipState, OwnershipStatusSummary, OwnershipSummary};
+use adi_ecosystem::{
+    CalldataOutput, OwnershipResult, OwnershipState, OwnershipStatusSummary, OwnershipSummary,
+};
 use adi_state::StateManager;
 use alloy_primitives::Address;
 use std::sync::Arc;
@@ -295,4 +297,29 @@ pub fn resolve_protocol_version(arg_value: Option<&String>, config: &Config) -> 
                 "Protocol version required: use --protocol-version or set protocol_version in config"
             )
         })
+}
+
+/// Display calldata output for external submission.
+pub fn display_calldata_output(title: &str, output: &CalldataOutput) -> Result<()> {
+    if output.is_empty() {
+        ui::note(title, "No pending ownership transfers")?;
+        return Ok(());
+    }
+
+    let mut lines = Vec::new();
+    for entry in &output.entries {
+        lines.push(format!("{}", ui::cyan(&entry.name)));
+        lines.push(format!("  To:       {}", ui::green(entry.to)));
+        lines.push(format!("  Call:     {}", entry.description));
+        lines.push(format!("  Calldata: {}", entry.calldata));
+        lines.push(String::new());
+    }
+
+    // Remove trailing empty line
+    if lines.last().is_some_and(|s| s.is_empty()) {
+        lines.pop();
+    }
+
+    ui::note(title, lines.join("\n"))?;
+    Ok(())
 }

@@ -6,7 +6,7 @@
 use adi_ecosystem::{
     accept_all_ownership, accept_chain_ownership, check_chain_ownership_status,
     check_ecosystem_ownership_status, check_ecosystem_ownership_status_for_new_owner,
-    OwnershipStatusSummary,
+    collect_all_ownership_calldata, collect_chain_ownership_calldata, OwnershipStatusSummary,
 };
 use adi_types::{ChainContracts, EcosystemContracts};
 use clap::Args;
@@ -15,8 +15,9 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::commands::helpers::{
-    create_state_manager_with_context, derive_address_from_key, display_ownership_status,
-    display_summary, resolve_chain_name, resolve_ecosystem_name, resolve_rpc_url,
+    create_state_manager_with_context, derive_address_from_key, display_calldata_output,
+    display_ownership_status, display_summary, resolve_chain_name, resolve_ecosystem_name,
+    resolve_rpc_url,
 };
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
@@ -75,6 +76,10 @@ pub struct AcceptArgs {
     /// Use stored governor key without prompting.
     #[arg(long, help = "Use stored governor key without prompting")]
     pub use_governor: bool,
+
+    /// Print calldata without sending transactions (for multisig/external submission).
+    #[arg(long, help = "Print calldata without sending transactions")]
+    pub calldata: bool,
 }
 
 /// Execute the accept ownership command.
@@ -274,6 +279,38 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
     // Dry-run mode
     if args.dry_run {
         ui::outro("Dry-run mode: no transactions will be executed")?;
+        return Ok(());
+    }
+
+    // Calldata mode - collect and display calldata without sending
+    if args.calldata {
+        ui::info("Collecting calldata for pending contracts...")?;
+
+        let ecosystem_calldata = collect_all_ownership_calldata(
+            rpc_url.as_str(),
+            &ecosystem_contracts,
+            key_address,
+            context.logger().as_ref(),
+        )
+        .await
+        .wrap_err("Failed to collect ecosystem calldata")?;
+
+        display_calldata_output("Ecosystem Calldata", &ecosystem_calldata)?;
+
+        if let Some(ref contracts) = chain_contracts {
+            let chain_calldata = collect_chain_ownership_calldata(
+                rpc_url.as_str(),
+                contracts,
+                key_address,
+                context.logger().as_ref(),
+            )
+            .await
+            .wrap_err("Failed to collect chain calldata")?;
+
+            display_calldata_output("Chain Calldata", &chain_calldata)?;
+        }
+
+        ui::outro("Calldata collection complete")?;
         return Ok(());
     }
 

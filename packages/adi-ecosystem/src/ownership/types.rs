@@ -3,7 +3,7 @@
 //! This module contains all struct and enum definitions used
 //! for ownership acceptance operations.
 
-use alloy_primitives::{Address, B256};
+use alloy_primitives::{Address, Bytes, B256};
 use alloy_sol_types::sol;
 
 // Define contract interfaces
@@ -234,6 +234,65 @@ impl OwnershipStatusSummary {
             .iter()
             .filter(|s| s.state == OwnershipState::NotTransferred)
             .count()
+    }
+}
+
+/// Transaction calldata for ownership acceptance.
+///
+/// Contains all information needed to submit a transaction
+/// through external tooling (e.g., multisig, Safe).
+#[derive(Debug, Clone)]
+pub struct CalldataEntry {
+    /// Contract name.
+    pub name: &'static str,
+    /// Target contract address (where to send tx).
+    pub to: Address,
+    /// Encoded calldata.
+    pub calldata: Bytes,
+    /// Human-readable description.
+    pub description: String,
+}
+
+impl CalldataEntry {
+    /// Create a new calldata entry.
+    pub fn new(name: &'static str, to: Address, calldata: Bytes, description: String) -> Self {
+        Self {
+            name,
+            to,
+            calldata,
+            description,
+        }
+    }
+}
+
+/// Collection of calldata entries for batch submission.
+#[derive(Debug, Default)]
+pub struct CalldataOutput {
+    /// Calldata entries for each contract.
+    pub entries: Vec<CalldataEntry>,
+}
+
+impl CalldataOutput {
+    /// Create a new empty calldata output.
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    /// Add an entry to the output.
+    pub fn push(&mut self, entry: CalldataEntry) {
+        self.entries.push(entry);
+    }
+
+    /// Returns the number of entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns true if there are no entries.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
     }
 }
 
