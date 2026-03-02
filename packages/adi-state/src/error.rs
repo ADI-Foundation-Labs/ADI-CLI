@@ -79,7 +79,6 @@ pub enum StateError {
     },
 
     /// S3 upload failed.
-    #[cfg(feature = "s3")]
     #[error("Failed to upload to S3 key '{key}': {reason}")]
     S3UploadFailed {
         /// S3 object key that failed to upload.
@@ -89,7 +88,6 @@ pub enum StateError {
     },
 
     /// S3 download failed.
-    #[cfg(feature = "s3")]
     #[error("Failed to download from S3 key '{key}': {reason}")]
     S3DownloadFailed {
         /// S3 object key that failed to download.
@@ -99,7 +97,6 @@ pub enum StateError {
     },
 
     /// Archive creation failed.
-    #[cfg(feature = "s3")]
     #[error("Failed to create archive from '{}': {reason}", .path.display())]
     ArchiveCreateFailed {
         /// Path that failed to archive.
@@ -109,7 +106,6 @@ pub enum StateError {
     },
 
     /// Archive extraction failed.
-    #[cfg(feature = "s3")]
     #[error("Failed to extract archive to '{}': {reason}", .path.display())]
     ArchiveExtractFailed {
         /// Path where extraction failed.

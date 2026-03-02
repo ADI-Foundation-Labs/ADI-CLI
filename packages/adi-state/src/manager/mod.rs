@@ -6,15 +6,12 @@ mod ecosystem;
 pub use chain::ChainStateOps;
 pub use ecosystem::EcosystemStateOps;
 
-use crate::backend::{create_backend, BackendType, StateBackend};
-#[cfg(feature = "s3")]
 use crate::backend::{
-    create_s3_sync_backend, create_s3_sync_backend_with_control,
-    create_s3_sync_backend_with_handler, S3SyncControl,
+    create_backend, create_s3_sync_backend, create_s3_sync_backend_with_control,
+    create_s3_sync_backend_with_handler, BackendType, S3SyncControl, StateBackend,
 };
 use crate::error::Result;
 use crate::paths;
-#[cfg(feature = "s3")]
 use crate::s3::{S3Config, S3SyncEventHandler};
 use adi_types::{LogCrateLogger, Logger};
 use std::path::{Path, PathBuf};
@@ -148,7 +145,6 @@ impl StateManager {
     /// # Errors
     ///
     /// Returns error if S3 client initialization fails.
-    #[cfg(feature = "s3")]
     pub async fn with_s3_sync(
         ecosystem_path: &Path,
         ecosystem_name: &str,
@@ -191,7 +187,6 @@ impl StateManager {
     /// # Errors
     ///
     /// Returns error if S3 client initialization fails.
-    #[cfg(feature = "s3")]
     pub async fn with_s3_sync_and_handler(
         ecosystem_path: &Path,
         ecosystem_name: &str,
@@ -236,7 +231,6 @@ impl StateManager {
     /// # Errors
     ///
     /// Returns error if S3 client initialization fails.
-    #[cfg(feature = "s3")]
     pub async fn with_s3_sync_and_control(
         ecosystem_path: &Path,
         ecosystem_name: &str,

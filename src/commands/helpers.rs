@@ -151,7 +151,6 @@ pub fn create_state_manager_with_context(ecosystem_name: &str, context: &Context
 /// # Errors
 ///
 /// Returns error if required fields are missing when S3 is enabled.
-#[cfg(feature = "s3")]
 pub fn to_state_s3_config(cli_config: &crate::config::S3Config) -> Result<adi_state::S3Config> {
     use secrecy::ExposeSecret;
 
@@ -199,12 +198,7 @@ pub fn to_state_s3_config(cli_config: &crate::config::S3Config) -> Result<adi_st
 }
 
 /// Optional S3 sync control handle.
-#[cfg(feature = "s3")]
 pub type OptionalS3Control = Option<adi_state::S3SyncControl>;
-
-/// Optional S3 sync control handle (stub when S3 feature is disabled).
-#[cfg(not(feature = "s3"))]
-pub type OptionalS3Control = Option<()>;
 
 /// Create state manager with optional S3 sync and control handle.
 ///
@@ -226,7 +220,6 @@ pub async fn create_state_manager_with_s3(
 ) -> Result<(StateManager, OptionalS3Control)> {
     let ecosystem_path = context.config().state_dir.join(ecosystem_name);
 
-    #[cfg(feature = "s3")]
     if context.config().s3.enabled {
         use crate::s3_events::SpinnerS3EventHandler;
 

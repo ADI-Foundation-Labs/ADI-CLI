@@ -15,7 +15,6 @@ mod init;
 mod owners;
 mod scan;
 mod server_params;
-#[cfg(feature = "s3")]
 mod state;
 mod transfer;
 mod version;
@@ -47,7 +46,6 @@ pub enum Commands {
     /// Display server parameters for Docker Compose configuration
     ServerParams(server_params::ServerParamsArgs),
     /// Manage state synchronization with S3
-    #[cfg(feature = "s3")]
     State(state::StateArgs),
 }
 
@@ -66,7 +64,6 @@ impl Commands {
             Commands::Owners(args) => owners::run(&args, context).await,
             Commands::Scan(args) => scan::run(args, context).await,
             Commands::ServerParams(args) => server_params::run(&args, context).await,
-            #[cfg(feature = "s3")]
             Commands::State(args) => state::run(&args, context).await,
         }
     }

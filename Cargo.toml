@@ -172,10 +172,6 @@ adi-types = { path = "packages/adi-types" }
 adi-state = { path = "packages/adi-state" }
 adi-funding = { path = "packages/adi-funding" }
 
-[features]
-default = ["s3"]
-s3 = ["adi-state/s3"]
-
 [lints]
 workspace = true
 

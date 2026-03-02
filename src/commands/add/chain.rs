@@ -58,7 +58,6 @@ pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
         .wrap_err("Failed to create state manager")?;
 
     // Disable auto-sync for batch operations
-    #[cfg(feature = "s3")]
     if let Some(ref control) = s3_control {
         control.disable_auto_sync();
     }
@@ -243,7 +242,6 @@ pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
     ));
 
     // Sync to S3 if enabled
-    #[cfg(feature = "s3")]
     if let Some(control) = s3_control {
         control.sync_now().await.wrap_err("Failed to sync to S3")?;
     }

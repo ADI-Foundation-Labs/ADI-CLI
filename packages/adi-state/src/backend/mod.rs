@@ -1,13 +1,9 @@
 //! State backend abstraction.
 
 mod filesystem;
-
-#[cfg(feature = "s3")]
 mod s3_sync;
 
 pub use filesystem::FilesystemBackend;
-
-#[cfg(feature = "s3")]
 pub use s3_sync::{S3SyncBackend, S3SyncControl};
 
 use crate::error::Result;
@@ -28,7 +24,6 @@ pub enum BackendType {
     #[default]
     Filesystem,
     /// Filesystem with S3 sync on writes.
-    #[cfg(feature = "s3")]
     #[serde(rename = "filesystem_s3_sync")]
     FilesystemWithS3Sync,
 }
@@ -260,7 +255,6 @@ pub fn create_backend(
 ) -> Box<dyn StateBackend> {
     match backend_type {
         BackendType::Filesystem => Box::new(FilesystemBackend::new(base_path, logger)),
-        #[cfg(feature = "s3")]
         BackendType::FilesystemWithS3Sync => {
             // S3SyncBackend requires async initialization
             // Use create_s3_sync_backend() instead
@@ -281,7 +275,6 @@ pub fn create_backend(
 /// # Errors
 ///
 /// Returns error if S3 client initialization fails.
-#[cfg(feature = "s3")]
 pub async fn create_s3_sync_backend(
     base_path: &Path,
     ecosystem_name: &str,
@@ -307,7 +300,6 @@ pub async fn create_s3_sync_backend(
 /// # Errors
 ///
 /// Returns error if S3 client initialization fails.
-#[cfg(feature = "s3")]
 pub async fn create_s3_sync_backend_with_handler(
     base_path: &Path,
     ecosystem_name: &str,
@@ -337,7 +329,6 @@ pub async fn create_s3_sync_backend_with_handler(
 /// # Errors
 ///
 /// Returns error if S3 client initialization fails.
-#[cfg(feature = "s3")]
 pub async fn create_s3_sync_backend_with_control(
     base_path: &Path,
     ecosystem_name: &str,

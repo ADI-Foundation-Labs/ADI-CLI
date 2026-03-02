@@ -62,7 +62,6 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
         .wrap_err("Failed to create state manager")?;
 
     // Disable auto-sync for batch import operations
-    #[cfg(feature = "s3")]
     if let Some(ref control) = s3_control {
         control.disable_auto_sync();
     }
@@ -218,7 +217,6 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     ui::success(format!("State validated: {} chain(s) found", chains.len()))?;
 
     // Sync to S3 once at the end (if enabled)
-    #[cfg(feature = "s3")]
     if let Some(control) = s3_control {
         control
             .sync_now()
