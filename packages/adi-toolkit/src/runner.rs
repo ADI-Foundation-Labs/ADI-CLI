@@ -16,6 +16,19 @@ pub const GENESIS_FILENAME: &str = "genesis.json";
 /// Path where genesis.json should be copied in the container.
 pub const GENESIS_CONTAINER_PATH: &str = "/deps/zksync-era/etc/env/file_based/genesis.json";
 
+/// Options for contract verification during deployment.
+#[derive(Debug, Clone, Default)]
+pub struct VerificationOpts {
+    /// Enable verification (--verify flag).
+    pub enabled: bool,
+    /// Verifier type: etherscan, blockscout, sourcify, oklink.
+    pub verifier: Option<String>,
+    /// Verifier API URL.
+    pub verifier_url: Option<String>,
+    /// Verifier API key.
+    pub api_key: Option<String>,
+}
+
 /// Executes commands inside Docker toolkit containers.
 ///
 /// Container lifecycle: create -> start -> stream output -> wait -> remove
@@ -263,9 +276,12 @@ impl ToolkitRunner {
     /// * `contract_path` - Path to contract in format "path/to/Contract.sol:ContractName"
     /// * `chain_id` - Chain ID for the network
     /// * `verifier_url` - Block explorer API URL
+    /// * `verifier` - Verifier type ("blockscout", "etherscan", "sourcify", etc.)
     /// * `api_key` - Block explorer API key (optional for public explorers like Blockscout)
     /// * `constructor_args` - Optional constructor arguments (hex-encoded)
     /// * `protocol_version` - Protocol version for toolkit image selection
+    /// * `log_dir` - Directory for saving log files
+    /// * `root_path` - Root path for contract sources (e.g., /deps/era-contracts/l1-contracts)
     #[allow(clippy::too_many_arguments)]
     pub async fn run_forge_verify(
         &self,
@@ -273,29 +289,35 @@ impl ToolkitRunner {
         contract_path: &str,
         chain_id: u64,
         verifier_url: &str,
+        verifier: &str,
         api_key: Option<&str>,
         constructor_args: Option<&str>,
         protocol_version: &Version,
+        log_dir: &Path,
+        root_path: &str,
     ) -> Result<i64> {
         self.logger.debug(&format!(
-            "Running forge verify-contract for {} (contract: {})",
-            address, contract_path
+            "Running forge verify-contract for {} (contract: {}, root: {})",
+            address, contract_path, root_path
         ));
 
         // Build the forge verify-contract command
-        // Working directory inside container is /deps/era-contracts/l1-contracts/contracts
+        // Forge verify doesn't use src setting, so we prepend contracts/ to the path
+        let full_contract_path = format!("contracts/{}", contract_path);
         let chain_id_str = chain_id.to_string();
         let mut args: Vec<&str> = vec![
             "forge",
             "verify-contract",
             address,
-            contract_path,
+            &full_contract_path,
             "--chain-id",
             &chain_id_str,
+            "--verifier",
+            verifier,
             "--verifier-url",
             verifier_url,
             "--root",
-            "/deps/era-contracts/l1-contracts/contracts",
+            root_path,
             "--compiler-version",
             "0.8.28",
         ];
@@ -312,9 +334,10 @@ impl ToolkitRunner {
 
         let temp_dir = std::env::temp_dir();
 
-        self.run_command(
+        self.run_command_with_log_dir(
             &args,
             &temp_dir,
+            log_dir,
             protocol_version,
             &[("CI", "true")], // Suppress interactive prompts like telemetry
             "forge-verify",
@@ -335,6 +358,8 @@ impl ToolkitRunner {
     ///   - `true` for first-time deployment (creates Bridgehub, Governance, etc.)
     ///   - `false` when adding a chain to an existing ecosystem
     /// * `chain_name` - Name of the chain to initialize/deploy
+    /// * `verification` - Contract verification options
+    #[allow(clippy::too_many_arguments)]
     pub async fn run_zkstack_ecosystem_init(
         &self,
         ecosystem_dir: &Path,
@@ -343,6 +368,7 @@ impl ToolkitRunner {
         protocol_version: &Version,
         deploy_ecosystem: bool,
         chain_name: &str,
+        verification: &VerificationOpts,
     ) -> Result<i64> {
         self.logger.debug(&format!(
             "Running zkstack ecosystem init (ecosystem_dir: {}, rpc: {}, deploy_ecosystem: {})",
@@ -379,6 +405,24 @@ impl ToolkitRunner {
 
         let container_rpc_url = transform_url_for_container(l1_rpc_url, self.logger.as_ref());
         zkstack_args.push_str(&format!(" --l1-rpc-url {}", container_rpc_url));
+
+        // Add verification flags if enabled
+        if verification.enabled {
+            zkstack_args.push_str(" --verify true");
+
+            if let Some(ref verifier) = verification.verifier {
+                zkstack_args.push_str(&format!(" --verifier {}", verifier));
+            }
+
+            if let Some(ref url) = verification.verifier_url {
+                let container_url = transform_url_for_container(url, self.logger.as_ref());
+                zkstack_args.push_str(&format!(" --verifier-url {}", container_url));
+            }
+
+            if let Some(ref key) = verification.api_key {
+                zkstack_args.push_str(&format!(" --verifier-api-key {}", key));
+            }
+        }
 
         let shell_cmd = format!(
             r#"cp /workspace/{genesis} {genesis_path} && {foundry_fix} && \

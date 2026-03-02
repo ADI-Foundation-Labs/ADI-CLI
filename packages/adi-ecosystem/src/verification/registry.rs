@@ -6,6 +6,25 @@ use adi_types::{ChainContracts, EcosystemContracts};
 use alloy_primitives::Address;
 use serde::{Deserialize, Serialize};
 
+/// Root directory for contract sources within era-contracts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContractsRoot {
+    /// L1 contracts: /deps/era-contracts/l1-contracts
+    L1Contracts,
+    /// DA contracts: /deps/era-contracts/da-contracts
+    DaContracts,
+}
+
+impl ContractsRoot {
+    /// Get the filesystem path for this root.
+    pub fn path(self) -> &'static str {
+        match self {
+            Self::L1Contracts => "/deps/era-contracts/l1-contracts",
+            Self::DaContracts => "/deps/era-contracts/da-contracts",
+        }
+    }
+}
+
 /// Contract type identifier for verification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ContractType {
@@ -222,7 +241,9 @@ pub struct VerificationTarget {
     pub contract_type: ContractType,
     /// Contract address.
     pub address: Address,
-    /// Source file path relative to era-contracts/l1-contracts/contracts/.
+    /// Root path for the contract sources.
+    pub root_path: &'static str,
+    /// Source file path relative to the root's contracts/ subdirectory.
     pub source_path: &'static str,
     /// Contract name in Solidity.
     pub contract_name: &'static str,
@@ -232,9 +253,11 @@ pub struct VerificationTarget {
 
 impl VerificationTarget {
     /// Create a new verification target.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         contract_type: ContractType,
         address: Address,
+        root_path: &'static str,
         source_path: &'static str,
         contract_name: &'static str,
         is_proxy: bool,
@@ -242,6 +265,7 @@ impl VerificationTarget {
         Self {
             contract_type,
             address,
+            root_path,
             source_path,
             contract_name,
             is_proxy,
@@ -259,8 +283,20 @@ impl VerificationTarget {
 pub struct ContractRegistry;
 
 impl ContractRegistry {
+    /// Get the root directory for a contract type.
+    pub fn root_path(contract_type: ContractType) -> ContractsRoot {
+        match contract_type {
+            ContractType::RollupL1DaValidator
+            | ContractType::BlobsZkSyncOsL1DaValidator
+            | ContractType::AvailL1DaValidator
+            | ContractType::DummyAvailBridge
+            | ContractType::DummyVectorX => ContractsRoot::DaContracts,
+            _ => ContractsRoot::L1Contracts,
+        }
+    }
+
     /// Get source file path for a contract type.
-    /// Paths are relative to /deps/era-contracts/l1-contracts/contracts/
+    /// Paths are relative to the contracts/ subdirectory of the root path.
     pub fn source_path(contract_type: ContractType) -> &'static str {
         match contract_type {
             ContractType::Bridgehub => "bridgehub/L1Bridgehub.sol",
@@ -272,28 +308,24 @@ impl ContractRegistry {
             ContractType::NativeTokenVault => "bridge/ntv/L1NativeTokenVault.sol",
             ContractType::Governance => "governance/Governance.sol",
             ContractType::ChainAdmin => "governance/ChainAdmin.sol",
-            ContractType::StateTransitionProxy => "state-transition/ChainTypeManager.sol",
+            ContractType::StateTransitionProxy => "state-transition/ZKsyncOSChainTypeManager.sol",
             ContractType::ValidatorTimelock => "state-transition/ValidatorTimelock.sol",
-            ContractType::ServerNotifier => "state-transition/ServerNotifier.sol",
-            ContractType::Verifier => "verifier/Verifier.sol",
+            ContractType::ServerNotifier => "governance/ServerNotifier.sol",
+            ContractType::Verifier => "state-transition/verifiers/ZKsyncOSDualVerifier.sol",
             ContractType::L1RollupDaManager => {
-                "state-transition/data-availability/L1RollupDAManager.sol"
+                "state-transition/data-availability/RollupDAManager.sol"
             }
-            ContractType::L1BytecodesSupplier => "state-transition/L1BytecodesSupplier.sol",
-            ContractType::RollupL1DaValidator => {
-                "state-transition/data-availability/RollupL1DAValidator.sol"
-            }
+            ContractType::L1BytecodesSupplier => "upgrades/BytecodesSupplier.sol",
+            // DA contracts (in da-contracts directory)
+            ContractType::RollupL1DaValidator => "RollupL1DAValidator.sol",
+            ContractType::BlobsZkSyncOsL1DaValidator => "BlobsL1DAValidatorZKsyncOS.sol",
+            ContractType::AvailL1DaValidator => "da-layers/avail/AvailL1DAValidator.sol",
+            // L1 contracts (in l1-contracts directory)
             ContractType::NoDaValidiumL1Validator => {
                 "state-transition/data-availability/ValidiumL1DAValidator.sol"
             }
-            ContractType::BlobsZkSyncOsL1DaValidator => {
-                "state-transition/data-availability/BlobsRollupL1DAValidator.sol"
-            }
-            ContractType::AvailL1DaValidator => {
-                "state-transition/data-availability/AvailL1DAValidator.sol"
-            }
             ContractType::DefaultUpgrade => "upgrades/DefaultUpgrade.sol",
-            ContractType::GenesisUpgrade => "upgrades/GenesisUpgrade.sol",
+            ContractType::GenesisUpgrade => "upgrades/L1GenesisUpgrade.sol",
             ContractType::Erc20Bridge => "bridge/L1ERC20Bridge.sol",
             ContractType::SharedBridge => "bridge/asset-router/L1AssetRouter.sol",
             ContractType::L1Nullifier => "bridge/L1Nullifier.sol",
@@ -312,23 +344,21 @@ impl ContractRegistry {
             ContractType::MessageRootImpl => "bridgehub/L1MessageRoot.sol",
             ContractType::NativeTokenVaultImpl => "bridge/ntv/L1NativeTokenVault.sol",
             ContractType::StmDeploymentTrackerImpl => "bridgehub/CTMDeploymentTracker.sol",
-            ContractType::ChainTypeManagerImpl => "state-transition/ChainTypeManager.sol",
-            ContractType::ServerNotifierImpl => "state-transition/ServerNotifier.sol",
+            ContractType::ChainTypeManagerImpl => "state-transition/ZKsyncOSChainTypeManager.sol",
+            ContractType::ServerNotifierImpl => "governance/ServerNotifier.sol",
             ContractType::Erc20BridgeImpl => "bridge/L1ERC20Bridge.sol",
             ContractType::SharedBridgeImpl => "bridge/asset-router/L1AssetRouter.sol",
             ContractType::L1NullifierImpl => "bridge/L1Nullifier.sol",
             ContractType::ValidatorTimelockImpl => "state-transition/ValidatorTimelock.sol",
             // Verifier components
-            ContractType::VerifierFflonk => "verifier/ZKsyncOsVerifierFflonk.sol",
-            ContractType::VerifierPlonk => "verifier/ZKsyncOsVerifierPlonk.sol",
+            ContractType::VerifierFflonk => "state-transition/verifiers/ZKsyncOSVerifierFflonk.sol",
+            ContractType::VerifierPlonk => "state-transition/verifiers/ZKsyncOSVerifierPlonk.sol",
             // Bridge token contracts
             ContractType::BridgedStandardErc20 => "bridge/BridgedStandardERC20.sol",
             ContractType::BridgedTokenBeacon => "bridge/BridgedTokenBeacon.sol",
-            // Avail test contracts
-            ContractType::DummyAvailBridge => {
-                "state-transition/data-availability/DummyAvailBridge.sol"
-            }
-            ContractType::DummyVectorX => "state-transition/data-availability/DummyVectorX.sol",
+            // Avail test contracts (in da-contracts directory)
+            ContractType::DummyAvailBridge => "da-layers/avail/DummyAvailBridge.sol",
+            ContractType::DummyVectorX => "da-layers/avail/DummyVectorX.sol",
             // Server notifier proxy admin
             ContractType::ServerNotifierProxyAdmin => {
                 "transparent-proxy/TransparentUpgradeableProxy.sol"
@@ -348,18 +378,18 @@ impl ContractRegistry {
             ContractType::NativeTokenVault => "L1NativeTokenVault",
             ContractType::Governance => "Governance",
             ContractType::ChainAdmin => "ChainAdmin",
-            ContractType::StateTransitionProxy => "ChainTypeManager",
+            ContractType::StateTransitionProxy => "ZKsyncOSChainTypeManager",
             ContractType::ValidatorTimelock => "ValidatorTimelock",
             ContractType::ServerNotifier => "ServerNotifier",
-            ContractType::Verifier => "Verifier",
-            ContractType::L1RollupDaManager => "L1RollupDAManager",
-            ContractType::L1BytecodesSupplier => "L1BytecodesSupplier",
+            ContractType::Verifier => "ZKsyncOSDualVerifier",
+            ContractType::L1RollupDaManager => "RollupDAManager",
+            ContractType::L1BytecodesSupplier => "BytecodesSupplier",
             ContractType::RollupL1DaValidator => "RollupL1DAValidator",
             ContractType::NoDaValidiumL1Validator => "ValidiumL1DAValidator",
-            ContractType::BlobsZkSyncOsL1DaValidator => "BlobsRollupL1DAValidator",
+            ContractType::BlobsZkSyncOsL1DaValidator => "BlobsL1DAValidatorZKsyncOS",
             ContractType::AvailL1DaValidator => "AvailL1DAValidator",
             ContractType::DefaultUpgrade => "DefaultUpgrade",
-            ContractType::GenesisUpgrade => "GenesisUpgrade",
+            ContractType::GenesisUpgrade => "L1GenesisUpgrade",
             ContractType::Erc20Bridge => "L1ERC20Bridge",
             ContractType::SharedBridge => "L1AssetRouter",
             ContractType::L1Nullifier => "L1Nullifier",
@@ -378,7 +408,7 @@ impl ContractRegistry {
             ContractType::MessageRootImpl => "L1MessageRoot",
             ContractType::NativeTokenVaultImpl => "L1NativeTokenVault",
             ContractType::StmDeploymentTrackerImpl => "CTMDeploymentTracker",
-            ContractType::ChainTypeManagerImpl => "ChainTypeManager",
+            ContractType::ChainTypeManagerImpl => "ZKsyncOSChainTypeManager",
             ContractType::ServerNotifierImpl => "ServerNotifier",
             ContractType::Erc20BridgeImpl => "L1ERC20Bridge",
             ContractType::SharedBridgeImpl => "L1AssetRouter",
@@ -420,11 +450,8 @@ impl ContractRegistry {
     ///
     /// Some contracts don't exist in the current toolkit image:
     /// - TransparentUpgradeableProxy: External OpenZeppelin contract
-    /// - RollupL1DAValidator: Not in v30.x toolkit
-    /// - BlobsRollupL1DAValidator: Not in v30.x toolkit
-    /// - AvailL1DAValidator: Not in v30.x toolkit
-    /// - DummyAvailBridge: Test contract, not in toolkit
-    /// - DummyVectorX: Test contract, not in toolkit
+    /// - BridgedTokenBeacon: External OpenZeppelin UpgradeableBeacon
+    /// - L1WrappedBaseTokenStore: Only L2 version exists
     pub fn is_available(contract_type: ContractType) -> bool {
         !matches!(
             contract_type,
@@ -432,13 +459,9 @@ impl ContractRegistry {
             ContractType::TransparentProxyAdmin
                 | ContractType::ChainProxyAdmin
                 | ContractType::ServerNotifierProxyAdmin
-                // DA validators not in v30.x toolkit
-                | ContractType::RollupL1DaValidator
-                | ContractType::BlobsZkSyncOsL1DaValidator
-                | ContractType::AvailL1DaValidator
-                // Test contracts not in toolkit
-                | ContractType::DummyAvailBridge
-                | ContractType::DummyVectorX
+                | ContractType::BridgedTokenBeacon // Uses OpenZeppelin UpgradeableBeacon
+                // Contracts that don't exist in v30.x
+                | ContractType::L1WrappedBaseTokenStore // Only L2 version exists
         )
     }
 
@@ -447,15 +470,11 @@ impl ContractRegistry {
         match contract_type {
             ContractType::TransparentProxyAdmin
             | ContractType::ChainProxyAdmin
-            | ContractType::ServerNotifierProxyAdmin => {
+            | ContractType::ServerNotifierProxyAdmin
+            | ContractType::BridgedTokenBeacon => {
                 Some("External OpenZeppelin contract (verify separately)")
             }
-            ContractType::RollupL1DaValidator
-            | ContractType::BlobsZkSyncOsL1DaValidator
-            | ContractType::AvailL1DaValidator => Some("Not available in v30.x toolkit"),
-            ContractType::DummyAvailBridge | ContractType::DummyVectorX => {
-                Some("Test contract, not in toolkit")
-            }
+            ContractType::L1WrappedBaseTokenStore => Some("Only L2 version exists in v30.x"),
             _ => None,
         }
     }
@@ -472,6 +491,7 @@ impl ContractRegistry {
         Some(VerificationTarget::new(
             contract_type,
             address,
+            Self::root_path(contract_type).path(),
             Self::source_path(contract_type),
             Self::contract_name(contract_type),
             Self::is_proxy(contract_type),
@@ -487,6 +507,7 @@ impl ContractRegistry {
         VerificationTarget::new(
             contract_type,
             address,
+            Self::root_path(contract_type).path(),
             Self::source_path(contract_type),
             Self::contract_name(contract_type),
             Self::is_proxy(contract_type),

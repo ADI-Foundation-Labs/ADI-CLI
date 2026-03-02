@@ -1,9 +1,7 @@
-//! Verify command implementation.
+//! Scan command implementation.
 //!
-//! This command verifies deployed smart contracts on block explorers
-//! like Etherscan and Blockscout.
-
-mod contracts;
+//! This command checks the verification status of deployed smart contracts
+//! on block explorers like Etherscan and Blockscout.
 
 use adi_ecosystem::verification::{
     parse_diamond_cut_data, ContractRegistry, ExplorerClient, ExplorerConfig, ExplorerType,
@@ -23,8 +21,6 @@ use crate::context::Context;
 use crate::error::{Result, WrapErr};
 use crate::ui;
 
-use contracts::verify_contracts;
-
 /// Result of a verification status check for display purposes.
 enum CheckResult {
     Verified,
@@ -34,11 +30,11 @@ enum CheckResult {
     Error(String),
 }
 
-/// Arguments for `verify` command.
+/// Arguments for `scan` command.
 ///
-/// Verifies deployed smart contracts on block explorers.
+/// Checks verification status of deployed smart contracts on block explorers.
 #[derive(Clone, Args, Debug, Serialize, Deserialize)]
-pub struct VerifyArgs {
+pub struct ScanArgs {
     /// Ecosystem name (falls back to config file if not provided).
     #[arg(
         long,
@@ -47,7 +43,7 @@ pub struct VerifyArgs {
     pub ecosystem_name: Option<String>,
 
     /// Chain name for chain-level contract verification.
-    #[arg(long, help = "Chain name for chain-level contract verification")]
+    #[arg(long, help = "Chain name for chain-level contract status")]
     pub chain: Option<String>,
 
     /// Block explorer type.
@@ -75,10 +71,6 @@ pub struct VerifyArgs {
     #[arg(long, env = "ADI_EXPLORER_API_KEY", help = "Block explorer API key")]
     pub api_key: Option<String>,
 
-    /// Protocol version for toolkit image (e.g., v30.0.2).
-    #[arg(long, short = 'p', help = "Protocol version for toolkit image")]
-    pub protocol_version: Option<String>,
-
     /// Settlement layer chain ID.
     /// If not provided, will be fetched from RPC.
     #[arg(long, help = "Settlement layer chain ID")]
@@ -92,23 +84,11 @@ pub struct VerifyArgs {
     )]
     pub rpc_url: Option<Url>,
 
-    /// Preview contracts without submitting verification.
-    #[arg(long, help = "Preview contracts without submitting verification")]
-    pub dry_run: bool,
-
-    /// Skip confirmation prompt.
-    #[arg(long, short = 'y', help = "Skip confirmation prompt")]
-    pub yes: bool,
-
-    /// Force verification even if contracts are already verified.
-    #[arg(long, help = "Force verification even if already verified")]
-    pub force: bool,
-
-    /// Verify only specific contract types (comma-separated).
+    /// Check only specific contract types (comma-separated).
     #[arg(
         long,
         value_delimiter = ',',
-        help = "Verify only specific contracts (comma-separated)"
+        help = "Check only specific contracts (comma-separated)"
     )]
     pub contracts: Option<Vec<String>>,
 }
@@ -124,9 +104,9 @@ fn is_local_network_url(url: &Url) -> bool {
         || host.starts_with("10.")
 }
 
-/// Execute the verify command.
-pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
-    ui::intro("ADI Verify Contracts")?;
+/// Execute the scan command.
+pub async fn run(args: ScanArgs, context: &Context) -> Result<()> {
+    ui::intro("ADI Scan Verification Status")?;
 
     // Early check for local network - verification not supported
     let rpc_url = args
@@ -213,7 +193,7 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
     let explorer_url = resolve_explorer_url(&args, chain_id)?;
 
     ui::note(
-        "Verification configuration",
+        "Scan configuration",
         format!(
             "Ecosystem: {}\nChain: {}\nExplorer: {}\nAPI URL: {}\nChain ID: {}",
             ui::green(&ecosystem_name),
@@ -231,11 +211,11 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
         ContractRegistry::build_all_targets(&ecosystem_contracts, chain_contracts.as_ref());
 
     if targets.is_empty() {
-        ui::outro("No contracts found to verify.")?;
+        ui::outro("No contracts found to check.")?;
         return Ok(());
     }
 
-    ui::info(format!("Found {} contracts to verify", targets.len()))?;
+    ui::info(format!("Found {} contracts to check", targets.len()))?;
     ui::info(ui::dim(
         "Note: Excludes Create2 Factory, Multicall3 (external), L2 contracts, \
          Forge libraries (internal in v30), and contracts unavailable in toolkit \
@@ -255,7 +235,7 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
     ui::section("Checking Verification Status")?;
 
     let mut verified_count = 0;
-    let mut unverified_targets = Vec::new();
+    let mut unverified_count = 0;
 
     let progress = cliclack::progress_bar(targets.len() as u64);
     progress.start("Checking verification status...");
@@ -286,16 +266,16 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
                         CheckResult::Verified
                     }
                     Ok(VerificationStatus::NotVerified) => {
-                        unverified_targets.push(target.clone());
+                        unverified_count += 1;
                         CheckResult::NotVerified
                     }
                     Ok(VerificationStatus::Pending) => CheckResult::Pending,
                     Ok(VerificationStatus::Unknown(msg)) => {
-                        unverified_targets.push(target.clone());
+                        unverified_count += 1;
                         CheckResult::Unknown(msg)
                     }
                     Err(e) => {
-                        unverified_targets.push(target.clone());
+                        unverified_count += 1;
                         CheckResult::Error(e.to_string())
                     }
                 }
@@ -323,7 +303,7 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
 
     // Exit early if interrupted
     if interrupted {
-        ui::outro_cancel("Verification interrupted by user")?;
+        ui::outro_cancel("Scan interrupted by user")?;
         return Ok(());
     }
 
@@ -373,114 +353,25 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
         format!(
             "Verified: {}  Unverified: {}",
             ui::green(verified_count),
-            ui::yellow(unverified_targets.len())
+            ui::yellow(unverified_count)
         ),
     )?;
 
-    // Early exit if all contracts are verified
-    if unverified_targets.is_empty() && !args.force {
-        ui::outro("All contracts are already verified!")?;
-        return Ok(());
-    }
-
-    // If force flag is set, verify all contracts
-    let targets_to_verify = if args.force {
-        targets
+    // Final message based on status
+    if unverified_count == 0 {
+        ui::outro("All contracts are verified!")?;
     } else {
-        unverified_targets
-    };
-
-    if targets_to_verify.is_empty() {
-        ui::outro("No contracts need verification.")?;
-        return Ok(());
+        ui::outro(format!(
+            "{} contracts need verification. Use 'adi deploy --verify' to verify during deployment.",
+            unverified_count
+        ))?;
     }
 
-    // Dry-run mode
-    if args.dry_run {
-        ui::note(
-            "Dry Run",
-            format!(
-                "Would verify {} contracts:\n{}",
-                targets_to_verify.len(),
-                targets_to_verify
-                    .iter()
-                    .map(|t| format!("  - {} ({})", t.contract_type.display_name(), t.address))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            ),
-        )?;
-        ui::outro("Dry-run mode: no verifications submitted")?;
-        return Ok(());
-    }
-
-    // Confirmation
-    if !args.yes {
-        let confirmed = ui::confirm(format!(
-            "Proceed with verification of {} contracts?",
-            targets_to_verify.len()
-        ))
-        .initial_value(true)
-        .interact()
-        .wrap_err("Failed to get confirmation")?;
-
-        if !confirmed {
-            ui::outro_cancel("Aborted by user")?;
-            return Ok(());
-        }
-    }
-
-    // Execute verification
-    ui::section("Submitting Verifications")?;
-
-    let summary = verify_contracts(
-        &targets_to_verify,
-        &explorer_url,
-        api_key.as_deref(),
-        chain_id,
-        &args
-            .protocol_version
-            .clone()
-            .unwrap_or_else(|| "v30.0.2".to_string()),
-        context,
-    )
-    .await;
-
-    // Display final summary
-    ui::note(
-        "Verification Summary",
-        format!(
-            "Already Verified: {}  Submitted: {}  Failed: {}",
-            ui::green(summary.already_verified_count()),
-            ui::cyan(summary.submitted_count()),
-            ui::red(summary.failed_count())
-        ),
-    )?;
-
-    if summary.failed_count() > 0 {
-        for result in &summary.results {
-            if let adi_ecosystem::verification::VerificationOutcome::Failed { reason } =
-                &result.outcome
-            {
-                context
-                    .logger()
-                    .error(&format!("{}: {}", result.name, reason));
-            }
-        }
-    }
-
-    if summary.submitted_count() > 0 || summary.already_verified_count() > 0 {
-        ui::outro("Verification complete!")?;
-        Ok(())
-    } else if summary.failed_count() > 0 {
-        Err(eyre::eyre!("All verification attempts failed"))
-    } else {
-        ui::outro("No contracts were verified")?;
-        Ok(())
-    }
+    Ok(())
 }
 
 /// Resolve chain ID from args or RPC.
-async fn resolve_chain_id(args: &VerifyArgs, context: &Context) -> Result<u64> {
+async fn resolve_chain_id(args: &ScanArgs, context: &Context) -> Result<u64> {
     if let Some(chain_id) = args.chain_id {
         return Ok(chain_id);
     }
@@ -517,7 +408,7 @@ async fn resolve_chain_id(args: &VerifyArgs, context: &Context) -> Result<u64> {
 
 /// Resolve API key from args, env, or config.
 /// Returns None if no API key is provided (optional for public explorers).
-fn resolve_api_key(args: &VerifyArgs, context: &Context) -> Option<String> {
+fn resolve_api_key(args: &ScanArgs, context: &Context) -> Option<String> {
     if let Some(ref key) = args.api_key {
         return Some(key.clone());
     }
@@ -531,7 +422,7 @@ fn resolve_api_key(args: &VerifyArgs, context: &Context) -> Option<String> {
 }
 
 /// Resolve explorer URL from args or defaults.
-fn resolve_explorer_url(args: &VerifyArgs, chain_id: u64) -> Result<Url> {
+fn resolve_explorer_url(args: &ScanArgs, chain_id: u64) -> Result<Url> {
     if let Some(ref url) = args.explorer_url {
         let url_str = url.as_str();
 

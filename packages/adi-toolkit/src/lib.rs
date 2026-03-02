@@ -51,7 +51,7 @@
 //! The [`ToolkitConfig`] struct controls:
 //! - Registry URL (default: `harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli`)
 //! - Image name (default: `adi-toolkit`)
-//! - Operation timeout (default: 30 minutes)
+//! - Operation timeout (default: 1 hour)
 //!
 //! Image tags are derived from the protocol version: `v{major}.{minor}.{patch}`
 
@@ -65,9 +65,10 @@ mod runner;
 mod version;
 
 // Public re-exports
+pub use adi_docker::DEFAULT_TIMEOUT_SECONDS;
 pub use cleanup::cleanup_tmp_dir;
 pub use config::{ImageReference, ToolkitConfig};
-pub use config::{DEFAULT_IMAGE_NAME, DEFAULT_REGISTRY, DEFAULT_TIMEOUT_SECONDS};
+pub use config::{DEFAULT_IMAGE_NAME, DEFAULT_REGISTRY};
 pub use error::{Result, ToolkitError};
-pub use runner::{ToolkitRunner, GENESIS_FILENAME};
+pub use runner::{ToolkitRunner, VerificationOpts, GENESIS_FILENAME};
 pub use version::{ParseError, ProtocolVersion};

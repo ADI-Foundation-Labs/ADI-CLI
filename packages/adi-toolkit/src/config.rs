@@ -1,5 +1,6 @@
 //! Configuration types for toolkit operations.
 
+use adi_docker::DEFAULT_TIMEOUT_SECONDS;
 use adi_types::Logger;
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -9,9 +10,6 @@ pub const DEFAULT_REGISTRY: &str = "harbor-v2.dev.internal.adifoundation.ai/adi-
 
 /// Default image name for ADI toolkit.
 pub const DEFAULT_IMAGE_NAME: &str = "adi-toolkit";
-
-/// Default timeout in seconds (30 minutes).
-pub const DEFAULT_TIMEOUT_SECONDS: u64 = 1800;
 
 /// Configuration for toolkit image orchestration.
 ///
@@ -167,7 +165,7 @@ mod tests {
             "harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli"
         );
         assert_eq!(config.image_name, "adi-toolkit");
-        assert_eq!(config.timeout_seconds, 1800);
+        assert_eq!(config.timeout_seconds, 3600);
     }
 
     #[test]

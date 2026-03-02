@@ -6,7 +6,7 @@
 //! 3. Configures validator roles for operators
 
 use adi_ecosystem::verification::{
-    apply_implementations, parse_diamond_cut_data, read_all_implementations,
+    apply_implementations, parse_diamond_cut_data, read_all_implementations, ExplorerType,
 };
 use adi_ecosystem::{add_validator_roles, configure_l3_da, DeployedContracts};
 use adi_funding::{
@@ -15,7 +15,7 @@ use adi_funding::{
     FundingPlanBuilder, FundingTargetStatus, LoggingEventHandler, SpinnerEventHandler,
 };
 use adi_state::StateManager;
-use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
+use adi_toolkit::{ProtocolVersion, ToolkitRunner, VerificationOpts, GENESIS_FILENAME};
 use adi_types::Wallets;
 use alloy_primitives::{Address, U256};
 use clap::Args;
@@ -143,6 +143,30 @@ pub struct DeployArgs {
         help = "Deploy as L3 chain (disables blobs, uses calldata DA on L2 settlement layer)"
     )]
     pub l3: bool,
+
+    /// Enable contract verification during deployment.
+    #[arg(long, help = "Enable contract verification during deployment")]
+    pub verify: bool,
+
+    /// Disable contract verification (overrides --verify and config).
+    #[arg(
+        long,
+        conflicts_with = "verify",
+        help = "Disable contract verification"
+    )]
+    pub no_verify: bool,
+
+    /// Block explorer type for verification (etherscan, blockscout, custom).
+    #[arg(long, value_enum, help = "Block explorer type")]
+    pub explorer: Option<ExplorerType>,
+
+    /// Block explorer API URL for verification.
+    #[arg(long, env = "ADI_EXPLORER_URL", help = "Block explorer API URL")]
+    pub explorer_url: Option<Url>,
+
+    /// Block explorer API key for verification.
+    #[arg(long, env = "ADI_EXPLORER_API_KEY", help = "Block explorer API key")]
+    pub explorer_api_key: Option<String>,
 }
 
 /// Execute the ecosystem deploy command.
@@ -720,6 +744,17 @@ async fn run_ecosystem_deployment(
     };
     ui::info(init_msg)?;
 
+    // Build verification options from CLI args and config
+    let verification = resolve_verification_opts(args, context);
+
+    if verification.enabled {
+        ui::info(format!(
+            "Verification enabled: {} ({})",
+            ui::green(verification.verifier.as_deref().unwrap_or("etherscan")),
+            ui::green(verification.verifier_url.as_deref().unwrap_or("auto"))
+        ))?;
+    }
+
     let exit_code = runner
         .run_zkstack_ecosystem_init(
             &ecosystem_path,
@@ -728,6 +763,7 @@ async fn run_ecosystem_deployment(
             &protocol_version.to_semver(),
             deploy_ecosystem,
             chain_name,
+            &verification,
         )
         .await
         .wrap_err("Failed to run zkstack ecosystem init")?;
@@ -1044,6 +1080,44 @@ fn resolve_gas_multiplier(args: &DeployArgs, context: &Context) -> u64 {
 /// Priority: CLI arg > config file
 fn resolve_l3_mode(args: &DeployArgs, context: &Context) -> bool {
     args.l3 || context.config().ecosystem.l3
+}
+
+/// Resolve verification options from CLI args and config.
+///
+/// Priority: CLI --no-verify > CLI flags > config
+fn resolve_verification_opts(args: &DeployArgs, context: &Context) -> VerificationOpts {
+    use secrecy::ExposeSecret;
+    let cfg = &context.config().verification;
+
+    // --no-verify takes absolute precedence
+    if args.no_verify {
+        return VerificationOpts::default();
+    }
+
+    // Determine if enabled: CLI --verify > CLI --explorer-url > config
+    let enabled = args.verify || args.explorer_url.is_some() || cfg.explorer_url.is_some();
+
+    if !enabled {
+        return VerificationOpts::default();
+    }
+
+    // Build opts with CLI overrides > config fallbacks
+    VerificationOpts {
+        enabled: true,
+        verifier: args
+            .explorer
+            .map(|e| e.to_string())
+            .or_else(|| cfg.explorer.clone()),
+        verifier_url: args
+            .explorer_url
+            .as_ref()
+            .map(|u| u.to_string())
+            .or_else(|| cfg.explorer_url.as_ref().map(|u| u.to_string())),
+        api_key: args
+            .explorer_api_key
+            .clone()
+            .or_else(|| cfg.api_key.as_ref().map(|s| s.expose_secret().to_string())),
+    }
 }
 
 /// Get L1 DA validator address from state.

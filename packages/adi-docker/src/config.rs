@@ -2,8 +2,8 @@
 
 use std::path::PathBuf;
 
-/// Default timeout in seconds (30 minutes).
-pub const DEFAULT_TIMEOUT_SECONDS: u64 = 1800;
+/// Default timeout in seconds (1 hour).
+pub const DEFAULT_TIMEOUT_SECONDS: u64 = 3600;
 
 /// Configuration for creating a container.
 #[derive(Debug, Clone)]
