@@ -545,6 +545,7 @@ The `accept` command operates in two modes depending on who is accepting:
 | `--private-key` | Provide your own private key (for new owner acceptance) |
 | `--chain <name>` | Also process chain-level contracts |
 | `--dry-run` | Preview contracts without executing transactions |
+| `--calldata` | Print calldata without sending transactions (for multisig/external submission) |
 | `--yes, -y` | Skip confirmation prompt |
 
 **Acceptance methods by contract:**
@@ -581,6 +582,31 @@ adi accept --chain my-chain --yes
 
 # Option 3: Pass directly (less secure, visible in shell history)
 adi accept --private-key 0x... --chain my-chain --yes
+```
+
+**Example: Export calldata for multisig submission**
+
+Use `--calldata` to get transaction data for external submission (Safe, Gnosis multisig):
+
+```bash
+# Get calldata for ecosystem contracts
+adi accept --calldata --use-governor
+
+# Include chain-level contracts
+adi accept --calldata --use-governor --chain my-chain
+```
+
+Output format:
+```
+Server Notifier
+  To:       0x1234...abcd
+  Call:     multicall([(server_notifier, 0, acceptOwnership())])
+  Calldata: 0xac9650d8...
+
+Validator Timelock
+  To:       0x5678...efgh
+  Call:     acceptOwnership()
+  Calldata: 0x79ba5097
 ```
 
 **Private key resolution priority (highest to lowest):**
