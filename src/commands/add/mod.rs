@@ -6,6 +6,7 @@ use adi_ecosystem::ProverMode;
 use alloy_primitives::Address;
 use clap::Args;
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 pub use chain::run;
 
@@ -31,6 +32,14 @@ pub struct AddArgs {
         help = "Ecosystem name (falls back to config file if not provided)"
     )]
     pub ecosystem_name: Option<String>,
+
+    /// Settlement layer JSON-RPC URL for chain ID validation
+    #[arg(
+        long,
+        env = "ADI_RPC_URL",
+        help = "Settlement layer JSON-RPC URL (e.g., http://localhost:8545)"
+    )]
+    pub rpc_url: Option<Url>,
 
     /// Name for the new chain (must be unique within ecosystem).
     #[arg(

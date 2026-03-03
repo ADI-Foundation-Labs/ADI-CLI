@@ -3,8 +3,42 @@
 use adi_types::ETH_TOKEN_ADDRESS;
 use alloy_primitives::Address;
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 use crate::types::{L1Network, ProverMode};
+
+/// Validate that L2/L3 chain ID does not conflict with the settlement layer chain ID.
+///
+/// # Arguments
+///
+/// * `chain_id` - The L2/L3 chain ID to validate.
+/// * `settlement_chain_id` - The actual settlement layer chain ID from RPC.
+///
+/// # Returns
+///
+/// `Ok(())` if valid, `Err` with descriptive message if chain IDs match.
+///
+/// # Example
+///
+/// ```rust
+/// use adi_ecosystem::validate_chain_id;
+///
+/// // Valid: L2 chain ID differs from settlement
+/// assert!(validate_chain_id(270, 1).is_ok());
+///
+/// // Invalid: L2 chain ID matches settlement
+/// assert!(validate_chain_id(1, 1).is_err());
+/// ```
+pub fn validate_chain_id(chain_id: u64, settlement_chain_id: u64) -> Result<(), String> {
+    if chain_id == settlement_chain_id {
+        return Err(format!(
+            "Chain ID {} conflicts with settlement layer chain ID {}. \
+             L2/L3 chains must have a unique chain ID different from the settlement layer.",
+            chain_id, settlement_chain_id
+        ));
+    }
+    Ok(())
+}
 
 /// Configuration for ecosystem creation.
 ///
@@ -47,6 +81,10 @@ pub struct EcosystemConfig {
     /// L3 chains deploying on L2 settlement layers.
     #[serde(default)]
     pub l3: bool,
+
+    /// Settlement layer RPC URL.
+    #[serde(default)]
+    pub rpc_url: Option<Url>,
 }
 
 fn default_base_token_address() -> Address {
@@ -66,6 +104,7 @@ impl Default for EcosystemConfig {
             base_token_price_denominator: 1,
             evm_emulator: false,
             l3: false,
+            rpc_url: None,
         }
     }
 }
@@ -350,5 +389,25 @@ mod tests {
         assert_eq!(config.chain_id, 456);
         assert_eq!(config.prover_mode, ProverMode::Gpu);
         assert!(config.evm_emulator);
+    }
+
+    #[test]
+    fn test_validate_chain_id_conflict() {
+        // Same chain IDs should fail
+        let result = validate_chain_id(1, 1);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("conflicts"));
+
+        // Sepolia chain ID conflict
+        let result = validate_chain_id(11155111, 11155111);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_chain_id_valid() {
+        // Different chain IDs should pass
+        assert!(validate_chain_id(270, 1).is_ok());
+        assert!(validate_chain_id(271, 1).is_ok());
+        assert!(validate_chain_id(270, 11155111).is_ok());
     }
 }

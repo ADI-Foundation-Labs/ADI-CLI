@@ -7,6 +7,7 @@ use alloy_primitives::Address;
 use clap::Args;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 pub use ecosystem::run;
 
@@ -40,6 +41,14 @@ pub struct InitArgs {
         help = "Settlement layer network: localhost (Anvil), sepolia (testnet), or mainnet"
     )]
     pub l1_network: Option<L1Network>,
+
+    /// Settlement layer JSON-RPC URL for chain ID validation
+    #[arg(
+        long,
+        env = "ADI_RPC_URL",
+        help = "Settlement layer JSON-RPC URL (e.g., http://localhost:8545)"
+    )]
+    pub rpc_url: Option<Url>,
 
     /// Name for the initial chain within this ecosystem
     #[arg(long, help = "Name for the initial chain within this ecosystem")]

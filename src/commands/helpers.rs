@@ -272,11 +272,16 @@ pub fn resolve_chain_name(arg_value: Option<&String>, config: &Config) -> Result
 }
 
 /// Resolve RPC URL from optional arg or config.
+///
+/// Priority: CLI arg > ecosystem.rpc_url > funding.rpc_url (backward compat)
 pub fn resolve_rpc_url(arg_value: Option<&Url>, config: &Config) -> Result<Url> {
     arg_value
         .cloned()
-        .or_else(|| config.funding.rpc_url.clone())
-        .ok_or_else(|| eyre::eyre!("RPC URL required: use --rpc-url or set in config"))
+        .or_else(|| config.ecosystem.rpc_url.clone())
+        .or_else(|| config.funding.rpc_url.clone()) // backward compatibility
+        .ok_or_else(|| {
+            eyre::eyre!("RPC URL required: use --rpc-url or set ecosystem.rpc_url in config")
+        })
 }
 
 /// Resolve new owner address from optional arg or config.

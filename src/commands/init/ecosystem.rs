@@ -1,8 +1,10 @@
 //! Ecosystem initialization command implementation.
 
 use adi_ecosystem::{
-    build_ecosystem_create_args, normalize_name, verify_ecosystem_created, EcosystemConfig,
+    build_ecosystem_create_args, normalize_name, validate_chain_id, verify_ecosystem_created,
+    EcosystemConfig,
 };
+use adi_funding::FundingProvider;
 use adi_state::{import_ecosystem_state, StateManager};
 use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
 use adi_types::{Wallet, Wallets};
@@ -12,7 +14,9 @@ use std::sync::Arc;
 use tempfile::TempDir;
 
 use super::InitArgs;
-use crate::commands::helpers::{create_state_manager_with_s3, resolve_protocol_version};
+use crate::commands::helpers::{
+    create_state_manager_with_s3, resolve_protocol_version, resolve_rpc_url,
+};
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
 use crate::ui;
@@ -42,6 +46,24 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     // 2. Merge CLI args with config defaults (CLI > Config)
     let config_defaults = &context.config().ecosystem;
     let config = build_ecosystem_config(args, config_defaults);
+
+    // 3. Validate chain ID doesn't conflict with settlement layer
+    ui::info("Validating chain ID against settlement layer...")?;
+    let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
+    let provider = FundingProvider::new(rpc_url.as_str())
+        .wrap_err("Failed to connect to settlement layer RPC")?;
+    let settlement_chain_id = provider
+        .get_chain_id()
+        .await
+        .wrap_err("Failed to get settlement layer chain ID")?;
+
+    if let Err(msg) = validate_chain_id(config.chain_id, settlement_chain_id) {
+        return Err(eyre::eyre!("{}", msg));
+    }
+    ui::success(format!(
+        "Chain ID {} validated (settlement layer: {})",
+        config.chain_id, settlement_chain_id
+    ))?;
 
     ui::note(
         format!("Protocol version: {}", ui::green(&version)),
@@ -278,6 +300,7 @@ fn build_ecosystem_config(args: &InitArgs, defaults: &EcosystemConfig) -> Ecosys
             .unwrap_or(defaults.base_token_price_denominator),
         evm_emulator: args.evm_emulator.unwrap_or(defaults.evm_emulator),
         l3: defaults.l3,
+        rpc_url: args.rpc_url.clone().or_else(|| defaults.rpc_url.clone()),
     }
 }
 

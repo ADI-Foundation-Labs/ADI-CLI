@@ -56,7 +56,9 @@ pub mod verification;
 
 // Public re-exports
 pub use commands::{build_chain_create_args, build_ecosystem_create_args, ERA_CONTRACTS_PATH};
-pub use config::{ChainConfig, ChainConfigBuilder, EcosystemConfig, EcosystemConfigBuilder};
+pub use config::{
+    validate_chain_id, ChainConfig, ChainConfigBuilder, EcosystemConfig, EcosystemConfigBuilder,
+};
 pub use da::{configure_l3_da, PubdataSource};
 pub use deploy::{add_validator_roles, DeployedContracts};
 pub use error::{EcosystemError, Result};

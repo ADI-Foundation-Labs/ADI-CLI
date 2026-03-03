@@ -8,7 +8,7 @@
 use adi_ecosystem::verification::{
     apply_implementations, parse_diamond_cut_data, read_all_implementations, ExplorerType,
 };
-use adi_ecosystem::{add_validator_roles, configure_l3_da, DeployedContracts};
+use adi_ecosystem::{add_validator_roles, configure_l3_da, validate_chain_id, DeployedContracts};
 use adi_funding::{
     build_funding_target_statuses, is_localhost_rpc, normalize_rpc_url, AnvilFunder,
     AnvilFundingTarget, DefaultAmounts, FundingConfig, FundingError, FundingExecutor,
@@ -206,6 +206,30 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
 
     // 6. Resolve RPC URL (args > config)
     let rpc_url = resolve_rpc_url(&args, context)?;
+
+    // 7. Validate chain ID doesn't conflict with settlement layer
+    ui::info("Validating chain ID against settlement layer...")?;
+    let chain_metadata = state_manager
+        .chain(&chain_name)
+        .metadata()
+        .await
+        .wrap_err("Failed to load chain metadata")?;
+
+    let normalized_rpc = normalize_rpc_url(rpc_url.as_str());
+    let validation_provider = adi_funding::FundingProvider::new(&normalized_rpc)
+        .wrap_err("Failed to connect to settlement layer for validation")?;
+    let settlement_chain_id = validation_provider
+        .get_chain_id()
+        .await
+        .wrap_err("Failed to get settlement layer chain ID")?;
+
+    if let Err(msg) = validate_chain_id(chain_metadata.chain_id, settlement_chain_id) {
+        return Err(eyre::eyre!("{}", msg));
+    }
+    ui::success(format!(
+        "Chain ID {} validated (settlement layer: {})",
+        chain_metadata.chain_id, settlement_chain_id
+    ))?;
 
     // Display deployment info
     let is_l3 = resolve_l3_mode(&args, context);

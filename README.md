@@ -115,13 +115,13 @@ ecosystem:
   # Default: false
   l3: false
 
-# Default values for wallet funding during deployment
-funding:
-  # RPC endpoint for the settlement layer
+  # Settlement layer RPC endpoint
   # For Anvil (local): http://host.docker.internal:8545
   # For Sepolia: https://sepolia.infura.io/v3/YOUR_KEY
   rpc_url: https://sepolia.infura.io/v3/YOUR_KEY
 
+# Default values for wallet funding during deployment
+funding:
   # SECURITY: Use ADI_FUNDER_KEY environment variable instead
   # Never commit private keys to config files
   # funder_key: "0x..."
@@ -236,8 +236,8 @@ You can also override any config value using the `ADI__` prefix with double unde
 # Override ecosystem name
 export ADI__ECOSYSTEM__NAME=production
 
-# Override funding RPC URL
-export ADI__FUNDING__RPC_URL=http://localhost:8545
+# Override ecosystem RPC URL
+export ADI__ECOSYSTEM__RPC_URL=http://localhost:8545
 ```
 
 ## Usage Guide
@@ -480,11 +480,10 @@ anvil --block-base-fee-per-gas 1 --disable-min-priority-fee --disable-block-gas-
 ecosystem:
   # Use sepolia for Docker network compatibility (not localhost)
   l1_network: sepolia
-
-funding:
   # Docker containers access host machine via host.docker.internal
   rpc_url: http://host.docker.internal:8545
 
+funding:
   # No funder_key needed - Anvil accounts are pre-funded
   # funder_key: not required
 

@@ -1,6 +1,9 @@
 //! Chain addition command implementation.
 
-use adi_ecosystem::{build_chain_create_args, verify_chain_created, ChainConfig, EcosystemConfig};
+use adi_ecosystem::{
+    build_chain_create_args, validate_chain_id, verify_chain_created, ChainConfig, EcosystemConfig,
+};
+use adi_funding::FundingProvider;
 use adi_state::{export_ecosystem_state, import_chain_state};
 use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
 use std::sync::Arc;
@@ -8,7 +11,7 @@ use tempfile::TempDir;
 
 use super::AddArgs;
 use crate::commands::helpers::{
-    create_state_manager_with_s3, resolve_ecosystem_name, resolve_protocol_version,
+    create_state_manager_with_s3, resolve_ecosystem_name, resolve_protocol_version, resolve_rpc_url,
 };
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
@@ -50,7 +53,25 @@ pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
         .logger()
         .debug(&format!("Chain config: {:?}", chain_config));
 
-    // 4. Create state manager and validate ecosystem exists
+    // 4. Validate chain ID doesn't conflict with settlement layer
+    ui::info("Validating chain ID against settlement layer...")?;
+    let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
+    let provider = FundingProvider::new(rpc_url.as_str())
+        .wrap_err("Failed to connect to settlement layer RPC")?;
+    let settlement_chain_id = provider
+        .get_chain_id()
+        .await
+        .wrap_err("Failed to get settlement layer chain ID")?;
+
+    if let Err(msg) = validate_chain_id(chain_config.chain_id, settlement_chain_id) {
+        return Err(eyre::eyre!("{}", msg));
+    }
+    ui::success(format!(
+        "Chain ID {} validated (settlement layer: {})",
+        chain_config.chain_id, settlement_chain_id
+    ))?;
+
+    // 5. Create state manager and validate ecosystem exists
     let state_dir = &context.config().state_dir;
     #[allow(unused_variables)]
     let (state_manager, s3_control) = create_state_manager_with_s3(&ecosystem_name, context)
