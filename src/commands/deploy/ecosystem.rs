@@ -25,7 +25,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use url::Url;
 
-use crate::commands::helpers::{create_state_manager_with_s3, resolve_protocol_version};
+use crate::commands::helpers::{
+    create_state_manager_with_s3, resolve_protocol_version, resolve_rpc_url,
+};
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
 use crate::ui;
@@ -204,8 +206,8 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
         return Ok(());
     }
 
-    // 6. Resolve RPC URL (args > config)
-    let rpc_url = resolve_rpc_url(&args, context)?;
+    // 6. Resolve RPC URL (args > ecosystem.rpc_url > funding.rpc_url)
+    let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
 
     // 7. Validate chain ID doesn't conflict with settlement layer
     ui::info("Validating chain ID against settlement layer...")?;
@@ -1053,23 +1055,6 @@ async fn validate_chain_exists(
         ));
     }
     Ok(())
-}
-
-/// Resolve RPC URL from args or config.
-fn resolve_rpc_url(args: &DeployArgs, context: &Context) -> Result<Url> {
-    // Try args first (CLI flag or ADI_RPC_URL env var)
-    if let Some(url) = &args.rpc_url {
-        return Ok(url.clone());
-    }
-
-    // Try config (which includes ADI__FUNDING__RPC_URL env var)
-    if let Some(url) = &context.config().funding.rpc_url {
-        return Ok(url.clone());
-    }
-
-    Err(eyre::eyre!(
-        "RPC URL required: use --rpc-url, ADI_RPC_URL env var, or set funding.rpc_url in config"
-    ))
 }
 
 /// Resolve funder private key from args or config.

@@ -376,7 +376,7 @@ async fn resolve_chain_id(args: &ScanArgs, context: &Context) -> Result<u64> {
         return Ok(chain_id);
     }
 
-    // Try to get from RPC
+    // Try to get from RPC (CLI arg)
     if let Some(ref rpc_url) = args.rpc_url {
         context.logger().debug("Fetching chain ID from RPC...");
         let provider = alloy_provider::ProviderBuilder::new().connect_http(rpc_url.clone());
@@ -388,16 +388,29 @@ async fn resolve_chain_id(args: &ScanArgs, context: &Context) -> Result<u64> {
         return Ok(chain_id);
     }
 
-    // Try from funding config
-    if let Some(ref rpc_url) = context.config().funding.rpc_url {
+    // Try from ecosystem config
+    if let Some(ref rpc_url) = context.config().ecosystem.rpc_url {
         context
             .logger()
-            .debug("Fetching chain ID from config RPC...");
+            .debug("Fetching chain ID from ecosystem config RPC...");
         let provider = alloy_provider::ProviderBuilder::new().connect_http(rpc_url.clone());
         let chain_id = provider
             .get_chain_id()
             .await
-            .wrap_err("Failed to get chain ID from config RPC")?;
+            .wrap_err("Failed to get chain ID from ecosystem config RPC")?;
+        return Ok(chain_id);
+    }
+
+    // Try from funding config (backward compatibility)
+    if let Some(ref rpc_url) = context.config().funding.rpc_url {
+        context
+            .logger()
+            .debug("Fetching chain ID from funding config RPC...");
+        let provider = alloy_provider::ProviderBuilder::new().connect_http(rpc_url.clone());
+        let chain_id = provider
+            .get_chain_id()
+            .await
+            .wrap_err("Failed to get chain ID from funding config RPC")?;
         return Ok(chain_id);
     }
 
