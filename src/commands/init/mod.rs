@@ -5,7 +5,6 @@ mod ecosystem;
 use adi_ecosystem::{L1Network, ProverMode};
 use alloy_primitives::Address;
 use clap::Args;
-use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -97,25 +96,17 @@ pub struct InitArgs {
     )]
     pub evm_emulator: Option<bool>,
 
-    /// Override operator private key (address derived automatically)
-    #[arg(long, env = "ADI_OPERATOR_KEY")]
-    #[serde(skip)]
-    pub operator_key: Option<SecretString>,
+    /// Operator address (receives PRECOMMITTER, COMMITTER, REVERTER roles)
+    #[arg(long, env = "ADI_OPERATOR")]
+    pub operator: Option<Address>,
 
-    /// Override blob operator private key (address derived automatically)
-    #[arg(long, env = "ADI_BLOB_OPERATOR_KEY")]
-    #[serde(skip)]
-    pub blob_operator_key: Option<SecretString>,
+    /// Prove operator address (receives PROVER role)
+    #[arg(long, env = "ADI_PROVE_OPERATOR")]
+    pub prove_operator: Option<Address>,
 
-    /// Override prove operator private key (address derived automatically)
-    #[arg(long, env = "ADI_PROVE_OPERATOR_KEY")]
-    #[serde(skip)]
-    pub prove_operator_key: Option<SecretString>,
-
-    /// Override execute operator private key (address derived automatically)
-    #[arg(long, env = "ADI_EXECUTE_OPERATOR_KEY")]
-    #[serde(skip)]
-    pub execute_operator_key: Option<SecretString>,
+    /// Execute operator address (receives EXECUTOR role)
+    #[arg(long, env = "ADI_EXECUTE_OPERATOR")]
+    pub execute_operator: Option<Address>,
 
     /// Force reinitialization without confirmation prompt
     #[arg(

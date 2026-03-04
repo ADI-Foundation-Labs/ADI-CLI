@@ -5,7 +5,7 @@ use crate::error::{Result, StateError};
 use crate::paths;
 use adi_types::{
     Apps, ChainContracts, ChainMetadata, EcosystemContracts, EcosystemMetadata, Erc20Deployments,
-    InitialDeployments, Logger, Wallets,
+    InitialDeployments, Logger, Operators, Wallets,
 };
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
@@ -427,6 +427,32 @@ impl StateBackend for FilesystemBackend {
         let key = paths::chain_contracts_path(chain);
         self.logger
             .debug(&format!("Creating chain '{}' contracts at {}", chain, key));
+        let yaml = self.serialize(data, &key)?;
+        self.create_raw(&key, &yaml).await
+    }
+
+    // ========== CHAIN OPERATORS ==========
+
+    async fn read_chain_operators(&self, chain: &str) -> Result<Operators> {
+        let key = paths::chain_operators_path(chain);
+        self.logger
+            .debug(&format!("Reading chain '{}' operators from {}", chain, key));
+        let content = self.read_raw(&key).await?;
+        self.deserialize(&content, &key)
+    }
+
+    async fn write_chain_operators(&self, chain: &str, data: &Operators) -> Result<()> {
+        let key = paths::chain_operators_path(chain);
+        self.logger
+            .debug(&format!("Writing chain '{}' operators to {}", chain, key));
+        let yaml = self.serialize(data, &key)?;
+        self.write_raw(&key, &yaml).await
+    }
+
+    async fn create_chain_operators(&self, chain: &str, data: &Operators) -> Result<()> {
+        let key = paths::chain_operators_path(chain);
+        self.logger
+            .debug(&format!("Creating chain '{}' operators at {}", chain, key));
         let yaml = self.serialize(data, &key)?;
         self.create_raw(&key, &yaml).await
     }

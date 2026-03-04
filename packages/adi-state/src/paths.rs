@@ -21,6 +21,9 @@ pub const ERC20_DEPLOYMENTS_FILE: &str = "erc20_deployments.yaml";
 /// Apps config file name.
 pub const APPS_FILE: &str = "apps.yaml";
 
+/// Operators config file name.
+pub const OPERATORS_FILE: &str = "operators.yaml";
+
 /// Chains directory name.
 pub const CHAINS_DIR: &str = "chains";
 
@@ -81,6 +84,12 @@ pub fn chain_contracts_path(chain_name: &str) -> String {
     format!("{CHAINS_DIR}/{chain_name}/{CONFIGS_DIR}/{CONTRACTS_FILE}")
 }
 
+/// Relative path to chain operators from ecosystem root.
+#[must_use]
+pub fn chain_operators_path(chain_name: &str) -> String {
+    format!("{CHAINS_DIR}/{chain_name}/{CONFIGS_DIR}/{OPERATORS_FILE}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -111,6 +120,10 @@ mod tests {
         assert_eq!(
             chain_contracts_path("mychain"),
             "chains/mychain/configs/contracts.yaml"
+        );
+        assert_eq!(
+            chain_operators_path("mychain"),
+            "chains/mychain/configs/operators.yaml"
         );
     }
 }

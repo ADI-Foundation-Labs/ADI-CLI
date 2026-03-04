@@ -313,6 +313,17 @@ pub(crate) fn merge_wallets(mut current: Wallets, partial: &Wallets) -> Wallets 
     if partial.deployer.is_some() {
         current.deployer.clone_from(&partial.deployer);
     }
+    if partial.fee_account.is_some() {
+        current.fee_account.clone_from(&partial.fee_account);
+    }
+    if partial.governor.is_some() {
+        current.governor.clone_from(&partial.governor);
+    }
+    if partial.token_multiplier_setter.is_some() {
+        current
+            .token_multiplier_setter
+            .clone_from(&partial.token_multiplier_setter);
+    }
     if partial.operator.is_some() {
         current.operator.clone_from(&partial.operator);
     }
@@ -326,17 +337,6 @@ pub(crate) fn merge_wallets(mut current: Wallets, partial: &Wallets) -> Wallets 
         current
             .execute_operator
             .clone_from(&partial.execute_operator);
-    }
-    if partial.fee_account.is_some() {
-        current.fee_account.clone_from(&partial.fee_account);
-    }
-    if partial.governor.is_some() {
-        current.governor.clone_from(&partial.governor);
-    }
-    if partial.token_multiplier_setter.is_some() {
-        current
-            .token_multiplier_setter
-            .clone_from(&partial.token_multiplier_setter);
     }
     current
 }

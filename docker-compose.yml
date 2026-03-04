@@ -27,11 +27,11 @@ services:
       #
       # run command: `adi server-params`
 
-      genesis_bytecode_supplier_address: "0x9FCBe7dD5aa25c63A7cC3810EE38873d9eC6ED7c"
+      genesis_bytecode_supplier_address: "0x0ABCe1cb5b50AAbE10Cf57972a4fdF13B491990e"
       genesis_genesis_input_path: "/genesis/genesis.json"
       l1_sender_max_fee_per_blob_gas_gwei: 15
 
-      genesis_bridgehub_address: "0x076e1622cb6181b05aEC9B4aB7B1fFe6020834f5"
+      genesis_bridgehub_address: "0xc3FAe584D9e28Ab87Ffc276f20f807353a9FEACC"
       genesis_chain_id: 222
 
       prover_api_object_store_file_backed_base_path: "/shared"
@@ -45,9 +45,9 @@ services:
       batcher_batch_timeout: "10s"
       batcher_blocks_per_batch_limit: 10
 
-      l1_sender_operator_commit_pk: "0xa1f4a74ca5af0fd874a8cb68bb7c3c1c38be37072f8ef744bdfad7bec38df2f8"
-      l1_sender_operator_prove_pk: "0x8af75ce9d789be73bab5e31959d8dc6f3100aa5ae15c886e79a11305aecdb170"
-      l1_sender_operator_execute_pk: "0x56a97ee9fb652352c21a4b48b6aa5624a6d6cd269a91b0f4c9d48b739dbc6c27"
+      l1_sender_operator_commit_pk: "0x5a80a87e88e45ddc107f63bd184f37f0f43cbe0db6f9cd323d118b82e2604c22"
+      l1_sender_operator_prove_pk: "0xb2dc5172cc4e74aee012a80dcacbef1ae90744cb9296af5d89bc96a9723f6711"
+      l1_sender_operator_execute_pk: "0xc02c52feaa7faea6b310c5689ebdaab4fe5205553a363a6debc1dd744323bafd"
       l1_sender_max_fee_per_gas_gwei: 1500
       l1_sender_max_priority_fee_per_gas_gwei: 1500
 
@@ -56,7 +56,7 @@ services:
 
       RUST_LOG: "info,zksync_os_server=debug,zksync_os_sequencer=info,zksync_os_merkle_tree=info,zksync_os_priority_tree=info"
     volumes:
-      - ./state/volumes/chain:/chain
-      - ./state/volumes/shared:/shared
+      - ./.state/volumes/chain:/chain
+      - ./.state/volumes/shared:/shared
       # Change path to the genesis.json
-      - ./state/l3eco/chains/adi/configs/genesis.json:/genesis/genesis.json:ro
+      - ./.state/l3eco/chains/adi/configs/genesis.json:/genesis/genesis.json:ro

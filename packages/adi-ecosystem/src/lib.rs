@@ -60,7 +60,7 @@ pub use config::{
     validate_chain_id, ChainConfig, ChainConfigBuilder, EcosystemConfig, EcosystemConfigBuilder,
 };
 pub use da::{configure_l3_da, PubdataSource};
-pub use deploy::{add_validator_roles, DeployedContracts};
+pub use deploy::{add_validator_roles, remove_validator_roles, DeployedContracts};
 pub use error::{EcosystemError, Result};
 pub use ownership::{
     accept_all_ownership, accept_chain_ownership, build_accept_ownership_calldata,
@@ -73,7 +73,9 @@ pub use ownership::{
     OwnershipState, OwnershipStatus, OwnershipStatusSummary, OwnershipSummary,
 };
 pub use types::{L1Network, ProverMode};
-pub use validator::{build_add_validator_roles_calldata, ValidatorRoles};
+pub use validator::{
+    build_add_validator_roles_calldata, build_remove_validator_roles_calldata, ValidatorRoles,
+};
 pub use verify::{verify_chain_created, verify_ecosystem_created};
 
 /// Normalize ecosystem/chain name to match zkstack convention.

@@ -5,7 +5,7 @@ use crate::config::{FundingConfig, FundingTarget, FundingTargetStatus, WalletRol
 use crate::error::{FundingError, Result};
 use crate::provider::FundingProvider;
 use crate::transfer::{estimate_eth_transfer_gas, estimate_token_transfer_gas, Transfer};
-use adi_types::Wallets;
+use adi_types::{Operators, Wallets};
 use alloy_primitives::{Address, U256};
 
 /// A complete funding plan ready for execution.
@@ -82,6 +82,7 @@ impl<'a> FundingPlanBuilder<'a> {
     ///
     /// This automatically adds all wallets present in the Wallets struct
     /// with their corresponding default funding amounts.
+    /// Note: Operators are now stored separately - use `with_operators` for operator funding.
     pub fn with_wallets(mut self, wallets: &Wallets, source: WalletSource) -> Self {
         let amounts = &self.config.default_amounts;
 
@@ -102,46 +103,6 @@ impl<'a> FundingPlanBuilder<'a> {
                 source,
                 w.address,
                 amounts.governor_eth,
-            ));
-        }
-
-        // Add operator if present
-        if let Some(w) = &wallets.operator {
-            self.targets.push(FundingTarget::new(
-                WalletRole::Operator,
-                source,
-                w.address,
-                amounts.operator_eth,
-            ));
-        }
-
-        // Add blob operator if present
-        if let Some(w) = &wallets.blob_operator {
-            self.targets.push(FundingTarget::new(
-                WalletRole::BlobOperator,
-                source,
-                w.address,
-                amounts.blob_operator_eth,
-            ));
-        }
-
-        // Add prove operator if present
-        if let Some(w) = &wallets.prove_operator {
-            self.targets.push(FundingTarget::new(
-                WalletRole::ProveOperator,
-                source,
-                w.address,
-                amounts.prove_operator_eth,
-            ));
-        }
-
-        // Add execute operator if present
-        if let Some(w) = &wallets.execute_operator {
-            self.targets.push(FundingTarget::new(
-                WalletRole::ExecuteOperator,
-                source,
-                w.address,
-                amounts.execute_operator_eth,
             ));
         }
 
@@ -207,12 +168,8 @@ impl<'a> FundingPlanBuilder<'a> {
     ///
     /// Chain deployment requires funding only:
     /// - `governor` - for chain governance (ETH + CGT)
-    /// - `operator` - for chain operations (ETH)
-    /// - `prove_operator` - for proof submission (ETH)
-    /// - `execute_operator` - for transaction execution (ETH)
     ///
-    /// Other wallet roles (deployer, blob_operator, fee_account,
-    /// token_multiplier_setter) are NOT funded.
+    /// Note: Operators are now stored separately - use `with_operators` for operator funding.
     pub fn with_chain_wallets(mut self, wallets: &Wallets) -> Self {
         let amounts = &self.config.default_amounts;
 
@@ -225,29 +182,42 @@ impl<'a> FundingPlanBuilder<'a> {
             ));
         }
 
-        if let Some(w) = &wallets.operator {
+        self
+    }
+
+    /// Add funding targets for operators from address overrides.
+    ///
+    /// Used when CLI/config provides operator addresses for funding.
+    /// Operators need funding for chain operations:
+    /// - `operator` - for committing batches (ETH)
+    /// - `prove_operator` - for proof submission (ETH)
+    /// - `execute_operator` - for transaction execution (ETH)
+    pub fn with_operators(mut self, operators: &Operators, source: WalletSource) -> Self {
+        let amounts = &self.config.default_amounts;
+
+        if let Some(addr) = operators.operator {
             self.targets.push(FundingTarget::new(
                 WalletRole::Operator,
-                WalletSource::Chain,
-                w.address,
+                source,
+                addr,
                 amounts.operator_eth,
             ));
         }
 
-        if let Some(w) = &wallets.prove_operator {
+        if let Some(addr) = operators.prove_operator {
             self.targets.push(FundingTarget::new(
                 WalletRole::ProveOperator,
-                WalletSource::Chain,
-                w.address,
+                source,
+                addr,
                 amounts.prove_operator_eth,
             ));
         }
 
-        if let Some(w) = &wallets.execute_operator {
+        if let Some(addr) = operators.execute_operator {
             self.targets.push(FundingTarget::new(
                 WalletRole::ExecuteOperator,
-                WalletSource::Chain,
-                w.address,
+                source,
+                addr,
                 amounts.execute_operator_eth,
             ));
         }
@@ -459,6 +429,7 @@ pub async fn build_funding_target_statuses(
     config: &FundingConfig,
     ecosystem_wallets: &Wallets,
     chain_wallets: &Wallets,
+    operators: Option<&Operators>,
 ) -> Result<Vec<FundingTargetStatus>> {
     let amounts = &config.default_amounts;
     let mut targets: Vec<FundingTarget> = Vec::new();
@@ -490,27 +461,39 @@ pub async fn build_funding_target_statuses(
             amounts.governor_eth,
         ));
     }
-    if let Some(w) = &chain_wallets.operator {
+
+    // Add operators - prefer CLI overrides, fallback to chain wallets
+    let operator_addr = operators
+        .and_then(|o| o.operator)
+        .or_else(|| chain_wallets.operator.as_ref().map(|w| w.address));
+    let prove_operator_addr = operators
+        .and_then(|o| o.prove_operator)
+        .or_else(|| chain_wallets.prove_operator.as_ref().map(|w| w.address));
+    let execute_operator_addr = operators
+        .and_then(|o| o.execute_operator)
+        .or_else(|| chain_wallets.execute_operator.as_ref().map(|w| w.address));
+
+    if let Some(addr) = operator_addr {
         targets.push(FundingTarget::new(
             WalletRole::Operator,
             WalletSource::Chain,
-            w.address,
+            addr,
             amounts.operator_eth,
         ));
     }
-    if let Some(w) = &chain_wallets.prove_operator {
+    if let Some(addr) = prove_operator_addr {
         targets.push(FundingTarget::new(
             WalletRole::ProveOperator,
             WalletSource::Chain,
-            w.address,
+            addr,
             amounts.prove_operator_eth,
         ));
     }
-    if let Some(w) = &chain_wallets.execute_operator {
+    if let Some(addr) = execute_operator_addr {
         targets.push(FundingTarget::new(
             WalletRole::ExecuteOperator,
             WalletSource::Chain,
-            w.address,
+            addr,
             amounts.execute_operator_eth,
         ));
     }
