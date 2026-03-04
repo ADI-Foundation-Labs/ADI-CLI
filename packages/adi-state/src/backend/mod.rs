@@ -9,7 +9,7 @@ pub use s3_sync::{S3SyncBackend, S3SyncControl};
 use crate::error::Result;
 use adi_types::{
     Apps, ChainContracts, ChainMetadata, EcosystemContracts, EcosystemMetadata, Erc20Deployments,
-    InitialDeployments, Logger, Wallets,
+    InitialDeployments, Logger, Operators, Wallets,
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -234,6 +234,17 @@ pub trait StateBackend: Send + Sync {
 
     /// Create chain contracts (chains/{chain}/configs/contracts.yaml).
     async fn create_chain_contracts(&self, chain: &str, data: &ChainContracts) -> Result<()>;
+
+    // ========== CHAIN OPERATORS ==========
+
+    /// Read chain operators (chains/{chain}/configs/operators.yaml).
+    async fn read_chain_operators(&self, chain: &str) -> Result<Operators>;
+
+    /// Write chain operators (chains/{chain}/configs/operators.yaml).
+    async fn write_chain_operators(&self, chain: &str, data: &Operators) -> Result<()>;
+
+    /// Create chain operators (chains/{chain}/configs/operators.yaml).
+    async fn create_chain_operators(&self, chain: &str, data: &Operators) -> Result<()>;
 }
 
 /// Create a backend instance based on backend type.

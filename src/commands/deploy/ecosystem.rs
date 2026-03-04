@@ -8,7 +8,10 @@
 use adi_ecosystem::verification::{
     apply_implementations, parse_diamond_cut_data, read_all_implementations, ExplorerType,
 };
-use adi_ecosystem::{add_validator_roles, configure_l3_da, validate_chain_id, DeployedContracts};
+use adi_ecosystem::{
+    add_validator_roles, configure_l3_da, remove_validator_roles, validate_chain_id,
+    DeployedContracts,
+};
 use adi_funding::{
     build_funding_target_statuses, is_localhost_rpc, normalize_rpc_url, AnvilFunder,
     AnvilFundingTarget, DefaultAmounts, FundingConfig, FundingError, FundingExecutor,
@@ -16,7 +19,7 @@ use adi_funding::{
 };
 use adi_state::StateManager;
 use adi_toolkit::{ProtocolVersion, ToolkitRunner, VerificationOpts, GENESIS_FILENAME};
-use adi_types::Wallets;
+use adi_types::{Operators, Wallets};
 use alloy_primitives::{Address, U256};
 use clap::Args;
 use secrecy::SecretString;
@@ -278,6 +281,12 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
         .await
         .wrap_err_with(|| format!("Failed to load chain '{}' wallets", chain_name))?;
 
+    let operators = state_manager
+        .chain(&chain_name)
+        .operators()
+        .await
+        .unwrap_or_default();
+
     ui::info(format!(
         "Loaded wallets: ecosystem={}, chain={}",
         ui::green(count_wallets(&ecosystem_wallets)),
@@ -311,6 +320,7 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
         &funding_config,
         &ecosystem_wallets,
         &chain_wallets,
+        Some(&operators),
     )
     .await
     .wrap_err("Failed to get funding target statuses")?;
@@ -842,9 +852,6 @@ async fn run_ecosystem_deployment(
         .private_key
         .clone();
 
-    // Add validator roles
-    ui::section("Configuring Validator Roles")?;
-
     // Normalize URL for host-side connection (host.docker.internal -> localhost)
     let normalized_rpc = normalize_rpc_url(rpc_url.as_str());
 
@@ -855,21 +862,117 @@ async fn run_ecosystem_deployment(
         Some(gas_multiplier)
     };
 
-    let tx_hashes = add_validator_roles(
-        &normalized_rpc,
-        &deployed,
-        chain_wallets,
-        &governor_key,
-        validator_gas_multiplier,
-        context.logger().as_ref(),
-    )
-    .await
-    .wrap_err("Failed to add validator roles")?;
+    // Add validator roles
+    ui::section("Configuring Validator Roles")?;
 
-    ui::success(format!(
-        "Validator roles configured: {} transactions confirmed",
-        ui::green(tx_hashes.len())
-    ))?;
+    // Load chain wallets for operator addresses
+    let chain_wallets = state_manager
+        .chain(chain_name)
+        .wallets()
+        .await
+        .wrap_err("Failed to load chain wallets for operator role assignment")?;
+
+    // Load operators from config (.adi.yml - highest priority)
+    let config_operators = &context.config().operators;
+
+    // Build operators for role assignment: config > wallets fallback
+    let operators = Operators {
+        operator: config_operators
+            .operator
+            .or_else(|| chain_wallets.operator.as_ref().map(|w| w.address)),
+        prove_operator: config_operators
+            .prove_operator
+            .or_else(|| chain_wallets.prove_operator.as_ref().map(|w| w.address)),
+        execute_operator: config_operators
+            .execute_operator
+            .or_else(|| chain_wallets.execute_operator.as_ref().map(|w| w.address)),
+    };
+
+    // Save operators to state (record of what addresses were assigned)
+    if operators.has_any() {
+        let chain_ops = state_manager.chain(chain_name);
+        if chain_ops.operators_exist().await.unwrap_or(false) {
+            chain_ops
+                .update_operators(&operators)
+                .await
+                .wrap_err("Failed to update operators")?;
+        } else {
+            chain_ops
+                .create_operators(&operators)
+                .await
+                .wrap_err("Failed to create operators")?;
+        }
+    }
+
+    if !operators.has_any() {
+        ui::warning("No operators configured - skipping validator role assignment")?;
+        ui::info("Operators will be assigned from wallets.yaml or via --operator CLI flag")?;
+    } else {
+        // Identify default operators to revoke (wallet operators being replaced by config)
+        let wallet_operator = chain_wallets.operator.as_ref().map(|w| w.address);
+        let wallet_prove = chain_wallets.prove_operator.as_ref().map(|w| w.address);
+        let wallet_execute = chain_wallets.execute_operator.as_ref().map(|w| w.address);
+
+        let operators_to_revoke = Operators {
+            operator: if config_operators.operator.is_some()
+                && config_operators.operator != wallet_operator
+            {
+                wallet_operator
+            } else {
+                None
+            },
+            prove_operator: if config_operators.prove_operator.is_some()
+                && config_operators.prove_operator != wallet_prove
+            {
+                wallet_prove
+            } else {
+                None
+            },
+            execute_operator: if config_operators.execute_operator.is_some()
+                && config_operators.execute_operator != wallet_execute
+            {
+                wallet_execute
+            } else {
+                None
+            },
+        };
+
+        // Revoke roles from default operators being replaced
+        if operators_to_revoke.has_any() {
+            let revoke_hashes = remove_validator_roles(
+                &normalized_rpc,
+                &deployed,
+                &operators_to_revoke,
+                &governor_key,
+                validator_gas_multiplier,
+                context.logger().as_ref(),
+            )
+            .await
+            .wrap_err("Failed to revoke default validator roles")?;
+
+            ui::success(format!(
+                "Revoked default validator roles: {} transactions",
+                ui::green(revoke_hashes.len())
+            ))?;
+        }
+
+        // Add validator roles to the final operators
+        let tx_hashes = add_validator_roles(
+            &normalized_rpc,
+            &deployed,
+            &operators,
+            &governor_key,
+            validator_gas_multiplier,
+            context.logger().as_ref(),
+        )
+        .await
+        .wrap_err("Failed to add validator roles")?;
+
+        ui::success(format!(
+            "Validator roles configured: {} transactions confirmed",
+            ui::green(tx_hashes.len())
+        ))?;
+    }
 
     // Configure L3 DA mode if requested (disables blobs, uses calldata)
     let is_l3 = resolve_l3_mode(args, context);
@@ -1304,21 +1407,10 @@ fn build_default_amounts(
 }
 
 /// Count non-None wallets in Wallets struct.
+/// Note: Operators are now stored separately and not counted here.
 fn count_wallets(wallets: &Wallets) -> usize {
     let mut count = 0;
     if wallets.deployer.is_some() {
-        count += 1;
-    }
-    if wallets.operator.is_some() {
-        count += 1;
-    }
-    if wallets.blob_operator.is_some() {
-        count += 1;
-    }
-    if wallets.prove_operator.is_some() {
-        count += 1;
-    }
-    if wallets.execute_operator.is_some() {
         count += 1;
     }
     if wallets.fee_account.is_some() {

@@ -1,7 +1,7 @@
 //! Display L1 contract owners with wallet name mapping.
 
 use adi_ecosystem::verification::read_proxy_admin;
-use adi_types::{normalize_rpc_url, ChainContracts, EcosystemContracts, Wallets};
+use adi_types::{normalize_rpc_url, ChainContracts, EcosystemContracts, Operators, Wallets};
 use alloy_primitives::Address;
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
@@ -174,10 +174,14 @@ pub async fn run(args: &OwnersArgs, context: &Context) -> Result<()> {
             .wrap_err("Failed to load chain contracts")?;
 
         let chain_wallets = chain_ops.wallets().await.ok();
+        let chain_operators = chain_ops.operators().await.ok();
         let mut combined_map = known_map.clone();
 
         if let Some(ref cw) = chain_wallets {
             add_wallet_addresses(&mut combined_map, cw);
+        }
+        if let Some(ref ops) = chain_operators {
+            add_operator_addresses(&mut combined_map, ops);
         }
         add_chain_contract_addresses(&mut combined_map, &chain_contracts);
 
@@ -299,6 +303,15 @@ fn add_wallet_addresses(map: &mut HashMap<Address, &'static str>, wallets: &Wall
     if let Some(w) = &wallets.deployer {
         map.insert(w.address, "deployer");
     }
+    if let Some(w) = &wallets.fee_account {
+        map.insert(w.address, "fee_account");
+    }
+    if let Some(w) = &wallets.governor {
+        map.insert(w.address, "governor");
+    }
+    if let Some(w) = &wallets.token_multiplier_setter {
+        map.insert(w.address, "token_multiplier_setter");
+    }
     if let Some(w) = &wallets.operator {
         map.insert(w.address, "operator");
     }
@@ -311,14 +324,18 @@ fn add_wallet_addresses(map: &mut HashMap<Address, &'static str>, wallets: &Wall
     if let Some(w) = &wallets.execute_operator {
         map.insert(w.address, "execute_operator");
     }
-    if let Some(w) = &wallets.fee_account {
-        map.insert(w.address, "fee_account");
+}
+
+/// Add operator override addresses to the map (from CLI/config).
+fn add_operator_addresses(map: &mut HashMap<Address, &'static str>, operators: &Operators) {
+    if let Some(addr) = operators.operator {
+        map.insert(addr, "operator (override)");
     }
-    if let Some(w) = &wallets.governor {
-        map.insert(w.address, "governor");
+    if let Some(addr) = operators.prove_operator {
+        map.insert(addr, "prove_operator (override)");
     }
-    if let Some(w) = &wallets.token_multiplier_setter {
-        map.insert(w.address, "token_multiplier_setter");
+    if let Some(addr) = operators.execute_operator {
+        map.insert(addr, "execute_operator (override)");
     }
 }
 

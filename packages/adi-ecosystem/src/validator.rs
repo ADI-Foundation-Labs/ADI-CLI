@@ -16,6 +16,14 @@ sol! {
         (bool, bool, bool, bool, bool) roles
     ) external;
 
+    /// ValidatorTimelock interface for removeValidatorRoles.
+    #[allow(missing_docs)]
+    function removeValidatorRoles(
+        address diamondProxy,
+        address operator,
+        (bool, bool, bool, bool, bool) roles
+    ) external;
+
     /// ChainAdmin multicall interface.
     #[allow(missing_docs)]
     function multicall(
@@ -133,6 +141,45 @@ pub fn build_add_validator_roles_calldata(
     Bytes::from(multicall_call.abi_encode())
 }
 
+/// Build calldata for removing validator roles via multicall.
+///
+/// This function builds the calldata for calling `multicall` on the ChainAdmin
+/// contract, which internally calls `removeValidatorRoles` on the ValidatorTimelock.
+///
+/// # Arguments
+///
+/// * `validator_timelock` - The ValidatorTimelock contract address.
+/// * `diamond_proxy` - The Diamond proxy contract address.
+/// * `operator` - The operator address to revoke roles from.
+/// * `roles` - The validator roles to remove.
+///
+/// # Returns
+///
+/// ABI-encoded calldata for the multicall transaction.
+#[must_use]
+pub fn build_remove_validator_roles_calldata(
+    validator_timelock: Address,
+    diamond_proxy: Address,
+    operator: Address,
+    roles: ValidatorRoles,
+) -> Bytes {
+    // Build inner call to removeValidatorRoles
+    let inner_call = removeValidatorRolesCall {
+        diamondProxy: diamond_proxy,
+        operator,
+        roles: roles.to_tuple(),
+    };
+    let inner_calldata = Bytes::from(inner_call.abi_encode());
+
+    // Build outer multicall: [(validator_timelock, 0, calldata)]
+    let multicall_call = multicallCall {
+        calls: vec![(validator_timelock, U256::ZERO, inner_calldata)],
+        requireSuccess: true,
+    };
+
+    Bytes::from(multicall_call.abi_encode())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -168,7 +215,7 @@ mod tests {
     }
 
     #[test]
-    fn test_build_calldata_not_empty() {
+    fn test_build_add_calldata_not_empty() {
         let validator_timelock = Address::ZERO;
         let diamond_proxy = Address::ZERO;
         let operator = Address::ZERO;
@@ -176,6 +223,26 @@ mod tests {
 
         let calldata =
             build_add_validator_roles_calldata(validator_timelock, diamond_proxy, operator, roles);
+
+        // Calldata should not be empty
+        assert!(!calldata.is_empty());
+        // Should start with multicall selector (first 4 bytes)
+        assert!(calldata.len() >= 4);
+    }
+
+    #[test]
+    fn test_build_remove_calldata_not_empty() {
+        let validator_timelock = Address::ZERO;
+        let diamond_proxy = Address::ZERO;
+        let operator = Address::ZERO;
+        let roles = ValidatorRoles::commit_operator();
+
+        let calldata = build_remove_validator_roles_calldata(
+            validator_timelock,
+            diamond_proxy,
+            operator,
+            roles,
+        );
 
         // Calldata should not be empty
         assert!(!calldata.is_empty());

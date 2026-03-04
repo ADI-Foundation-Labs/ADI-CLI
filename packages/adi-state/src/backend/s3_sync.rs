@@ -8,7 +8,7 @@ use crate::s3::{create_tar_gz, S3Client, S3Config};
 use crate::s3::{NoOpS3EventHandler, S3SyncEvent, S3SyncEventHandler};
 use adi_types::{
     Apps, ChainContracts, ChainMetadata, EcosystemContracts, EcosystemMetadata, Erc20Deployments,
-    InitialDeployments, Logger, Wallets,
+    InitialDeployments, Logger, Operators, Wallets,
 };
 use async_trait::async_trait;
 use std::path::{Path, PathBuf};
@@ -375,6 +375,22 @@ impl StateBackend for S3SyncBackend {
 
     async fn create_chain_contracts(&self, chain: &str, data: &ChainContracts) -> Result<()> {
         self.inner.create_chain_contracts(chain, data).await?;
+        self.sync_to_s3().await
+    }
+
+    // ========== CHAIN OPERATORS ==========
+
+    async fn read_chain_operators(&self, chain: &str) -> Result<Operators> {
+        self.inner.read_chain_operators(chain).await
+    }
+
+    async fn write_chain_operators(&self, chain: &str, data: &Operators) -> Result<()> {
+        self.inner.write_chain_operators(chain, data).await?;
+        self.sync_to_s3().await
+    }
+
+    async fn create_chain_operators(&self, chain: &str, data: &Operators) -> Result<()> {
+        self.inner.create_chain_operators(chain, data).await?;
         self.sync_to_s3().await
     }
 }

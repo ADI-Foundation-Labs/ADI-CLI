@@ -40,6 +40,7 @@ mod deployments;
 mod logger;
 mod metadata;
 mod network;
+mod operators;
 mod partial;
 mod prover;
 mod url;
@@ -74,6 +75,9 @@ pub use prover::{BatchCommitDataMode, ProverMode, WalletCreation};
 
 // Re-export wallet types
 pub use wallet::{Wallet, Wallets};
+
+// Re-export operator types
+pub use operators::Operators;
 
 // Re-export logger types
 pub use logger::{LogCrateLogger, Logger, NoopLogger};

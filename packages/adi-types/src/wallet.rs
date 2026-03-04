@@ -82,15 +82,15 @@ impl<'de> Deserialize<'de> for Wallet {
 
 /// Collection of wallets for ecosystem or chain operations.
 ///
-/// Contains the 8 standard wallet roles used in ZkSync ecosystems:
+/// Contains wallet roles that require private keys for signing:
 /// - `deployer` - Deploys contracts
-/// - `operator` - Operates the chain
-/// - `blob_operator` - Handles blob operations
-/// - `prove_operator` - Submits proofs
-/// - `execute_operator` - Executes transactions
 /// - `fee_account` - Receives fees
 /// - `governor` - Governance operations
 /// - `token_multiplier_setter` - Sets token multipliers
+/// - `operator` - Commits batches (PRECOMMITTER, COMMITTER, REVERTER roles)
+/// - `blob_operator` - Blob operations
+/// - `prove_operator` - Submits proofs (PROVER role)
+/// - `execute_operator` - Executes batches (EXECUTOR role)
 ///
 /// All fields are optional to support partial configurations.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -98,22 +98,6 @@ pub struct Wallets {
     /// Deployer wallet - deploys contracts.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deployer: Option<Wallet>,
-
-    /// Operator wallet - operates the chain.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub operator: Option<Wallet>,
-
-    /// Blob operator wallet - handles blob operations.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub blob_operator: Option<Wallet>,
-
-    /// Prove operator wallet - submits proofs.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub prove_operator: Option<Wallet>,
-
-    /// Execute operator wallet - executes transactions.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub execute_operator: Option<Wallet>,
 
     /// Fee account wallet - receives fees.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -126,6 +110,25 @@ pub struct Wallets {
     /// Token multiplier setter wallet.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token_multiplier_setter: Option<Wallet>,
+
+    /// Operator wallet - commits batches to L1.
+    /// Receives PRECOMMITTER, COMMITTER, REVERTER roles.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operator: Option<Wallet>,
+
+    /// Blob operator wallet - handles blob operations.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub blob_operator: Option<Wallet>,
+
+    /// Prove operator wallet - submits batch proofs.
+    /// Receives PROVER role.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prove_operator: Option<Wallet>,
+
+    /// Execute operator wallet - executes proved batches.
+    /// Receives EXECUTOR role.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub execute_operator: Option<Wallet>,
 }
 
 impl Wallets {
@@ -137,12 +140,6 @@ impl Wallets {
     /// Sets the deployer wallet.
     pub fn with_deployer(mut self, wallet: Wallet) -> Self {
         self.deployer = Some(wallet);
-        self
-    }
-
-    /// Sets the operator wallet.
-    pub fn with_operator(mut self, wallet: Wallet) -> Self {
-        self.operator = Some(wallet);
         self
     }
 
@@ -187,7 +184,7 @@ governor:
         let wallets: Wallets = serde_yaml::from_str(yaml).unwrap();
         assert!(wallets.deployer.is_some());
         assert!(wallets.governor.is_some());
-        assert!(wallets.operator.is_none());
+        assert!(wallets.fee_account.is_none());
     }
 
     #[test]

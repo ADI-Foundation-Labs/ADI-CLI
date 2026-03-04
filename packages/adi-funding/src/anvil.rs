@@ -191,8 +191,8 @@ impl AnvilFunder {
             );
         }
 
-        // Chain wallets: governor, operator, prove_operator, execute_operator
-        // Note: blob_operator, fee_account, token_multiplier_setter are NOT funded
+        // Chain wallets: governor only
+        // Note: fee_account, token_multiplier_setter are NOT funded
         // during ecosystem deployment (same as production funding logic)
         if let Some(w) = &chain.governor {
             let balance = get_eth_balance(&self.provider, w.address).await?;
@@ -205,6 +205,8 @@ impl AnvilFunder {
                 balance,
             );
         }
+
+        // Chain operators (from chain wallets)
         if let Some(w) = &chain.operator {
             let balance = get_eth_balance(&self.provider, w.address).await?;
             check_and_add(

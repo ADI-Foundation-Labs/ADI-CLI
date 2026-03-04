@@ -110,27 +110,24 @@ pub struct VerificationDefaults {
     pub api_key: Option<SecretString>,
 }
 
-/// Predefined operator keys (private keys only, address derived).
+/// Predefined operator addresses.
 ///
-/// These keys override randomly generated keys after init.
-/// All fields are optional — only specified keys are overridden.
+/// These addresses override randomly generated operator addresses after init.
+/// All fields are optional - only specified addresses are overridden.
+/// Operators manage their own private keys externally.
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-pub struct OperatorKeysConfig {
-    /// Operator private key.
-    #[serde(default, skip_serializing)]
-    pub operator: Option<SecretString>,
+pub struct OperatorsConfig {
+    /// Operator address (receives commit/precommit/revert roles).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operator: Option<Address>,
 
-    /// Blob operator private key.
-    #[serde(default, skip_serializing)]
-    pub blob_operator: Option<SecretString>,
+    /// Prove operator address (receives prover role).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prove_operator: Option<Address>,
 
-    /// Prove operator private key.
-    #[serde(default, skip_serializing)]
-    pub prove_operator: Option<SecretString>,
-
-    /// Execute operator private key.
-    #[serde(default, skip_serializing)]
-    pub execute_operator: Option<SecretString>,
+    /// Execute operator address (receives executor role).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execute_operator: Option<Address>,
 }
 
 /// S3 synchronization configuration.
@@ -236,10 +233,10 @@ pub struct Config {
     #[serde(default)]
     pub s3: S3Config,
 
-    /// Predefined operator keys (private keys).
-    /// Override randomly generated keys after init.
+    /// Predefined operator addresses.
+    /// Override randomly generated operator addresses after init.
     #[serde(default)]
-    pub operator_keys: OperatorKeysConfig,
+    pub operators: OperatorsConfig,
 }
 
 impl Config {
