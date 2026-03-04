@@ -203,6 +203,15 @@ gas_multiplier: 120
 #   blob_operator: "0x..."
 #   prove_operator: "0x..."
 #   execute_operator: "0x..."
+
+# OPTIONAL: Predefined operator addresses for validator role assignment
+# Use this to assign validator roles to externally managed addresses during deploy.
+# When specified, roles are revoked from default wallet operators and granted
+# to these addresses instead. Operators manage their own private keys externally.
+# operators:
+#   operator: "0x..."         # PRECOMMITTER, COMMITTER, REVERTER roles
+#   prove_operator: "0x..."   # PROVER role
+#   execute_operator: "0x..." # EXECUTOR role
 ```
 
 ### Environment Variables
@@ -422,6 +431,22 @@ After funding, the CLI runs zkstack inside a container to deploy ecosystem contr
 | Operator         | Commits transaction batches to L1           | 5+ ETH          |
 | Prove Operator   | Submits validity proofs                     | 5+ ETH          |
 | Execute Operator | Executes verified batches                   | 5+ ETH          |
+
+**Validator role assignment:**
+
+When deploying, the CLI assigns validator roles to operators. By default, these are the addresses from `wallets.yaml` (generated during init). You can override these with custom addresses via the `operators` config:
+
+```yaml
+operators:
+  operator: "0x1234..."
+  prove_operator: "0x5678..."
+  execute_operator: "0x9abc..."
+```
+
+When custom operators are specified:
+1. Roles are revoked from the default wallet operators
+2. Roles are granted to the custom operator addresses
+3. The final assignments are saved to `operators.yaml`
 
 **Gas multiplier:**
 
