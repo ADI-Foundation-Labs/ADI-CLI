@@ -42,28 +42,34 @@ pub struct FundingDefaults {
     #[serde(default, skip_serializing)]
     pub funder_key: Option<SecretString>,
 
-    /// Deployer ETH amount (default: 1.0 ETH).
-    #[serde(default)]
+    /// Deployer ETH amount.
+    /// Default: `100`
+    #[serde(default = "default_deployer_eth")]
     pub deployer_eth: Option<f64>,
 
-    /// Governor ETH amount (default: 1.0 ETH).
-    #[serde(default)]
+    /// Governor ETH amount.
+    /// Default: `40`
+    #[serde(default = "default_governor_eth")]
     pub governor_eth: Option<f64>,
 
-    /// Governor custom gas token amount (default: 5.0 tokens).
-    #[serde(default)]
+    /// Governor custom gas token amount.
+    /// Default: `5`
+    #[serde(default = "default_governor_cgt_units")]
     pub governor_cgt_units: Option<f64>,
 
-    /// Operator ETH amount (default: 5.0 ETH).
-    #[serde(default)]
+    /// Operator ETH amount.
+    /// Default: `30`
+    #[serde(default = "default_operator_eth")]
     pub operator_eth: Option<f64>,
 
-    /// Prove operator ETH amount (default: 5.0 ETH).
-    #[serde(default)]
+    /// Prove operator ETH amount.
+    /// Default: `30`
+    #[serde(default = "default_operator_eth")]
     pub prove_operator_eth: Option<f64>,
 
-    /// Execute operator ETH amount (default: 5.0 ETH).
-    #[serde(default)]
+    /// Execute operator ETH amount.
+    /// Default: `30`
+    #[serde(default = "default_operator_eth")]
     pub execute_operator_eth: Option<f64>,
 }
 
@@ -77,6 +83,26 @@ fn default_s3_bucket() -> Option<String> {
 
 fn default_s3_region() -> Option<String> {
     Some("us-east-1".to_string())
+}
+
+fn default_protocol_version() -> Option<String> {
+    Some("v0.30.1".to_string())
+}
+
+fn default_deployer_eth() -> Option<f64> {
+    Some(100.0)
+}
+
+fn default_governor_eth() -> Option<f64> {
+    Some(40.0)
+}
+
+fn default_governor_cgt_units() -> Option<f64> {
+    Some(5.0)
+}
+
+fn default_operator_eth() -> Option<f64> {
+    Some(30.0)
 }
 
 /// Default ownership transfer configuration values.
@@ -197,7 +223,8 @@ pub struct Config {
     /// Default protocol version for toolkit Docker image.
     /// Used by init, add, and deploy commands when --protocol-version is not provided.
     /// Can be overridden with --protocol-version or ADI__PROTOCOL_VERSION env var.
-    #[serde(default)]
+    /// Default: `v0.30.1`
+    #[serde(default = "default_protocol_version")]
     pub protocol_version: Option<String>,
 
     /// Default ecosystem configuration values.

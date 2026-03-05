@@ -5,9 +5,6 @@ ecosystem:
   chain_id: 222
 funding:
   funder_key: ""
-ownership:
-  new_owner: ""
-  private_key: ""
 verification:
   explorer: "blockscout"
   explorer_url: "https://explorer-api.ab.testnet.adifoundation.ai/api"

@@ -50,6 +50,8 @@ pub struct EcosystemConfig {
     pub name: String,
 
     /// L1 network.
+    /// Default: `Sepolia`
+    #[serde(default = "default_l1_network")]
     pub l1_network: L1Network,
 
     /// Initial chain name.
@@ -59,6 +61,8 @@ pub struct EcosystemConfig {
     pub chain_id: u64,
 
     /// Prover mode.
+    /// Default: `NoProofs`
+    #[serde(default = "default_prover_mode")]
     pub prover_mode: ProverMode,
 
     /// Base token address.
@@ -66,12 +70,18 @@ pub struct EcosystemConfig {
     pub base_token_address: Address,
 
     /// Base token price nominator.
+    /// Default: `1`
+    #[serde(default = "default_price_ratio")]
     pub base_token_price_nominator: u64,
 
     /// Base token price denominator.
+    /// Default: `1`
+    #[serde(default = "default_price_ratio")]
     pub base_token_price_denominator: u64,
 
     /// Enable EVM emulator.
+    /// Default: `false`
+    #[serde(default)]
     pub evm_emulator: bool,
 
     /// Deploy as L3 chain (uses calldata DA instead of blobs).
@@ -79,7 +89,8 @@ pub struct EcosystemConfig {
     /// When enabled, the deployment will configure the chain to use
     /// calldata-based pubdata instead of EIP-4844 blobs. Required for
     /// L3 chains deploying on L2 settlement layers.
-    #[serde(default)]
+    /// Default: `true`
+    #[serde(default = "default_l3")]
     pub l3: bool,
 
     /// Settlement layer RPC URL.
@@ -89,6 +100,22 @@ pub struct EcosystemConfig {
 
 fn default_base_token_address() -> Address {
     ETH_TOKEN_ADDRESS
+}
+
+fn default_l1_network() -> L1Network {
+    L1Network::Sepolia
+}
+
+fn default_prover_mode() -> ProverMode {
+    ProverMode::NoProofs
+}
+
+fn default_price_ratio() -> u64 {
+    1
+}
+
+fn default_l3() -> bool {
+    true
 }
 
 impl Default for EcosystemConfig {

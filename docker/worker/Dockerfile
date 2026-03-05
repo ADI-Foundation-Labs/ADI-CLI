@@ -47,6 +47,7 @@ RUN git submodule update --init --recursive
 RUN if [ -n "$CONTRACTS_COMMIT" ]; then \
   echo "Overriding contracts submodule to ${CONTRACTS_COMMIT}"; \
   git -C contracts checkout "$CONTRACTS_COMMIT" && \
+  git add contracts && \
   git -C contracts submodule update --init --recursive; \
   fi
 # Patch yanked parity-scale-codec version
