@@ -160,13 +160,24 @@ tasks:
           LOAD: "{{.LOAD}}"
           PUSH: "{{.PUSH}}"
 
+  build:docker:local:
+    desc: Build Docker image locally (no registry access required)
+    vars:
+      PLATFORM: '{{default "linux/arm64" .PLATFORM}}'
+    cmds:
+      - |
+        PLATFORM={{.PLATFORM}} \
+        NO_CACHE=1 \
+        TAG_SUFFIX="" \
+        docker buildx bake -f docker/docker-bake.hcl --load {{.TARGETS}}
+
   build:docker:manifest:
     desc: Create and push multiarch manifest
     vars:
       REF_SLUG: '{{default "main" .CI_COMMIT_REF_SLUG}}'
     cmds:
       - |
-        # Extract base tag from HCL (e.g. registry/adi-toolkit:v30.0.2)
+        # Extract base tag from HCL (e.g. registry/adi-toolkit:v0.30.1)
         # We run bake --print with empty suffix to get the clean target tag
         BASE_TAGS=$(TAG_SUFFIX="" docker buildx bake --print -f docker/docker-bake.hcl {{.TARGETS}} | jq -r '.target[].tags[0]')
 
@@ -182,13 +193,13 @@ tasks:
           SRC_AMD64="${BASE_TAG}-{{.REF_SLUG}}-amd64-{{.CI_COMMIT_SHORT_SHA}}"
           SRC_ARM64="${BASE_TAG}-{{.REF_SLUG}}-arm64-{{.CI_COMMIT_SHORT_SHA}}"
 
-          # 1. Mutable Branch Tag: v30.0.2-branch
+          # 1. Mutable Branch Tag: v0.30.1-branch
           docker buildx imagetools create -t "${BASE_TAG}-{{.REF_SLUG}}" $SRC_AMD64 $SRC_ARM64
 
-          # 2. Immutable Branch Tag: v30.0.2-branch-sha
+          # 2. Immutable Branch Tag: v0.30.1-branch-sha
           docker buildx imagetools create -t "${BASE_TAG}-{{.REF_SLUG}}-{{.CI_COMMIT_SHORT_SHA}}" $SRC_AMD64 $SRC_ARM64
 
-          # 3. Version Tag (Main Only): v30.0.2
+          # 3. Version Tag (Main Only): v0.30.1
           if [ "{{.REF_SLUG}}" = "main" ]; then
             docker buildx imagetools create -t "${BASE_TAG}" $SRC_AMD64 $SRC_ARM64
           fi

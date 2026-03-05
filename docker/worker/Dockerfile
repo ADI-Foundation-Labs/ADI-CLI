@@ -2,8 +2,9 @@ FROM rust:1.93.0
 
 ARG ZKSYNC_ERA_COMMIT
 ARG ZKSYNC_ERA_OS_INTEGRATION_COMMIT=""
-ARG ERA_CONTRACTS_TAG
+ARG CONTRACTS_COMMIT=""
 ARG FOUNDRY_ZKSYNC_VERSION
+ARG ERA_CONTRACTS_TAG=""
 
 # Install dependencies
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -42,6 +43,12 @@ RUN git clone https://github.com/matter-labs/zksync-era.git zksync-era
 WORKDIR /deps/zksync-era
 RUN git checkout ${ZKSYNC_ERA_COMMIT}
 RUN git submodule update --init --recursive
+# Override contracts submodule to specific commit if provided
+RUN if [ -n "$CONTRACTS_COMMIT" ]; then \
+  echo "Overriding contracts submodule to ${CONTRACTS_COMMIT}"; \
+  git -C contracts checkout "$CONTRACTS_COMMIT" && \
+  git -C contracts submodule update --init --recursive; \
+  fi
 # Patch yanked parity-scale-codec version
 RUN echo "[patch.crates-io]" >> Cargo.toml && \
   echo "parity-scale-codec = { version = \"3.6.12\" }" >> Cargo.toml
@@ -61,14 +68,16 @@ RUN if [ -n "$ZKSYNC_ERA_OS_INTEGRATION_COMMIT" ]; then \
   git submodule update --init --recursive; \
   fi
 
-# Install era-contracts (for upgrade scripts)
-WORKDIR /deps/era-contracts
-RUN git clone https://github.com/matter-labs/era-contracts.git .
-RUN git checkout ${ERA_CONTRACTS_TAG}
-RUN git submodule update --init --recursive
-# Pre-install dependencies for faster runtime
+# Install era-contracts (for upgrade scripts) - only if ERA_CONTRACTS_TAG is set
 RUN --mount=type=cache,target=/root/.cache/yarn,sharing=locked \
-  yarn install --cache-folder /root/.cache/yarn
+  if [ -n "$ERA_CONTRACTS_TAG" ]; then \
+    mkdir -p /deps/era-contracts && \
+    git clone https://github.com/matter-labs/era-contracts.git /deps/era-contracts && \
+    cd /deps/era-contracts && \
+    git checkout ${ERA_CONTRACTS_TAG} && \
+    git submodule update --init --recursive && \
+    yarn install --cache-folder /root/.cache/yarn; \
+  fi
 
 WORKDIR /workspace
 ENTRYPOINT ["/bin/bash"]

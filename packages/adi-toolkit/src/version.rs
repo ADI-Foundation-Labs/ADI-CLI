@@ -28,25 +28,25 @@ pub enum ParseError {
 /// # Parsing
 ///
 /// Versions can be parsed from strings in several formats:
-/// - With prefix: `v30.0.2`
-/// - Without prefix: `30.0.2`
+/// - With prefix: `v0.30.1`
+/// - Without prefix: `0.30.1`
 ///
 /// # Example
 ///
 /// ```rust
 /// use adi_toolkit::ProtocolVersion;
 ///
-/// let version = ProtocolVersion::parse("v30.0.2").unwrap();
-/// assert_eq!(version.to_semver(), semver::Version::new(30, 0, 2));
+/// let version = ProtocolVersion::parse("v0.30.1").unwrap();
+/// assert_eq!(version.to_semver(), semver::Version::new(0, 30, 1));
 /// ```
 #[derive(
     Clone, Copy, Debug, Default, EnumString, EnumIter, Serialize, Deserialize, PartialEq, Eq,
 )]
 pub enum ProtocolVersion {
-    /// Protocol version 30.0.2
+    /// Protocol version 0.30.1
     #[default]
-    #[strum(serialize = "v30.0.2", serialize = "30.0.2")]
-    V30_0_2,
+    #[strum(serialize = "v0.30.1", serialize = "0.30.1")]
+    V0_30_1,
 }
 
 impl ProtocolVersion {
@@ -67,8 +67,8 @@ impl ProtocolVersion {
     /// ```rust
     /// use adi_toolkit::ProtocolVersion;
     ///
-    /// let version = ProtocolVersion::parse("v30.0.2").unwrap();
-    /// let version2 = ProtocolVersion::parse("30.0.2").unwrap();
+    /// let version = ProtocolVersion::parse("v0.30.1").unwrap();
+    /// let version2 = ProtocolVersion::parse("0.30.1").unwrap();
     /// assert_eq!(version, version2);
     /// ```
     pub fn parse(s: &str) -> Result<Self, ParseError> {
@@ -96,16 +96,16 @@ impl ProtocolVersion {
     /// ```rust
     /// use adi_toolkit::ProtocolVersion;
     ///
-    /// let version = ProtocolVersion::V30_0_2;
+    /// let version = ProtocolVersion::V0_30_1;
     /// let semver = version.to_semver();
-    /// assert_eq!(semver.major, 30);
-    /// assert_eq!(semver.minor, 0);
-    /// assert_eq!(semver.patch, 2);
+    /// assert_eq!(semver.major, 0);
+    /// assert_eq!(semver.minor, 30);
+    /// assert_eq!(semver.patch, 1);
     /// ```
     #[must_use]
     pub fn to_semver(self) -> semver::Version {
         match self {
-            ProtocolVersion::V30_0_2 => semver::Version::new(30, 0, 2),
+            ProtocolVersion::V0_30_1 => semver::Version::new(0, 30, 1),
         }
     }
 
@@ -131,14 +131,14 @@ impl ProtocolVersion {
     /// ```rust
     /// use adi_toolkit::ProtocolVersion;
     ///
-    /// let version = ProtocolVersion::V30_0_2;
+    /// let version = ProtocolVersion::V0_30_1;
     /// let hash = version.genesis_commit_hash();
     /// assert!(!hash.is_empty());
     /// ```
     #[must_use]
     pub fn genesis_commit_hash(&self) -> &'static str {
         match self {
-            ProtocolVersion::V30_0_2 => "48650acecd1182c56c0f6d86f3c471f8d72159c6",
+            ProtocolVersion::V0_30_1 => "a8e6de4f4f260ab33bb2ac57c441c0bec4a8fb2c",
         }
     }
 
@@ -152,7 +152,7 @@ impl ProtocolVersion {
     /// ```rust
     /// use adi_toolkit::ProtocolVersion;
     ///
-    /// let version = ProtocolVersion::V30_0_2;
+    /// let version = ProtocolVersion::V0_30_1;
     /// let url = version.genesis_url();
     /// assert!(url.starts_with("https://raw.githubusercontent.com/"));
     /// assert!(url.ends_with("genesis/genesis.json"));
@@ -181,14 +181,14 @@ mod tests {
 
     #[test]
     fn test_parse_with_prefix() {
-        let version = ProtocolVersion::parse("v30.0.2").unwrap();
-        assert_eq!(version, ProtocolVersion::V30_0_2);
+        let version = ProtocolVersion::parse("v0.30.1").unwrap();
+        assert_eq!(version, ProtocolVersion::V0_30_1);
     }
 
     #[test]
     fn test_parse_without_prefix() {
-        let version = ProtocolVersion::parse("30.0.2").unwrap();
-        assert_eq!(version, ProtocolVersion::V30_0_2);
+        let version = ProtocolVersion::parse("0.30.1").unwrap();
+        assert_eq!(version, ProtocolVersion::V0_30_1);
     }
 
     #[test]
@@ -199,32 +199,32 @@ mod tests {
 
     #[test]
     fn test_to_semver() {
-        let version = ProtocolVersion::V30_0_2;
+        let version = ProtocolVersion::V0_30_1;
         let semver = version.to_semver();
-        assert_eq!(semver, semver::Version::new(30, 0, 2));
+        assert_eq!(semver, semver::Version::new(0, 30, 1));
     }
 
     #[test]
     fn test_display() {
-        let version = ProtocolVersion::V30_0_2;
-        assert_eq!(format!("{}", version), "v30.0.2");
+        let version = ProtocolVersion::V0_30_1;
+        assert_eq!(format!("{}", version), "v0.30.1");
     }
 
     #[test]
     fn test_genesis_commit_hash() {
-        let version = ProtocolVersion::V30_0_2;
+        let version = ProtocolVersion::V0_30_1;
         assert_eq!(
             version.genesis_commit_hash(),
-            "48650acecd1182c56c0f6d86f3c471f8d72159c6"
+            "a8e6de4f4f260ab33bb2ac57c441c0bec4a8fb2c"
         );
     }
 
     #[test]
     fn test_genesis_url() {
-        let version = ProtocolVersion::V30_0_2;
+        let version = ProtocolVersion::V0_30_1;
         assert_eq!(
             version.genesis_url(),
-            "https://raw.githubusercontent.com/matter-labs/zksync-os-server/48650acecd1182c56c0f6d86f3c471f8d72159c6/genesis/genesis.json"
+            "https://raw.githubusercontent.com/matter-labs/zksync-os-server/a8e6de4f4f260ab33bb2ac57c441c0bec4a8fb2c/genesis/genesis.json"
         );
     }
 
