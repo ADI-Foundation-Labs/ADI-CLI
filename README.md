@@ -71,7 +71,7 @@ debug: false
 
 # Default protocol version for toolkit Docker image
 # Used by init, add, and deploy when --protocol-version is not provided
-protocol_version: v30.0.2
+protocol_version: v0.30.1
 
 # State storage backend (currently only "filesystem" is supported)
 # Default: filesystem
@@ -226,7 +226,7 @@ For sensitive data like private keys, use environment variables instead of confi
 | `ADI_EXPLORER_URL`                  | Block explorer API URL for contract verification during deploy and scan commands.                                |
 | `ADI_EXPLORER_API_KEY`              | Block explorer API key for contract verification (optional for public explorers).                                |
 | `ADI_CONFIG`                        | Path to an alternative config file.                                                                              |
-| `ADI__PROTOCOL_VERSION`             | Default protocol version for init, add, and deploy commands (e.g., `v30.0.2`).                                   |
+| `ADI__PROTOCOL_VERSION`             | Default protocol version for init, add, and deploy commands (e.g., `v0.30.1`).                                   |
 | `ADI__TOOLKIT__IMAGE_TAG`           | Override Docker image tag for toolkit containers (e.g., `latest` or `custom-build`).                             |
 | `ADI_OPERATOR_KEY`                  | Override operator private key during init (address derived automatically).                                       |
 | `ADI_BLOB_OPERATOR_KEY`             | Override blob operator private key during init.                                                                  |
@@ -282,7 +282,7 @@ The `init` command creates the foundational configuration for your ZkSync ecosys
 
 | Flag                    | Description                                            |
 | ----------------------- | ------------------------------------------------------ |
-| `--protocol-version`    | Protocol version (e.g., `v30.0.2`)                     |
+| `--protocol-version`    | Protocol version (e.g., `v0.30.1`)                     |
 | `--ecosystem-name`      | Override the ecosystem name from config                |
 | `--l1-network`          | Settlement layer: `localhost`, `sepolia`, or `mainnet` |
 | `--chain-name`          | Name for the initial chain                             |
@@ -304,7 +304,7 @@ adi init
 
 ```bash
 adi init \
-  --protocol-version v30.0.2 \
+  --protocol-version v0.30.1 \
   --ecosystem-name dev-ecosystem \
   --l1-network localhost \
   --chain-name dev-chain \
@@ -316,7 +316,7 @@ adi init \
 
 ```bash
 adi init \
-  --protocol-version v30.0.2 \
+  --protocol-version v0.30.1 \
   --ecosystem-name testnet-ecosystem \
   --l1-network sepolia \
   --chain-name testnet-chain \
@@ -330,14 +330,14 @@ If you need specific operator keys (e.g., for key management or HSM integration)
 ```bash
 # Via CLI flags
 adi init \
-  --protocol-version v30.0.2 \
+  --protocol-version v0.30.1 \
   --operator-key 0x... \
   --blob-operator-key 0x...
 
 # Or via environment variables
 export ADI_OPERATOR_KEY="0x..."
 export ADI_BLOB_OPERATOR_KEY="0x..."
-adi init -p v30.0.2
+adi init -p v0.30.1
 
 # Or via config file (~/.adi.yml)
 # operator_keys:
@@ -387,7 +387,7 @@ adi add
 
 ```bash
 adi add \
-  --protocol-version v30.0.2 \
+  --protocol-version v0.30.1 \
   --chain-name second-chain \
   --chain-id 272 \
   --prover-mode no-proofs
@@ -471,7 +471,7 @@ Always start with a dry-run to see what will happen:
 
 ```bash
 # Preview the funding plan without executing
-adi deploy -p v30.0.2 --dry-run
+adi deploy -p v0.30.1 --dry-run
 ```
 
 Once you've verified the plan looks correct:
@@ -481,7 +481,7 @@ Once you've verified the plan looks correct:
 export ADI_FUNDER_KEY="0x..."
 
 # Execute deployment (will prompt for confirmation)
-adi deploy -p v30.0.2
+adi deploy -p v0.30.1
 ```
 
 **Local development with Anvil:**
@@ -519,7 +519,7 @@ gas_multiplier: 200
 Then deploy:
 
 ```bash
-adi deploy -p v30.0.2
+adi deploy -p v0.30.1
 ```
 
 > **Note:** We use `l1_network: sepolia` even for local Anvil because Docker containers cannot access `localhost` directly. The `host.docker.internal` hostname routes traffic from the container to your host machine where Anvil is running.
@@ -528,10 +528,10 @@ adi deploy -p v30.0.2
 
 ```bash
 # Only fund wallets, don't deploy contracts
-adi deploy -p v30.0.2 --skip-deployment
+adi deploy -p v0.30.1 --skip-deployment
 
 # Only deploy contracts (wallets already funded)
-adi deploy -p v30.0.2 --skip-funding
+adi deploy -p v0.30.1 --skip-funding
 ```
 
 **Deploying L3 chains:**
@@ -546,7 +546,7 @@ What L3 mode does:
 Enable L3 mode via CLI flag:
 
 ```bash
-adi deploy -p v30.0.2 --l3
+adi deploy -p v0.30.1 --l3
 ```
 
 Or via configuration file (`~/.adi.yml`):
@@ -564,13 +564,13 @@ Enable automatic contract verification on block explorers (Etherscan, Blockscout
 
 ```bash
 # Enable verification with Blockscout
-adi deploy -p v30.0.2 --verify --explorer blockscout --explorer-url https://explorer.example.com/api
+adi deploy -p v0.30.1 --verify --explorer blockscout --explorer-url https://explorer.example.com/api
 
 # Enable verification with Etherscan (uses V2 API, auto-detected URL)
-adi deploy -p v30.0.2 --verify --explorer etherscan --explorer-api-key YOUR_API_KEY
+adi deploy -p v0.30.1 --verify --explorer etherscan --explorer-api-key YOUR_API_KEY
 
 # Disable verification even if configured in ~/.adi.yml
-adi deploy -p v30.0.2 --no-verify
+adi deploy -p v0.30.1 --no-verify
 ```
 
 Verification flags:
@@ -914,7 +914,7 @@ Pre-built images contain all required tools for ecosystem management:
 
 Full image reference example:
 ```
-harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli/adi-toolkit:v30.0.2
+harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli/adi-toolkit:v0.30.1
 ```
 
 ### What's in the Toolkit
@@ -939,20 +939,20 @@ This ephemeral approach means containers don't accumulate—each operation start
 
 ### Overriding the Image Tag
 
-By default, the CLI determines the Docker image tag from the protocol version (e.g., `v30.0.2`). You can override this for testing custom builds or using special tags like `latest`.
+By default, the CLI determines the Docker image tag from the protocol version (e.g., `v0.30.1`). You can override this for testing custom builds or using special tags like `latest`.
 
 **Priority order:** CLI flag > environment variable > config file > protocol version
 
 **CLI flag (highest priority):**
 ```bash
-adi --image-tag custom-tag init -p v30.0.2
-adi --image-tag latest deploy -p v30.0.2
+adi --image-tag custom-tag init -p v0.30.1
+adi --image-tag latest deploy -p v0.30.1
 ```
 
 **Environment variable:**
 ```bash
 export ADI__TOOLKIT__IMAGE_TAG=custom-tag
-adi deploy -p v30.0.2
+adi deploy -p v0.30.1
 ```
 
 **Config file (`~/.adi.yml`):**
@@ -973,17 +973,17 @@ Default behavior is local single-platform builds (`linux/arm64`) unless overridd
 
 ```bash
 # Build amd64 image and load to local Docker
-task build:docker:amd64 TARGETS=toolkit-v30-0-2
+task build:docker:amd64 TARGETS=toolkit-v0-30-1
 
 # Build arm64 image and load to local Docker
-task build:docker:arm64 TARGETS=toolkit-v30-0-2
+task build:docker:arm64 TARGETS=toolkit-v0-30-1
 
 # Build and push architecture-specific image with branch-aware suffix tags
-task build:docker:amd64 TARGETS=toolkit-v30-0-2 LOAD=false PUSH=true CI_COMMIT_REF_SLUG=my-branch
+task build:docker:amd64 TARGETS=toolkit-v0-30-1 LOAD=false PUSH=true CI_COMMIT_REF_SLUG=my-branch
 
 # Create and push multi-arch manifest tags
 # Requires architecture-specific images already pushed by CI
-task build:docker:manifest TARGETS=toolkit-v30-0-2 CI_COMMIT_REF_SLUG=main
+task build:docker:manifest TARGETS=toolkit-v0-30-1 CI_COMMIT_REF_SLUG=main
 ```
 
 Docker task reference:
@@ -1019,7 +1019,7 @@ Public Docker task parameters:
 
 Tag behavior in `build:docker:internal`:
 
-- `LOAD=true`: `TAG_SUFFIX=""` (clean tags like `v30.0.2`)
+- `LOAD=true`: `TAG_SUFFIX=""` (clean tags like `v0.30.1`)
 - `LOAD=false`: `TAG_SUFFIX=-<ref>-<arch>-<sha>` (for pushed branch/commit tracking)
 
 ## Architecture
@@ -1076,7 +1076,7 @@ flowchart TB
 
 **adi-docker** is a pure Docker SDK built on the bollard crate. It handles low-level container operations: connecting to the Docker daemon, pulling images, creating and starting containers, streaming output, and cleanup. This package knows nothing about ZkSync—it's a generic Docker orchestration layer.
 
-**adi-toolkit** sits above adi-docker and adds protocol awareness. It knows about toolkit image naming conventions, protocol versions, and how to construct the right container configurations for running zkstack, forge, or cast commands. When you specify `--protocol-version v30.0.2`, this package translates that into the correct Docker image tag.
+**adi-toolkit** sits above adi-docker and adds protocol awareness. It knows about toolkit image naming conventions, protocol versions, and how to construct the right container configurations for running zkstack, forge, or cast commands. When you specify `--protocol-version v0.30.1`, this package translates that into the correct Docker image tag.
 
 **adi-ecosystem** contains domain logic for ZkSync ecosystem management. Importantly, it has no Docker dependencies—all operations are expressed as data transformations and command-line argument builders. This separation means the ecosystem logic can be tested without containers and reused in contexts where Docker isn't available.
 
@@ -1172,9 +1172,9 @@ task fmt            # Format code
 task fmt:check      # Verify formatting
 task check          # Run all checks (fmt, lint, test)
 task install        # Install adi binary from current repo
-task build:docker:amd64 TARGETS=toolkit-v30-0-2
-task build:docker:arm64 TARGETS=toolkit-v30-0-2
-task build:docker:manifest TARGETS=toolkit-v30-0-2 CI_COMMIT_REF_SLUG=main
+task build:docker:amd64 TARGETS=toolkit-v0-30-1
+task build:docker:arm64 TARGETS=toolkit-v0-30-1
+task build:docker:manifest TARGETS=toolkit-v0-30-1 CI_COMMIT_REF_SLUG=main
 ```
 
 ### Code Standards
