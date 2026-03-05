@@ -17,6 +17,7 @@ thiserror = { workspace = true }
 serde = { workspace = true }
 serde_yaml = { workspace = true }
 log = { workspace = true }
+console = { workspace = true }
 adi-types = { workspace = true }
 
 # S3 support

@@ -59,7 +59,8 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     }
     ui::success(format!(
         "Chain ID {} validated (settlement layer: {})",
-        config.chain_id, settlement_chain_id
+        ui::green(config.chain_id),
+        ui::green(settlement_chain_id)
     ))?;
 
     ui::note(
@@ -156,7 +157,10 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     let genesis_src = state_dir.join(GENESIS_FILENAME);
     if !genesis_src.exists() {
         let genesis_url = version.genesis_url();
-        ui::info(format!("Downloading genesis.json from {genesis_url}..."))?;
+        ui::info(format!(
+            "Downloading genesis.json from {}...",
+            ui::green(&genesis_url)
+        ))?;
 
         download_genesis(&genesis_url, &genesis_src)
             .await
@@ -208,7 +212,10 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     let ecosystem_name = normalize_name(&config.name);
     let chain_name = normalize_name(&config.chain_name);
 
-    ui::info(format!("State directory: {}", state_dir.display()))?;
+    ui::info(format!(
+        "State directory: {}",
+        ui::green(state_dir.display())
+    ))?;
     ui::info("Importing ecosystem state through backend...")?;
     import_ecosystem_state(&state_manager, &temp_path, &ecosystem_name, &chain_name)
         .await
@@ -252,7 +259,7 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
             .wrap_err("Failed to sync state to S3")?;
     }
 
-    ui::info(format!("Location: {}", ecosystem_path.display()))?;
+    ui::info(format!("Location: {}", ui::green(ecosystem_path.display())))?;
     ui::outro(format!(
         "Ecosystem '{}' initialized successfully!",
         config.name

@@ -233,7 +233,8 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     }
     ui::success(format!(
         "Chain ID {} validated (settlement layer: {})",
-        chain_metadata.chain_id, settlement_chain_id
+        ui::green(chain_metadata.chain_id),
+        ui::green(settlement_chain_id)
     ))?;
 
     // Display deployment info

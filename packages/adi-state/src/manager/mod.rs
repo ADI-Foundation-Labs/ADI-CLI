@@ -14,6 +14,7 @@ use crate::error::Result;
 use crate::paths;
 use crate::s3::{S3Config, S3SyncEventHandler};
 use adi_types::{LogCrateLogger, Logger};
+use console::style;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -338,7 +339,7 @@ impl StateManager {
     pub async fn delete_all(&self) -> Result<()> {
         self.logger.info(&format!(
             "Deleting ecosystem state at {}",
-            self.base_path.display()
+            style(self.base_path.display()).green()
         ));
         tokio::fs::remove_dir_all(&self.base_path)
             .await

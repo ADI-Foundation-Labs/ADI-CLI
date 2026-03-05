@@ -68,7 +68,8 @@ pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
     }
     ui::success(format!(
         "Chain ID {} validated (settlement layer: {})",
-        chain_config.chain_id, settlement_chain_id
+        ui::green(chain_config.chain_id),
+        ui::green(settlement_chain_id)
     ))?;
 
     // 5. Create state manager and validate ecosystem exists
@@ -274,7 +275,7 @@ pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
     ))?;
 
     let ecosystem_path = state_dir.join(&ecosystem_name);
-    ui::info(format!("Location: {}", ecosystem_path.display()))?;
+    ui::info(format!("Location: {}", ui::green(ecosystem_path.display())))?;
     ui::outro(format!("Chain '{}' added successfully!", chain_config.name))?;
 
     Ok(())

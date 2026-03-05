@@ -114,6 +114,7 @@ dependencies = [
  "async-trait",
  "aws-config",
  "aws-sdk-s3",
+ "console 0.15.11",
  "flate2",
  "log",
  "serde",

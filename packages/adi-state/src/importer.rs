@@ -6,6 +6,7 @@
 use crate::error::{Result, StateError};
 use crate::StateManager;
 use adi_types::{ChainMetadata, EcosystemMetadata, Logger, Wallets};
+use console::style;
 use serde::de::DeserializeOwned;
 use std::path::Path;
 use std::sync::Arc;
@@ -51,7 +52,7 @@ pub async fn import_ecosystem_state(
     let ecosystem_dir = source_dir.join(ecosystem_name);
     logger.info(&format!(
         "Importing ecosystem state from {}",
-        ecosystem_dir.display()
+        style(ecosystem_dir.display()).green()
     ));
 
     // Import ecosystem-level files
