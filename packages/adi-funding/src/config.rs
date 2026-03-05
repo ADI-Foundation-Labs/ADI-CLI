@@ -64,13 +64,13 @@ impl DefaultAmounts {
 impl Default for DefaultAmounts {
     fn default() -> Self {
         Self {
-            deployer_eth: eth(1),
-            governor_eth: eth(1),
+            deployer_eth: eth(100),
+            governor_eth: eth(40),
             governor_cgt_units: 5.0, // 5 tokens (converted using actual decimals at runtime)
-            operator_eth: eth(5),
+            operator_eth: eth(30),
             blob_operator_eth: eth(5),
-            prove_operator_eth: eth(5),
-            execute_operator_eth: eth(5),
+            prove_operator_eth: eth(30),
+            execute_operator_eth: eth(30),
             fee_account_eth: U256::ZERO,
             token_multiplier_setter_eth: eth_tenths(1), // 0.1 ETH
         }

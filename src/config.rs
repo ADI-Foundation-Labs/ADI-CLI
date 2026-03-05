@@ -68,7 +68,15 @@ pub struct FundingDefaults {
 }
 
 fn default_gas_multiplier() -> u64 {
-    120
+    200
+}
+
+fn default_s3_bucket() -> Option<String> {
+    Some("adi-state".to_string())
+}
+
+fn default_s3_region() -> Option<String> {
+    Some("us-east-1".to_string())
 }
 
 /// Default ownership transfer configuration values.
@@ -147,13 +155,13 @@ pub struct S3Config {
     pub tenant_id: Option<String>,
 
     /// S3 bucket name.
-    /// Required when S3 sync is enabled.
-    #[serde(default)]
+    /// Default: `adi-state`
+    #[serde(default = "default_s3_bucket")]
     pub bucket: Option<String>,
 
     /// AWS region (e.g., "us-east-1").
     /// Default: `us-east-1`
-    #[serde(default)]
+    #[serde(default = "default_s3_region")]
     pub region: Option<String>,
 
     /// Custom S3 endpoint URL (for MinIO, LocalStack, etc.).

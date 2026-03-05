@@ -95,15 +95,15 @@ impl Default for EcosystemConfig {
     fn default() -> Self {
         Self {
             name: "adi_ecosystem".to_string(),
-            l1_network: L1Network::default(),
+            l1_network: L1Network::Sepolia,
             chain_name: "adi".to_string(),
-            chain_id: 270,
+            chain_id: 222,
             prover_mode: ProverMode::default(),
             base_token_address: ETH_TOKEN_ADDRESS,
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
             evm_emulator: false,
-            l3: false,
+            l3: true,
             rpc_url: None,
         }
     }
@@ -337,13 +337,13 @@ mod tests {
     fn test_default_config() {
         let config = EcosystemConfig::default();
         assert_eq!(config.name, "adi_ecosystem");
-        assert_eq!(config.l1_network, L1Network::Localhost);
+        assert_eq!(config.l1_network, L1Network::Sepolia);
         assert_eq!(config.chain_name, "adi");
-        assert_eq!(config.chain_id, 270);
+        assert_eq!(config.chain_id, 222);
         assert_eq!(config.prover_mode, ProverMode::NoProofs);
         assert_eq!(config.base_token_address, ETH_TOKEN_ADDRESS);
         assert!(!config.evm_emulator);
-        assert!(!config.l3);
+        assert!(config.l3);
     }
 
     #[test]
