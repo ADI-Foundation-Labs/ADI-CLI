@@ -1,0 +1,19 @@
+ecosystem:
+  name: "l3"
+  rpc_url: "https://rpc.ab.testnet.adifoundation.ai"
+  chain_name: "adi"
+  chain_id: 222
+funding:
+  funder_key: ""
+ownership:
+  new_owner: ""
+  private_key: ""
+verification:
+  explorer: "blockscout"
+  explorer_url: "https://explorer-api.ab.testnet.adifoundation.ai/api"
+s3:
+  enabled: true
+  bucket: "adi-state"
+  access_key_id: ""
+  secret_access_key: ""
+  tenant_id: "UNIQUE_ID_THERE"
