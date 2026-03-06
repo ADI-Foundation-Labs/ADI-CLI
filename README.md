@@ -85,6 +85,7 @@ ecosystem:
 
   # Settlement layer network where contracts are deployed
   # Options: localhost (Anvil), sepolia (testnet), mainnet
+  # Default: sepolia
   l1_network: sepolia
 
   # Name of the initial ZK chain within this ecosystem
@@ -92,11 +93,13 @@ ecosystem:
 
   # Unique numeric identifier for the chain
   # Must not conflict with other chains
-  chain_id: 271
+  # Default: 222
+  chain_id: 222
 
   # Proof generation mode
   # no-proofs: Development/testing (fast, no real proofs)
   # gpu: Production (requires GPU prover infrastructure)
+  # Default: no-proofs
   prover_mode: no-proofs
 
   # OPTIONAL: Custom ERC20 token for gas payments
