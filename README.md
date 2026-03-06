@@ -112,8 +112,8 @@ ecosystem:
   # Deploy as L3 chain (settling on L2 instead of L1)
   # When enabled, blobs are disabled and calldata DA is used
   # Required for chains settling on ZKsync-based L2s
-  # Default: false
-  l3: false
+  # Default: true
+  l3: true
 
   # Settlement layer RPC endpoint
   # For Anvil (local): http://host.docker.internal:8545
@@ -137,12 +137,12 @@ funding:
   #   execute_operator_eth: 0.5
   #
   # For PRODUCTION or long-running chains (values below):
-  deployer_eth: 1.0           # Deploys contracts
-  governor_eth: 1.0           # Governance operations
+  deployer_eth: 100.0         # Deploys contracts
+  governor_eth: 40.0          # Governance operations
   governor_cgt_units: 5.0     # Custom gas token (if using custom base token)
-  operator_eth: 5.0           # Commits batches
-  prove_operator_eth: 5.0     # Submits proofs
-  execute_operator_eth: 5.0   # Executes batches
+  operator_eth: 30.0          # Commits batches
+  prove_operator_eth: 30.0    # Submits proofs
+  execute_operator_eth: 30.0  # Executes batches
 
 # Default values for ownership operations
 ownership:
@@ -155,12 +155,12 @@ ownership:
   # Can be overridden with --private-key flag or ADI_PRIVATE_KEY env var
   # private_key: "0x..."
 
-# Gas price multiplier percentage (default: 120 = 20% buffer).
+# Gas price multiplier percentage (default: 200 = 100% buffer).
 # Applied to all on-chain transactions (deploy, accept, transfer).
 # The CLI fetches current gas price and multiplies by this percentage.
-# Example: 120 means use 120% of estimated gas price (20% buffer).
+# Example: 200 means use 200% of estimated gas price (100% buffer).
 # Recommended: 200 for Anvil, 300 for Sepolia/mainnet.
-gas_multiplier: 120
+gas_multiplier: 200
 
 # OPTIONAL: S3 synchronization for state backup and sharing
 # When enabled, ecosystem state is automatically synced to S3 after changes
@@ -175,8 +175,8 @@ gas_multiplier: 120
 #   tenant_id: my-tenant
 #
 #   # S3 bucket name
-#   # Required when S3 is enabled
-#   bucket: my-adi-state-bucket
+#   # Default: adi-state
+#   bucket: adi-state
 #
 #   # AWS region
 #   # Default: us-east-1
@@ -195,15 +195,6 @@ gas_multiplier: 120
 #   # Use a custom image tag instead of protocol version-derived tag
 #   image_tag: "latest"
 
-# OPTIONAL: Predefined operator keys
-# Use this to override randomly generated operator keys during init.
-# Only private keys are needed — addresses are derived automatically.
-# operator_keys:
-#   operator: "0x..."
-#   blob_operator: "0x..."
-#   prove_operator: "0x..."
-#   execute_operator: "0x..."
-
 # OPTIONAL: Predefined operator addresses for validator role assignment
 # Use this to assign validator roles to externally managed addresses during deploy.
 # When specified, roles are revoked from default wallet operators and granted
@@ -218,26 +209,25 @@ gas_multiplier: 120
 
 For sensitive data like private keys, use environment variables instead of config files:
 
-| Variable                            | Purpose                                                                                                          |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `ADI_FUNDER_KEY`                    | Private key (hex) of the wallet that funds ecosystem wallets. This is the only wallet you need to fund manually. |
-| `ADI_PRIVATE_KEY`                   | Private key (hex) for accepting ownership as new owner. Used by the `accept` command.                            |
-| `ADI_RPC_URL`                       | Settlement layer RPC endpoint. Useful for switching networks without editing config.                             |
-| `ADI_EXPLORER_URL`                  | Block explorer API URL for contract verification during deploy and scan commands.                                |
-| `ADI_EXPLORER_API_KEY`              | Block explorer API key for contract verification (optional for public explorers).                                |
-| `ADI_CONFIG`                        | Path to an alternative config file.                                                                              |
-| `ADI__PROTOCOL_VERSION`             | Default protocol version for init, add, and deploy commands (e.g., `v0.30.1`).                                   |
-| `ADI__TOOLKIT__IMAGE_TAG`           | Override Docker image tag for toolkit containers (e.g., `latest` or `custom-build`).                             |
-| `ADI_OPERATOR_KEY`                  | Override operator private key during init (address derived automatically).                                       |
-| `ADI_BLOB_OPERATOR_KEY`             | Override blob operator private key during init.                                                                  |
-| `ADI_PROVE_OPERATOR_KEY`            | Override prove operator private key during init.                                                                 |
-| `ADI_EXECUTE_OPERATOR_KEY`          | Override execute operator private key during init.                                                               |
-| `AWS_ACCESS_KEY_ID`                 | AWS access key for S3 synchronization.                                                                           |
-| `AWS_SECRET_ACCESS_KEY`             | AWS secret key for S3 synchronization.                                                                           |
-| `ADI__S3__ENABLED`                  | Enable S3 sync (`true`/`false`).                                                                                 |
-| `ADI__S3__TENANT_ID`                | Tenant identifier for S3 key prefix.                                                                             |
-| `ADI__S3__BUCKET`                   | S3 bucket name.                                                                                                  |
-| `RUST_LOG`                          | Logging verbosity: `error`, `warn`, `info`, `debug`, `trace`                                                     |
+| Variable                   | Purpose                                                                                                          |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `ADI_FUNDER_KEY`           | Private key (hex) of the wallet that funds ecosystem wallets. This is the only wallet you need to fund manually. |
+| `ADI_PRIVATE_KEY`          | Private key (hex) for accepting ownership as new owner. Used by the `accept` command.                            |
+| `ADI_RPC_URL`              | Settlement layer RPC endpoint. Useful for switching networks without editing config.                             |
+| `ADI_EXPLORER_URL`         | Block explorer API URL for contract verification during deploy and scan commands.                                |
+| `ADI_EXPLORER_API_KEY`     | Block explorer API key for contract verification (optional for public explorers).                                |
+| `ADI_CONFIG`               | Path to an alternative config file.                                                                              |
+| `ADI__PROTOCOL_VERSION`    | Default protocol version for init, add, and deploy commands (e.g., `v0.30.1`).                                   |
+| `ADI__TOOLKIT__IMAGE_TAG`  | Override Docker image tag for toolkit containers (e.g., `latest` or `custom-build`).                             |
+| `ADI_OPERATOR`             | Operator address for init (receives PRECOMMITTER, COMMITTER, REVERTER roles).                                    |
+| `ADI_PROVE_OPERATOR`       | Prove operator address for init (receives PROVER role).                                                          |
+| `ADI_EXECUTE_OPERATOR`     | Execute operator address for init (receives EXECUTOR role).                                                      |
+| `AWS_ACCESS_KEY_ID`        | AWS access key for S3 synchronization.                                                                           |
+| `AWS_SECRET_ACCESS_KEY`    | AWS secret key for S3 synchronization.                                                                           |
+| `ADI__S3__ENABLED`         | Enable S3 sync (`true`/`false`).                                                                                 |
+| `ADI__S3__TENANT_ID`       | Tenant identifier for S3 key prefix.                                                                             |
+| `ADI__S3__BUCKET`          | S3 bucket name.                                                                                                  |
+| `RUST_LOG`                 | Logging verbosity: `error`, `warn`, `info`, `debug`, `trace`                                                     |
 
 You can also override any config value using the `ADI__` prefix with double underscores as path separators:
 
@@ -280,18 +270,17 @@ The `init` command creates the foundational configuration for your ZkSync ecosys
 
 **All arguments are optional** and fall back to values in `~/.adi.yml`:
 
-| Flag                    | Description                                            |
-| ----------------------- | ------------------------------------------------------ |
-| `--protocol-version`    | Protocol version (e.g., `v0.30.1`)                     |
-| `--ecosystem-name`      | Override the ecosystem name from config                |
-| `--l1-network`          | Settlement layer: `localhost`, `sepolia`, or `mainnet` |
-| `--chain-name`          | Name for the initial chain                             |
-| `--chain-id`            | Unique numeric chain identifier                        |
-| `--prover-mode`         | `no-proofs` for testing, `gpu` for production          |
-| `--operator-key`        | Override operator private key (address derived)        |
-| `--blob-operator-key`   | Override blob operator private key                     |
-| `--prove-operator-key`  | Override prove operator private key                    |
-| `--execute-operator-key`| Override execute operator private key                  |
+| Flag                     | Description                                            |
+| ------------------------ | ------------------------------------------------------ |
+| `--protocol-version`     | Protocol version (e.g., `v0.30.1`)                     |
+| `--ecosystem-name`       | Override the ecosystem name from config                |
+| `--l1-network`           | Settlement layer: `localhost`, `sepolia`, or `mainnet` |
+| `--chain-name`           | Name for the initial chain                             |
+| `--chain-id`             | Unique numeric chain identifier                        |
+| `--prover-mode`          | `no-proofs` for testing, `gpu` for production          |
+| `--operator`             | Operator address (PRECOMMITTER, COMMITTER, REVERTER)   |
+| `--prove-operator`       | Prove operator address (PROVER role)                   |
+| `--execute-operator`     | Execute operator address (EXECUTOR role)               |
 
 **Example: Using config file defaults**
 
@@ -323,29 +312,30 @@ adi init \
   --chain-id 271
 ```
 
-**Example: Using predefined operator keys**
+**Example: Using predefined operator addresses**
 
-If you need specific operator keys (e.g., for key management or HSM integration), you can override them during init:
+If you need specific operator addresses (e.g., for externally managed keys or HSM integration), you can override them during init:
 
 ```bash
 # Via CLI flags
 adi init \
   --protocol-version v0.30.1 \
-  --operator-key 0x... \
-  --blob-operator-key 0x...
+  --operator 0x1234... \
+  --prove-operator 0x5678...
 
 # Or via environment variables
-export ADI_OPERATOR_KEY="0x..."
-export ADI_BLOB_OPERATOR_KEY="0x..."
+export ADI_OPERATOR="0x1234..."
+export ADI_PROVE_OPERATOR="0x5678..."
 adi init -p v0.30.1
 
 # Or via config file (~/.adi.yml)
-# operator_keys:
+# operators:
 #   operator: "0x..."
-#   blob_operator: "0x..."
+#   prove_operator: "0x..."
+#   execute_operator: "0x..."
 ```
 
-The CLI generates random keys first, then overrides them with your predefined keys. Only private keys are needed — addresses are derived automatically.
+When operator addresses are specified, they override the randomly generated wallet addresses for role assignments.
 
 After initialization, check `~/.adi_cli/state/<ecosystem-name>/` to see the generated files, including `configs/wallets.yaml` with your new wallet addresses.
 
@@ -362,19 +352,19 @@ If you need multiple chains in your ecosystem, use the `add` command to create a
 
 **All arguments are optional** and fall back to values in `~/.adi.yml`:
 
-| Flag                             | Description                                    |
-| -------------------------------- | ---------------------------------------------- |
-| `--protocol-version, -p`         | Protocol version (should match `init`)         |
-| `--ecosystem-name`               | Target ecosystem name                          |
-| `--chain-name`                   | Name for the new chain (must be unique)        |
-| `--chain-id`                     | Unique numeric chain identifier                |
-| `--prover-mode`                  | `no-proofs` for testing, `gpu` for production  |
-| `--base-token-address`           | Custom ERC20 token address for gas payments    |
-| `--base-token-price-nominator`   | Price ratio numerator                          |
-| `--base-token-price-denominator` | Price ratio denominator                        |
-| `--evm-emulator`                 | Enable EVM bytecode emulator                   |
-| `--yes, -y`                      | Skip confirmation prompt                       |
-| `--force, -f`                    | Overwrite if chain already exists              |
+| Flag                             | Description                                   |
+| -------------------------------- | --------------------------------------------- |
+| `--protocol-version, -p`         | Protocol version (should match `init`)        |
+| `--ecosystem-name`               | Target ecosystem name                         |
+| `--chain-name`                   | Name for the new chain (must be unique)       |
+| `--chain-id`                     | Unique numeric chain identifier               |
+| `--prover-mode`                  | `no-proofs` for testing, `gpu` for production |
+| `--base-token-address`           | Custom ERC20 token address for gas payments   |
+| `--base-token-price-nominator`   | Price ratio numerator                         |
+| `--base-token-price-denominator` | Price ratio denominator                       |
+| `--evm-emulator`                 | Enable EVM bytecode emulator                  |
+| `--yes, -y`                      | Skip confirmation prompt                      |
+| `--force, -f`                    | Overwrite if chain already exists             |
 
 **Example: Add a second chain using config defaults**
 
@@ -452,12 +442,12 @@ When custom operators are specified:
 
 The `--gas-multiplier` flag controls gas price buffering for on-chain transactions. The CLI fetches the current gas price from the RPC endpoint and multiplies it by the specified percentage.
 
-| Value | Meaning | Recommended For |
-| ----- | ------- | --------------- |
-| 100   | Use exact estimated gas price | Not recommended |
-| 120   | 20% buffer (default) | Stable networks |
-| 200   | 100% buffer | Anvil (local) |
-| 300   | 200% buffer | Sepolia, congested networks |
+| Value | Meaning                       | Recommended For             |
+| ----- | ----------------------------- | --------------------------- |
+| 100   | Use exact estimated gas price | Not recommended             |
+| 120   | 20% buffer                    | Stable networks             |
+| 200   | 100% buffer (default)         | Anvil (local)               |
+| 300   | 200% buffer                   | Sepolia, congested networks |
 
 This flag is available on `deploy`, `accept`, and `transfer` commands. You can also set it globally in `~/.adi.yml`:
 
@@ -575,12 +565,12 @@ adi deploy -p v0.30.1 --no-verify
 
 Verification flags:
 
-| Flag | Description |
-| ---- | ----------- |
-| `--verify` | Enable contract verification during deployment |
-| `--no-verify` | Disable verification (overrides config) |
-| `--explorer` | Explorer type: `etherscan`, `blockscout`, or `custom` |
-| `--explorer-url` | Block explorer API URL |
+| Flag                 | Description                                            |
+| -------------------- | ------------------------------------------------------ |
+| `--verify`           | Enable contract verification during deployment         |
+| `--no-verify`        | Disable verification (overrides config)                |
+| `--explorer`         | Explorer type: `etherscan`, `blockscout`, or `custom`  |
+| `--explorer-url`     | Block explorer API URL                                 |
 | `--explorer-api-key` | Block explorer API key (optional for public explorers) |
 
 You can also configure verification defaults in `~/.adi.yml`:
@@ -604,14 +594,14 @@ The `accept` command operates in two modes depending on who is accepting:
 
 **Command flags:**
 
-| Flag | Description |
-| ---- | ----------- |
-| `--use-governor` | Use the stored governor key without prompting |
-| `--private-key` | Provide your own private key (for new owner acceptance) |
-| `--chain <name>` | Also process chain-level contracts |
-| `--dry-run` | Preview contracts without executing transactions |
-| `--calldata` | Print calldata without sending transactions (for multisig/external submission) |
-| `--yes, -y` | Skip confirmation prompt |
+| Flag             | Description                                                                    |
+| ---------------- | ------------------------------------------------------------------------------ |
+| `--use-governor` | Use the stored governor key without prompting                                  |
+| `--private-key`  | Provide your own private key (for new owner acceptance)                        |
+| `--chain <name>` | Also process chain-level contracts                                             |
+| `--dry-run`      | Preview contracts without executing transactions                               |
+| `--calldata`     | Print calldata without sending transactions (for multisig/external submission) |
+| `--yes, -y`      | Skip confirmation prompt                                                       |
 
 **Acceptance methods by contract:**
 - **Direct acceptance** — Calls `acceptOwnership()` directly (Governance, Validator Timelock, Verifier)
@@ -697,14 +687,14 @@ After accepting ownership, you may want to transfer it to a final owner address 
 
 **Contracts transferred to new owner:**
 
-| Contract | Type | Accept Required |
-| -------- | ---- | --------------- |
-| Governance | Ownable2Step | Yes |
-| Ecosystem Chain Admin | Ownable2Step | Yes |
-| Validator Timelock | Ownable2Step | Yes |
-| Bridged Token Beacon | Ownable | No (immediate) |
-| Chain Governance | Ownable2Step | Yes |
-| Chain Chain Admin | Ownable2Step | Yes |
+| Contract              | Type         | Accept Required |
+| --------------------- | ------------ | --------------- |
+| Governance            | Ownable2Step | Yes             |
+| Ecosystem Chain Admin | Ownable2Step | Yes             |
+| Validator Timelock    | Ownable2Step | Yes             |
+| Bridged Token Beacon  | Ownable      | No (immediate)  |
+| Chain Governance      | Ownable2Step | Yes             |
+| Chain Chain Admin     | Ownable2Step | Yes             |
 
 **Contracts NOT transferred (proxy-owned):**
 - Server Notifier (controlled via Ecosystem Chain Admin)
@@ -905,12 +895,12 @@ The CLI uses Docker to ensure reproducible execution of blockchain tooling. This
 
 Pre-built images contain all required tools for ecosystem management:
 
-| Property        | Value                                       |
-| --------------- | ------------------------------------------- |
+| Property        | Value                                                   |
+| --------------- | ------------------------------------------------------- |
 | Registry        | `harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli` |
-| Image           | `adi-toolkit`                               |
-| Tag format      | `v{MAJOR}.{MINOR}.{PATCH}`                  |
-| Default timeout | 30 minutes                                  |
+| Image           | `adi-toolkit`                                           |
+| Tag format      | `v{MAJOR}.{MINOR}.{PATCH}`                              |
+| Default timeout | 30 minutes                                              |
 
 Full image reference example:
 ```
@@ -988,34 +978,34 @@ task build:docker:manifest TARGETS=toolkit-v0-30-1 CI_COMMIT_REF_SLUG=main
 
 Docker task reference:
 
-| Task | Purpose |
-| ---- | ------- |
-| `build:docker:amd64` | Build linux/amd64 image (`--load` by default, can `--push`) |
-| `build:docker:arm64` | Build linux/arm64 image (`--load` by default, can `--push`) |
-| `build:docker:manifest` | Create multi-arch manifest tags from pushed arch images |
-| `build:docker:internal` | Internal worker task used by arch-specific tasks |
+| Task                    | Purpose                                                     |
+| ----------------------- | ----------------------------------------------------------- |
+| `build:docker:amd64`    | Build linux/amd64 image (`--load` by default, can `--push`) |
+| `build:docker:arm64`    | Build linux/arm64 image (`--load` by default, can `--push`) |
+| `build:docker:manifest` | Create multi-arch manifest tags from pushed arch images     |
+| `build:docker:internal` | Internal worker task used by arch-specific tasks            |
 
 Public Docker task parameters:
 
-| Variable               | Purpose |
-| ---------------------- | ------- |
-| `TARGETS`              | Bake target(s). Default: `default` (all toolkit targets) |
-| `LOAD`                 | `true`/`false` (default `true`). When `true`, image is loaded locally and uses clean version tag |
-| `PUSH`                 | `true`/`false` (default `false`). When `true`, image is pushed to registry |
-| `CI_COMMIT_REF_SLUG`   | Branch slug used for cache refs and suffix tags |
-| `REF_SLUG`             | Optional explicit branch slug override (defaults to `CI_COMMIT_REF_SLUG`) |
-| `CACHE_TO_REF`         | Optional explicit buildx cache destination (defaults to registry cache tag per arch/branch) |
+| Variable             | Purpose                                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------------------ |
+| `TARGETS`            | Bake target(s). Default: `default` (all toolkit targets)                                         |
+| `LOAD`               | `true`/`false` (default `true`). When `true`, image is loaded locally and uses clean version tag |
+| `PUSH`               | `true`/`false` (default `false`). When `true`, image is pushed to registry                       |
+| `CI_COMMIT_REF_SLUG` | Branch slug used for cache refs and suffix tags                                                  |
+| `REF_SLUG`           | Optional explicit branch slug override (defaults to `CI_COMMIT_REF_SLUG`)                        |
+| `CACHE_TO_REF`       | Optional explicit buildx cache destination (defaults to registry cache tag per arch/branch)      |
 
 `build:docker:internal` parameters (advanced):
 
-| Variable | Purpose |
-| -------- | ------- |
-| `ARCH_SLUG` | Architecture label in tag suffix (`amd64`, `arm64`) |
-| `PLATFORM` | Docker platform passed to bake (`linux/amd64`, `linux/arm64`) |
-| `REF_SLUG` | Branch slug used in suffix tags for pushed images |
-| `CACHE_TO_REF` | Build cache destination ref |
-| `LOAD` | Enables `docker buildx bake --load` |
-| `PUSH` | Enables `docker buildx bake --push` |
+| Variable       | Purpose                                                       |
+| -------------- | ------------------------------------------------------------- |
+| `ARCH_SLUG`    | Architecture label in tag suffix (`amd64`, `arm64`)           |
+| `PLATFORM`     | Docker platform passed to bake (`linux/amd64`, `linux/arm64`) |
+| `REF_SLUG`     | Branch slug used in suffix tags for pushed images             |
+| `CACHE_TO_REF` | Build cache destination ref                                   |
+| `LOAD`         | Enables `docker buildx bake --load`                           |
+| `PUSH`         | Enables `docker buildx bake --push`                           |
 
 Tag behavior in `build:docker:internal`:
 
