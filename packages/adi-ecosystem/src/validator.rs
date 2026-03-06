@@ -102,6 +102,28 @@ impl ValidatorRoles {
     }
 }
 
+impl std::fmt::Display for ValidatorRoles {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut roles = Vec::new();
+        if self.precommitter {
+            roles.push("precommitter");
+        }
+        if self.committer {
+            roles.push("committer");
+        }
+        if self.reverter {
+            roles.push("reverter");
+        }
+        if self.prover {
+            roles.push("prover");
+        }
+        if self.executor {
+            roles.push("executor");
+        }
+        write!(f, "{}", roles.join(", "))
+    }
+}
+
 /// Build calldata for adding validator roles via multicall.
 ///
 /// This function builds the calldata for calling `multicall` on the ChainAdmin
