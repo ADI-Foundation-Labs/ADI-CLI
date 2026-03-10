@@ -11,13 +11,13 @@ use strum::{Display, EnumString};
 /// # Serde Behavior
 /// - Serializes to PascalCase: `"Localhost"`, `"Sepolia"`, `"Mainnet"` (zkstack format)
 /// - Deserializes case-insensitively: accepts both `"Sepolia"` and `"sepolia"`
-#[derive(Clone, Debug, Default, Display, EnumString, PartialEq, Eq, ValueEnum)]
+#[derive(Clone, Copy, Debug, Default, Display, EnumString, PartialEq, Eq, ValueEnum)]
 #[strum(serialize_all = "lowercase")]
 pub enum L1Network {
     /// Local development network.
-    #[default]
     Localhost,
     /// Sepolia testnet.
+    #[default]
     Sepolia,
     /// Ethereum mainnet.
     Mainnet,

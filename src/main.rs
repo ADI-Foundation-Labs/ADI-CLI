@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 mod commands;
 mod config;
+mod config_writer;
 mod context;
 mod error;
 mod s3_events;

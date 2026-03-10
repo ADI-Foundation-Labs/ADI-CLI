@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::error::{Result, WrapErr};
-use adi_ecosystem::EcosystemConfig;
+use adi_ecosystem::EcosystemDefaults;
 use adi_state::BackendType;
 use alloy_primitives::Address;
 use secrecy::SecretString;
@@ -56,21 +56,6 @@ pub struct FundingDefaults {
     /// Default: `5`
     #[serde(default = "default_governor_cgt_units")]
     pub governor_cgt_units: Option<f64>,
-
-    /// Operator ETH amount.
-    /// Default: `30`
-    #[serde(default = "default_operator_eth")]
-    pub operator_eth: Option<f64>,
-
-    /// Prove operator ETH amount.
-    /// Default: `30`
-    #[serde(default = "default_operator_eth")]
-    pub prove_operator_eth: Option<f64>,
-
-    /// Execute operator ETH amount.
-    /// Default: `30`
-    #[serde(default = "default_operator_eth")]
-    pub execute_operator_eth: Option<f64>,
 }
 
 fn default_gas_multiplier() -> u64 {
@@ -99,10 +84,6 @@ fn default_governor_eth() -> Option<f64> {
 
 fn default_governor_cgt_units() -> Option<f64> {
     Some(5.0)
-}
-
-fn default_operator_eth() -> Option<f64> {
-    Some(30.0)
 }
 
 /// Default ownership transfer configuration values.
@@ -228,9 +209,9 @@ pub struct Config {
     pub protocol_version: Option<String>,
 
     /// Default ecosystem configuration values.
-    /// These can be overridden by CLI flags.
+    /// Includes nested chain configurations with operators, funding, and ownership.
     #[serde(default)]
-    pub ecosystem: EcosystemConfig,
+    pub ecosystem: EcosystemDefaults,
 
     /// State backend type for persistence.
     /// Default: `filesystem`
@@ -248,7 +229,8 @@ pub struct Config {
     pub toolkit: ToolkitDefaults,
 
     /// Default ownership transfer configuration values.
-    /// These can be overridden by CLI flags.
+    /// **Deprecated**: Use `ecosystem.ownership` for ecosystem-level
+    /// and `ecosystem.chains[].ownership` for chain-level ownership.
     #[serde(default)]
     pub ownership: OwnershipDefaults,
 
@@ -269,7 +251,7 @@ pub struct Config {
     pub s3: S3Config,
 
     /// Predefined operator addresses.
-    /// Override randomly generated operator addresses after init.
+    /// **Deprecated**: Use `ecosystem.chains[].operators` instead.
     #[serde(default)]
     pub operators: OperatorsConfig,
 }
@@ -277,12 +259,12 @@ pub struct Config {
 impl Config {
     /// Load configuration from file and environment variables.
     ///
-    /// Configuration is loaded from multiple sources with the following priority:
-    /// 1. Environment variables with `ADI__` prefix (highest)
-    /// 2. CLI `--config` flag
-    /// 3. `ADI_CONFIG` environment variable
-    /// 4. Global config file at `~/.adi_cli/.adi.yml`
-    /// 5. Built-in defaults (lowest)
+    /// Configuration sources (mutually exclusive for files):
+    /// 1. CLI `--config` flag (if provided, used exclusively)
+    /// 2. `ADI_CONFIG` environment variable (if set, used exclusively)
+    /// 3. Global config file at `~/.adi.yml` (fallback)
+    ///
+    /// Environment variables with `ADI__` prefix always override any file config.
     ///
     /// # Arguments
     /// * `config_path` - Optional path to config file from CLI `--config` flag
@@ -292,22 +274,24 @@ impl Config {
     /// If a config path is explicitly provided (via CLI or `ADI_CONFIG` env var)
     /// and the file doesn't exist, an error is returned.
     pub fn new(config_path: Option<&Path>) -> Result<Self> {
-        // 1. Global config (lowest file priority)
-        let global_config_path = path_with_home_dir(DEFAULT_CONFIG_FILE_NAME);
-        let mut builder = config::Config::builder()
-            .add_source(config::File::from(Path::new(&global_config_path)).required(false));
+        let mut builder = config::Config::builder();
 
-        // 2. ADI_CONFIG environment variable (higher priority)
-        if let Ok(env_path) = std::env::var(CONFIG_ENV_VAR) {
-            builder = builder.add_source(config::File::from(Path::new(&env_path)).required(true));
-        }
-
-        // 3. CLI --config flag (highest file priority)
+        // Determine which config file to use (mutually exclusive, not merged)
+        // Priority: CLI --config > ADI_CONFIG env var > global ~/.adi.yml
         if let Some(path) = config_path {
+            // CLI --config flag takes highest priority
             builder = builder.add_source(config::File::from(path).required(true));
+        } else if let Ok(env_path) = std::env::var(CONFIG_ENV_VAR) {
+            // ADI_CONFIG environment variable
+            builder = builder.add_source(config::File::from(Path::new(&env_path)).required(true));
+        } else {
+            // Fall back to global config
+            let global_config_path = path_with_home_dir(DEFAULT_CONFIG_FILE_NAME);
+            builder = builder
+                .add_source(config::File::from(Path::new(&global_config_path)).required(false));
         }
 
-        // 4. Environment variables ADI__* (highest overall priority)
+        // Environment variables ADI__* always override (highest priority)
         let mut config: Self = builder
             .add_source(
                 config::Environment::with_prefix("ADI")
@@ -340,7 +324,8 @@ pub fn path_with_home_dir(path: &str) -> String {
     format!("{home_dir}/{path}")
 }
 
-fn default_state_dir() -> PathBuf {
+/// Get the default state directory path.
+pub fn default_state_dir() -> PathBuf {
     dirs::home_dir()
         .map(|h| h.join(DEFAULT_STATE_DIR))
         .unwrap_or_else(|| PathBuf::from("/home/user").join(DEFAULT_STATE_DIR))

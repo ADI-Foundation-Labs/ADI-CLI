@@ -45,6 +45,7 @@
 mod commands;
 mod config;
 mod da;
+mod defaults;
 mod deploy;
 mod error;
 mod ownership;
@@ -57,9 +58,14 @@ pub mod verification;
 // Public re-exports
 pub use commands::{build_chain_create_args, build_ecosystem_create_args, ERA_CONTRACTS_PATH};
 pub use config::{
-    validate_chain_id, ChainConfig, ChainConfigBuilder, EcosystemConfig, EcosystemConfigBuilder,
+    validate_chain_id, validate_chain_id_unique, validate_chain_name_unique, ChainConfig,
+    ChainConfigBuilder, EcosystemConfig, EcosystemConfigBuilder,
 };
 pub use da::{configure_l3_da, PubdataSource};
+pub use defaults::{
+    ChainDefaults, ChainFundingDefaults, ChainOwnershipDefaults, EcosystemDefaults,
+    EcosystemOwnershipDefaults, OperatorsDefaults,
+};
 pub use deploy::{add_validator_roles, remove_validator_roles, DeployedContracts};
 pub use error::{EcosystemError, Result};
 pub use ownership::{
@@ -78,10 +84,10 @@ pub use validator::{
 };
 pub use verify::{verify_chain_created, verify_ecosystem_created};
 
-/// Normalize ecosystem/chain name to match zkstack convention.
+/// Normalize ecosystem name to match zkstack convention.
 ///
-/// zkstack replaces hyphens with underscores in ecosystem and chain names.
-/// This function applies the same normalization so our paths match zkstack's output.
+/// zkstack replaces hyphens with underscores in ecosystem names.
+/// This function applies the same normalization so paths match zkstack's output.
 ///
 /// # Example
 ///

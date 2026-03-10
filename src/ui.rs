@@ -11,7 +11,7 @@ use std::sync::Arc;
 pub use cliclack::log::{error, info, success, warning};
 
 // Re-export interactive components
-pub use cliclack::{confirm, input, intro, note, outro, outro_cancel, password};
+pub use cliclack::{confirm, input, intro, note, outro, outro_cancel, password, select};
 
 /// Print a section header (uses step styling).
 pub fn section<S: std::fmt::Display>(title: S) -> std::io::Result<()> {

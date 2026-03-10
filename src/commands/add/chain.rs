@@ -1,18 +1,16 @@
 //! Chain addition command implementation.
 
-use adi_ecosystem::{
-    build_chain_create_args, validate_chain_id, verify_chain_created, ChainConfig, EcosystemConfig,
-};
+use adi_ecosystem::{validate_chain_id, validate_chain_id_unique, ChainDefaults};
 use adi_funding::FundingProvider;
-use adi_state::{export_ecosystem_state, import_chain_state};
-use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
-use std::sync::Arc;
-use tempfile::TempDir;
+use adi_toolkit::ProtocolVersion;
 
 use super::AddArgs;
+use crate::commands::chain_ops;
 use crate::commands::helpers::{
-    create_state_manager_with_s3, resolve_ecosystem_name, resolve_protocol_version, resolve_rpc_url,
+    collect_existing_chains, create_state_manager_with_s3, resolve_ecosystem_name,
+    resolve_protocol_version, resolve_rpc_url, select_chain_from_config, ChainSelection,
 };
+use crate::config_writer;
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
 use crate::ui;
@@ -25,13 +23,8 @@ use crate::ui;
 /// 3. Validates ecosystem exists
 /// 4. Checks if chain already exists, handles conflict
 /// 5. Shows config summary, gets confirmation (unless --yes)
-/// 6. Creates a temporary directory for zkstack output
-/// 7. Exports ecosystem state to temp dir (needed by zkstack)
-/// 8. Copies genesis.json to temp directory
-/// 9. Runs zkstack chain create pointing to temp dir
-/// 10. Verifies chain files created
-/// 11. Imports chain state through StateManager
-/// 12. Validates imported state
+/// 6. Creates chain using shared chain_ops module
+/// 7. Offers to save chain config to ~/.adi.yml
 pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
     ui::intro("ADI Add Chain")?;
     context.logger().debug("Starting chain addition");
@@ -45,34 +38,7 @@ pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
     // 2. Resolve ecosystem name from args or config
     let ecosystem_name = resolve_ecosystem_name(args.ecosystem_name.as_ref(), context.config())?;
 
-    // 3. Merge CLI args with config defaults (CLI > Config)
-    let config_defaults = &context.config().ecosystem;
-    let chain_config = build_chain_config(args, config_defaults);
-
-    context
-        .logger()
-        .debug(&format!("Chain config: {:?}", chain_config));
-
-    // 4. Validate chain ID doesn't conflict with settlement layer
-    ui::info("Validating chain ID against settlement layer...")?;
-    let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
-    let provider = FundingProvider::new(rpc_url.as_str())
-        .wrap_err("Failed to connect to settlement layer RPC")?;
-    let settlement_chain_id = provider
-        .get_chain_id()
-        .await
-        .wrap_err("Failed to get settlement layer chain ID")?;
-
-    if let Err(msg) = validate_chain_id(chain_config.chain_id, settlement_chain_id) {
-        return Err(eyre::eyre!("{}", msg));
-    }
-    ui::success(format!(
-        "Chain ID {} validated (settlement layer: {})",
-        ui::green(chain_config.chain_id),
-        ui::green(settlement_chain_id)
-    ))?;
-
-    // 5. Create state manager and validate ecosystem exists
+    // 3. Create state manager and validate ecosystem exists (needed for uniqueness checks)
     let state_dir = &context.config().state_dir;
     #[allow(unused_variables)]
     let (state_manager, s3_control) = create_state_manager_with_s3(&ecosystem_name, context)
@@ -91,16 +57,63 @@ pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
         ));
     }
 
-    // 5. Check if chain already exists
-    let chain_ops = state_manager.chain(&chain_config.name);
-    if chain_ops.exists().await? {
+    // 4. Select chain from config (--chain takes priority, then --chain-name, else interactive)
+    let chain_arg = args.chain.as_ref().or(args.chain_name.as_ref());
+    let chain_selection = select_chain_from_config(chain_arg, true, context.config())?;
+
+    // 5. Merge CLI args with config defaults (CLI > Config)
+    let config_defaults = &context.config().ecosystem;
+    let selected_chain = match &chain_selection {
+        ChainSelection::Existing(name) => config_defaults.get_chain(name),
+        ChainSelection::New(_) => None,
+    };
+    let chain_defaults = build_chain_defaults(args, selected_chain, &chain_selection);
+
+    context
+        .logger()
+        .debug(&format!("Chain config: {:?}", chain_defaults));
+
+    // 6. Validate chain ID uniqueness within ecosystem
+    let existing_chains = collect_existing_chains(&state_manager).await?;
+    // Exclude the chain being overwritten (same name) from uniqueness check
+    let chains_for_id_check: Vec<_> = existing_chains
+        .iter()
+        .filter(|(name, _)| name != &chain_defaults.name)
+        .cloned()
+        .collect();
+    if let Err(msg) = validate_chain_id_unique(chain_defaults.chain_id, &chains_for_id_check) {
+        return Err(eyre::eyre!("{}", msg));
+    }
+
+    // 7. Validate chain ID doesn't conflict with settlement layer
+    ui::info("Validating chain ID against settlement layer...")?;
+    let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
+    let provider = FundingProvider::new(rpc_url.as_str())
+        .wrap_err("Failed to connect to settlement layer RPC")?;
+    let settlement_chain_id = provider
+        .get_chain_id()
+        .await
+        .wrap_err("Failed to get settlement layer chain ID")?;
+
+    if let Err(msg) = validate_chain_id(chain_defaults.chain_id, settlement_chain_id) {
+        return Err(eyre::eyre!("{}", msg));
+    }
+    ui::success(format!(
+        "Chain ID {} validated (settlement layer: {})",
+        ui::green(chain_defaults.chain_id),
+        ui::green(settlement_chain_id)
+    ))?;
+
+    // 8. Check if chain already exists
+    let chain_state_ops = state_manager.chain(&chain_defaults.name);
+    if chain_state_ops.exists().await? {
         if args.force {
             ui::warning(format!(
                 "Chain '{}' already exists. Force flag set, will overwrite.",
-                ui::yellow(&chain_config.name)
+                ui::yellow(&chain_defaults.name)
             ))?;
             // Delete existing chain state
-            chain_ops
+            chain_state_ops
                 .delete()
                 .await
                 .wrap_err("Failed to delete existing chain")?;
@@ -108,28 +121,28 @@ pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
         } else {
             ui::warning(format!(
                 "Chain '{}' already exists.",
-                ui::yellow(&chain_config.name)
+                ui::yellow(&chain_defaults.name)
             ))?;
 
             // Require typing chain name to confirm deletion
             let prompt = format!(
                 "Type '{}' to confirm deletion and overwrite",
-                ui::green(&chain_config.name)
+                ui::green(&chain_defaults.name)
             );
             let user_input: String = ui::input(prompt)
                 .interact()
                 .wrap_err("Failed to read user input")?;
 
-            if user_input != chain_config.name {
+            if user_input != chain_defaults.name {
                 return Err(eyre::eyre!(
                     "Confirmation failed: expected '{}', got '{}'",
-                    chain_config.name,
+                    chain_defaults.name,
                     user_input
                 ));
             }
 
             // Delete existing chain state
-            chain_ops
+            chain_state_ops
                 .delete()
                 .await
                 .wrap_err("Failed to delete existing chain")?;
@@ -137,21 +150,26 @@ pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
         }
     }
 
-    // 6. Display config summary
+    // 9. Display config summary
+    let base_token_display = chain_defaults
+        .base_token_address
+        .map(|a| format!("{}", a))
+        .unwrap_or_else(|| "ETH".to_string());
+
     ui::note(
         format!("Protocol version: {}", ui::green(&version)),
         format!(
             "Ecosystem: {}\nChain: {} (ID: {})\nProver mode: {}\nBase token: {}\nEVM emulator: {}",
             ui::green(&ecosystem_name),
-            ui::green(&chain_config.name),
-            ui::green(chain_config.chain_id),
-            ui::green(&chain_config.prover_mode),
-            ui::green(&chain_config.base_token_address),
-            ui::green(chain_config.evm_emulator)
+            ui::green(&chain_defaults.name),
+            ui::green(chain_defaults.chain_id),
+            ui::green(&chain_defaults.prover_mode),
+            ui::green(&base_token_display),
+            ui::green(chain_defaults.evm_emulator)
         ),
     )?;
 
-    // 7. Get confirmation unless --yes flag
+    // 10. Get confirmation unless --yes flag
     if !args.yes {
         let confirm = ui::confirm("Proceed with chain creation?")
             .initial_value(true)
@@ -164,145 +182,79 @@ pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
         }
     }
 
-    // 8. Build zkstack chain create args
-    let zkstack_args = build_chain_create_args(&chain_config);
-    context
-        .logger()
-        .debug(&format!("zkstack args: {:?}", zkstack_args));
+    // 11. Offer to save chain config (before Docker operations)
+    config_writer::prompt_and_save_chain_config(&chain_defaults, context.config_path())?;
 
-    // 9. Create temp directory and export ecosystem state
-    let temp_dir = TempDir::new().wrap_err("Failed to create temporary directory")?;
-    let temp_path = temp_dir
-        .path()
-        .canonicalize()
-        .wrap_err("Failed to resolve temp directory to absolute path")?;
-    context
-        .logger()
-        .debug(&format!("Using temp directory: {}", temp_path.display()));
-
-    // Export ecosystem state to temp dir (in ecosystem subdirectory)
-    // zkstack expects ZkStack.yaml at /workspace root, so we mount the ecosystem dir
-    let ecosystem_temp_path = temp_path.join(&ecosystem_name);
-    ui::info("Exporting ecosystem state to temp directory...")?;
-    export_ecosystem_state(&state_manager, &ecosystem_temp_path)
-        .await
-        .wrap_err("Failed to export ecosystem state")?;
-
-    // 10. Copy genesis.json to ecosystem temp directory
-    let genesis_src = state_dir.join(GENESIS_FILENAME);
-    if !genesis_src.exists() {
-        return Err(eyre::eyre!(
-            "genesis.json not found at {}. Run 'adi init' first.",
-            genesis_src.display()
-        ));
-    }
-    let genesis_dst = ecosystem_temp_path.join(GENESIS_FILENAME);
-    std::fs::copy(&genesis_src, &genesis_dst).wrap_err("Failed to copy genesis.json")?;
-
-    // 11. Create toolkit runner and execute zkstack chain create
-    ui::info("Connecting to Docker...")?;
-    let runner = ToolkitRunner::with_config_and_logger(
-        context.toolkit_config(),
-        Arc::clone(context.logger()),
-    )
-    .await
-    .wrap_err("Failed to create toolkit runner")?;
-
-    ui::info("Running zkstack chain create...")?;
-    let args_refs: Vec<&str> = zkstack_args.iter().map(String::as_str).collect();
-
-    // Run zkstack with ecosystem dir as working directory (mounted as /workspace)
-    let exit_code = runner
-        .run_zkstack(
-            &args_refs,
-            &ecosystem_temp_path,
-            state_dir,
-            &version.to_semver(),
-        )
-        .await
-        .wrap_err("Failed to run zkstack chain create")?;
-
-    if exit_code != 0 {
-        return Err(eyre::eyre!(
-            "zkstack chain create failed with exit code {}",
-            exit_code
-        ));
-    }
-
-    // 12. Verify chain was created
-    ui::info("Verifying chain files...")?;
-    verify_chain_created(
-        &temp_path,
+    // 12. Create chain using shared chain_ops module
+    chain_ops::create_chain(
         &ecosystem_name,
-        &chain_config.name,
-        context.logger().as_ref(),
-    )
-    .wrap_err("Chain verification failed")?;
-
-    // 13. Import chain state
-    ui::info("Importing chain state...")?;
-    import_chain_state(
+        &chain_defaults,
         &state_manager,
-        &temp_path,
-        &ecosystem_name,
-        &chain_config.name,
+        &s3_control,
+        &version,
+        context,
     )
-    .await
-    .wrap_err("Failed to import chain state")?;
-
-    // 14. Validate imported state
-    ui::info("Validating imported state...")?;
-    let chain_metadata = state_manager
-        .chain(&chain_config.name)
-        .metadata()
-        .await
-        .wrap_err("Failed to read chain metadata")?;
-
-    context.logger().debug(&format!(
-        "Chain '{}' validated: chain_id={}",
-        chain_config.name, chain_metadata.chain_id
-    ));
-
-    // Sync to S3 if enabled
-    if let Some(control) = s3_control {
-        control.sync_now().await.wrap_err("Failed to sync to S3")?;
-    }
-
-    let chains = state_manager.list_chains().await?;
-    ui::success(format!(
-        "Chain added. Ecosystem now has {} chain(s)",
-        chains.len()
-    ))?;
+    .await?;
 
     let ecosystem_path = state_dir.join(&ecosystem_name);
     ui::info(format!("Location: {}", ui::green(ecosystem_path.display())))?;
-    ui::outro(format!("Chain '{}' added successfully!", chain_config.name))?;
+    ui::outro(format!(
+        "Chain '{}' added successfully!",
+        chain_defaults.name
+    ))?;
 
     Ok(())
 }
 
-/// Build chain config by merging CLI args with config defaults.
+/// Build chain defaults by merging CLI args with config defaults.
 /// CLI args take priority over config file values.
-fn build_chain_config(args: &AddArgs, defaults: &EcosystemConfig) -> ChainConfig {
-    ChainConfig {
+///
+/// # Arguments
+/// * `args` - CLI arguments
+/// * `selected_chain` - Selected chain defaults (if existing chain from config)
+/// * `chain_selection` - Chain selection result (for getting chain name)
+fn build_chain_defaults(
+    args: &AddArgs,
+    selected_chain: Option<&ChainDefaults>,
+    chain_selection: &ChainSelection,
+) -> ChainDefaults {
+    // Use selected chain defaults (from config) or None for new chains
+    let defaults = selected_chain;
+
+    ChainDefaults {
         name: args
             .chain_name
             .clone()
-            .unwrap_or_else(|| defaults.chain_name.clone()),
-        chain_id: args.chain_id.unwrap_or(defaults.chain_id),
+            .or_else(|| defaults.map(|c| c.name.clone()))
+            .unwrap_or_else(|| chain_selection.name().to_string()),
+        chain_id: args
+            .chain_id
+            .or_else(|| defaults.map(|c| c.chain_id))
+            .unwrap_or(222),
         prover_mode: args
             .prover_mode
-            .clone()
-            .unwrap_or_else(|| defaults.prover_mode.clone()),
+            .or_else(|| defaults.map(|c| c.prover_mode))
+            .unwrap_or_default(),
         base_token_address: args
             .base_token_address
-            .unwrap_or(defaults.base_token_address),
+            .or_else(|| defaults.and_then(|c| c.base_token_address)),
         base_token_price_nominator: args
             .base_token_price_nominator
-            .unwrap_or(defaults.base_token_price_nominator),
+            .or_else(|| defaults.map(|c| c.base_token_price_nominator))
+            .unwrap_or(1),
         base_token_price_denominator: args
             .base_token_price_denominator
-            .unwrap_or(defaults.base_token_price_denominator),
-        evm_emulator: args.evm_emulator.unwrap_or(defaults.evm_emulator),
+            .or_else(|| defaults.map(|c| c.base_token_price_denominator))
+            .unwrap_or(1),
+        evm_emulator: args
+            .evm_emulator
+            .or_else(|| defaults.map(|c| c.evm_emulator))
+            .unwrap_or(false),
+        // Use blobs setting from config or default to false (calldata/L3 mode)
+        blobs: defaults.map(|c| c.blobs).unwrap_or(false),
+        // Copy operators, funding, ownership from selected chain if exists
+        operators: defaults.map(|c| c.operators.clone()).unwrap_or_default(),
+        funding: defaults.map(|c| c.funding.clone()).unwrap_or_default(),
+        ownership: defaults.map(|c| c.ownership.clone()).unwrap_or_default(),
     }
 }

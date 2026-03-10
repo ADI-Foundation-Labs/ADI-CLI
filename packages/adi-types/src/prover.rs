@@ -11,7 +11,7 @@ use strum::{Display, EnumString};
 /// # Serde Behavior
 /// - Serializes to PascalCase: `"NoProofs"`, `"Gpu"` (zkstack format)
 /// - Deserializes case-insensitively: accepts `"NoProofs"`, `"no-proofs"`, `"noproofs"`
-#[derive(Clone, Debug, Default, Display, EnumString, PartialEq, Eq, ValueEnum)]
+#[derive(Clone, Copy, Debug, Default, Display, EnumString, PartialEq, Eq, ValueEnum)]
 #[strum(serialize_all = "kebab-case")]
 pub enum ProverMode {
     /// No proofs (development mode).

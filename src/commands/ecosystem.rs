@@ -62,9 +62,9 @@ fn format_ecosystem_metadata(
     deployments: Option<&InitialDeployments>,
 ) -> String {
     let mut lines = vec![
-        format_val("L1 Network", &meta.l1_network),
+        format_val("L1 Network", meta.l1_network),
         format_val("Era Chain ID", meta.era_chain_id),
-        format_val("Prover Mode", format_prover_mode(&meta.prover_version)),
+        format_val("Prover Mode", format_prover_mode(meta.prover_version)),
         format_val("Default Chain", &meta.default_chain),
     ];
 
@@ -84,8 +84,8 @@ fn format_chain_metadata(meta: &ChainMetadata) -> String {
 
     [
         format_val("Chain ID", meta.chain_id),
-        format_val("L1 Network", &meta.l1_network),
-        format_val("Prover Mode", format_prover_mode(&meta.prover_version)),
+        format_val("L1 Network", meta.l1_network),
+        format_val("Prover Mode", format_prover_mode(meta.prover_version)),
         format_val("Base Token", base_token_display),
         format_val(
             "Batch Mode",
@@ -98,7 +98,7 @@ fn format_chain_metadata(meta: &ChainMetadata) -> String {
 }
 
 /// Format prover mode for display.
-fn format_prover_mode(mode: &ProverMode) -> &'static str {
+fn format_prover_mode(mode: ProverMode) -> &'static str {
     match mode {
         ProverMode::NoProofs => "NoProofs",
         ProverMode::Gpu => "GPU",

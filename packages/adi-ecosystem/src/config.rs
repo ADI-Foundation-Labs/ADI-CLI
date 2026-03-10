@@ -40,6 +40,49 @@ pub fn validate_chain_id(chain_id: u64, settlement_chain_id: u64) -> Result<(), 
     Ok(())
 }
 
+/// Validate that chain name is unique within the ecosystem.
+///
+/// # Arguments
+///
+/// * `name` - The chain name to validate.
+/// * `existing_names` - List of existing chain names in the ecosystem.
+///
+/// # Returns
+///
+/// `Ok(())` if unique, `Err` with descriptive message if name already exists.
+pub fn validate_chain_name_unique(name: &str, existing_names: &[String]) -> Result<(), String> {
+    if existing_names.iter().any(|n| n == name) {
+        return Err(format!(
+            "Chain name '{}' already exists in this ecosystem.",
+            name
+        ));
+    }
+    Ok(())
+}
+
+/// Validate that chain ID is unique within the ecosystem.
+///
+/// # Arguments
+///
+/// * `chain_id` - The chain ID to validate.
+/// * `existing_chains` - List of (name, chain_id) tuples for existing chains.
+///
+/// # Returns
+///
+/// `Ok(())` if unique, `Err` with descriptive message showing which chain uses the ID.
+pub fn validate_chain_id_unique(
+    chain_id: u64,
+    existing_chains: &[(String, u64)],
+) -> Result<(), String> {
+    if let Some((existing_name, _)) = existing_chains.iter().find(|(_, id)| *id == chain_id) {
+        return Err(format!(
+            "Chain ID {} is already used by chain '{}' in this ecosystem.",
+            chain_id, existing_name
+        ));
+    }
+    Ok(())
+}
+
 /// Configuration for ecosystem creation.
 ///
 /// This configuration is used to build zkstack ecosystem create command arguments.
@@ -84,15 +127,6 @@ pub struct EcosystemConfig {
     #[serde(default)]
     pub evm_emulator: bool,
 
-    /// Deploy as L3 chain (uses calldata DA instead of blobs).
-    ///
-    /// When enabled, the deployment will configure the chain to use
-    /// calldata-based pubdata instead of EIP-4844 blobs. Required for
-    /// L3 chains deploying on L2 settlement layers.
-    /// Default: `true`
-    #[serde(default = "default_l3")]
-    pub l3: bool,
-
     /// Settlement layer RPC URL.
     #[serde(default)]
     pub rpc_url: Option<Url>,
@@ -114,10 +148,6 @@ fn default_price_ratio() -> u64 {
     1
 }
 
-fn default_l3() -> bool {
-    true
-}
-
 impl Default for EcosystemConfig {
     fn default() -> Self {
         Self {
@@ -130,7 +160,6 @@ impl Default for EcosystemConfig {
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
             evm_emulator: false,
-            l3: true,
             rpc_url: None,
         }
     }
@@ -212,13 +241,6 @@ impl EcosystemConfigBuilder {
         self
     }
 
-    /// Set L3 deployment flag.
-    #[must_use]
-    pub fn l3(mut self, enabled: bool) -> Self {
-        self.config.l3 = enabled;
-        self
-    }
-
     /// Build the config.
     #[must_use]
     pub fn build(self) -> EcosystemConfig {
@@ -262,6 +284,14 @@ pub struct ChainConfig {
 
     /// Enable EVM emulator.
     pub evm_emulator: bool,
+
+    /// Use blob-based pubdata (EIP-4844).
+    ///
+    /// When `true`, uses blobs for pubdata (L2 chains settling on L1).
+    /// When `false`, uses calldata for pubdata (L3 chains settling on L2).
+    /// Default: `false` (calldata mode for L3 deployments)
+    #[serde(default)]
+    pub blobs: bool,
 }
 
 impl Default for ChainConfig {
@@ -274,6 +304,7 @@ impl Default for ChainConfig {
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
             evm_emulator: false,
+            blobs: false,
         }
     }
 }
@@ -340,6 +371,16 @@ impl ChainConfigBuilder {
         self
     }
 
+    /// Set blobs flag.
+    ///
+    /// When `true`, uses blobs for pubdata (L2 chains settling on L1).
+    /// When `false`, uses calldata for pubdata (L3 chains settling on L2).
+    #[must_use]
+    pub fn blobs(mut self, enabled: bool) -> Self {
+        self.config.blobs = enabled;
+        self
+    }
+
     /// Build the config.
     #[must_use]
     pub fn build(self) -> ChainConfig {
@@ -370,7 +411,6 @@ mod tests {
         assert_eq!(config.prover_mode, ProverMode::NoProofs);
         assert_eq!(config.base_token_address, ETH_TOKEN_ADDRESS);
         assert!(!config.evm_emulator);
-        assert!(config.l3);
     }
 
     #[test]
@@ -402,6 +442,7 @@ mod tests {
         assert_eq!(config.base_token_price_nominator, 1);
         assert_eq!(config.base_token_price_denominator, 1);
         assert!(!config.evm_emulator);
+        assert!(!config.blobs);
     }
 
     #[test]
@@ -411,12 +452,14 @@ mod tests {
             .chain_id(456)
             .prover_mode(ProverMode::Gpu)
             .evm_emulator(true)
+            .blobs(true)
             .build();
 
         assert_eq!(config.name, "my_chain");
         assert_eq!(config.chain_id, 456);
         assert_eq!(config.prover_mode, ProverMode::Gpu);
         assert!(config.evm_emulator);
+        assert!(config.blobs);
     }
 
     #[test]
@@ -437,5 +480,42 @@ mod tests {
         assert!(validate_chain_id(270, 1).is_ok());
         assert!(validate_chain_id(271, 1).is_ok());
         assert!(validate_chain_id(270, 11155111).is_ok());
+    }
+
+    #[test]
+    fn test_validate_chain_name_unique_conflict() {
+        let existing = vec!["chain_one".to_string(), "chain_two".to_string()];
+        let result = validate_chain_name_unique("chain_one", &existing);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("already exists"));
+    }
+
+    #[test]
+    fn test_validate_chain_name_unique_valid() {
+        let existing = vec!["chain_one".to_string(), "chain_two".to_string()];
+        assert!(validate_chain_name_unique("chain_three", &existing).is_ok());
+        assert!(validate_chain_name_unique("new_chain", &[]).is_ok());
+    }
+
+    #[test]
+    fn test_validate_chain_id_unique_conflict() {
+        let existing = vec![
+            ("chain_one".to_string(), 100),
+            ("chain_two".to_string(), 200),
+        ];
+        let result = validate_chain_id_unique(100, &existing);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("already used by chain 'chain_one'"));
+    }
+
+    #[test]
+    fn test_validate_chain_id_unique_valid() {
+        let existing = vec![
+            ("chain_one".to_string(), 100),
+            ("chain_two".to_string(), 200),
+        ];
+        assert!(validate_chain_id_unique(300, &existing).is_ok());
+        assert!(validate_chain_id_unique(100, &[]).is_ok());
     }
 }

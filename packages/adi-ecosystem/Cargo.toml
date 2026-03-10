@@ -33,3 +33,6 @@ cliclack = { workspace = true }
 colored = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }
+
+[dev-dependencies]
+serde_yaml = { workspace = true }
