@@ -45,14 +45,16 @@ cp ./target/release/adi ~/.local/bin/
 
 ## Configuration
 
-The CLI loads configuration from multiple sources, merged in the following order (later sources override earlier ones):
+The CLI loads configuration from multiple sources with the following priority:
 
-1. **Built-in defaults** — Sensible starting values
-2. **Config file** (`~/.adi.yml`) — Your persistent settings
-3. **`ADI_CONFIG` environment variable** — Alternative config file path
-4. **`--config` flag** — Override config file for this invocation
-5. **`ADI__*` environment variables** — Override individual settings
-6. **CLI flags** — Highest priority, per-command overrides
+**Config file sources (mutually exclusive — only ONE file is loaded):**
+1. **`--config` flag** — If provided, ONLY this file is loaded
+2. **`ADI_CONFIG` environment variable** — If set (and no `--config`), ONLY this file is loaded
+3. **Config file** (`~/.adi.yml`) — Fallback if neither above is specified
+
+**Override sources (always applied on top):**
+4. **`ADI__*` environment variables** — Override any config file value
+5. **CLI flags** — Highest priority, per-command overrides
 
 ### Configuration File
 
@@ -77,80 +79,101 @@ protocol_version: v0.30.1
 # Default: filesystem
 state_backend: filesystem
 
-# Default values for ecosystem initialization
-# These are used when CLI flags are not provided
+# Ecosystem configuration
+# Includes ecosystem-level settings and per-chain configurations
 ecosystem:
   # Name used for the ecosystem directory and identification
-  name: my-ecosystem
+  # Default: adi_ecosystem
+  name: adi_ecosystem
 
   # Settlement layer network where contracts are deployed
   # Options: localhost (Anvil), sepolia (testnet), mainnet
   # Default: sepolia
   l1_network: sepolia
 
-  # Name of the initial ZK chain within this ecosystem
-  chain_name: my-chain
-
-  # Unique numeric identifier for the chain
-  # Must not conflict with other chains
-  # Default: 222
-  chain_id: 222
-
-  # Proof generation mode
-  # no-proofs: Development/testing (fast, no real proofs)
-  # gpu: Production (requires GPU prover infrastructure)
-  # Default: no-proofs
-  prover_mode: no-proofs
-
-  # OPTIONAL: Custom ERC20 token for gas payments
-  # Omit this section to use native ETH (default)
-  # base_token_address: "0x2a98B46fe31BA8Be05ef1cE3D36e1f80Db04190D"
-  # base_token_price_nominator: 1
-  # base_token_price_denominator: 1
-
-  # Enable EVM bytecode emulator for running unmodified Ethereum contracts
-  # Default: false
-  evm_emulator: false
-
   # Settlement layer RPC endpoint
   # For Anvil (local): http://host.docker.internal:8545
   # For Sepolia: https://sepolia.infura.io/v3/YOUR_KEY
   rpc_url: https://sepolia.infura.io/v3/YOUR_KEY
 
-# Default values for wallet funding during deployment
+  # OPTIONAL: Ecosystem-level ownership (for Governance, Bridgehub, etc.)
+  # ownership:
+  #   new_owner: "0x..."
+
+  # Chain configurations (supports multiple chains)
+  # Each chain has its own settings, operators, funding, and ownership
+  chains:
+    - name: my-chain
+      # Unique numeric chain identifier
+      # Default: 222
+      chain_id: 222
+
+      # Proof generation mode
+      # no-proofs: Development/testing (fast, no real proofs)
+      # gpu: Production (requires GPU prover infrastructure)
+      # Default: no-proofs
+      prover_mode: no-proofs
+
+      # Enable EVM bytecode emulator for running unmodified Ethereum contracts
+      # Default: false
+      evm_emulator: false
+
+      # Use blob-based pubdata (EIP-4844)
+      # true: Uses blobs (L2 chains settling on L1)
+      # false: Uses calldata (L3 chains settling on L2)
+      # Default: false
+      blobs: false
+
+      # OPTIONAL: Custom ERC20 token for gas payments
+      # Omit to use native ETH (default)
+      # base_token_address: "0x..."
+      # base_token_price_nominator: 1
+      # base_token_price_denominator: 1
+
+      # OPTIONAL: Predefined operator addresses
+      # Override randomly generated addresses for validator roles
+      # operators:
+      #   operator: "0x..."         # PRECOMMITTER, COMMITTER, REVERTER roles
+      #   prove_operator: "0x..."   # PROVER role
+      #   execute_operator: "0x..." # EXECUTOR role
+
+      # OPTIONAL: Per-chain funding (ETH amounts in ether)
+      # funding:
+      #   operator_eth: 30.0
+      #   prove_operator_eth: 30.0
+      #   execute_operator_eth: 30.0
+
+      # OPTIONAL: Per-chain ownership configuration
+      # ownership:
+      #   new_owner: "0x..."
+
+# Ecosystem-level wallet funding during deployment
+# NOTE: Operator funding (operator_eth, prove_operator_eth, execute_operator_eth)
+# is now per-chain. Configure via ecosystem.chains[].funding
 funding:
   # SECURITY: Use ADI_FUNDER_KEY environment variable instead
   # Never commit private keys to config files
   # funder_key: "0x..."
 
-  # ETH amounts to send to each wallet role (in ether)
+  # ETH amounts for ecosystem-level wallets (in ether)
   #
   # For Sepolia TESTING (short-term, minimal funding):
   #   deployer_eth: 1.0
   #   governor_eth: 1.0
   #   governor_cgt_units: 5.0
-  #   operator_eth: 0.5
-  #   prove_operator_eth: 0.5
-  #   execute_operator_eth: 0.5
   #
   # For PRODUCTION or long-running chains (values below):
   deployer_eth: 100.0         # Deploys contracts
   governor_eth: 40.0          # Governance operations
   governor_cgt_units: 5.0     # Custom gas token (if using custom base token)
-  operator_eth: 30.0          # Commits batches
-  prove_operator_eth: 30.0    # Submits proofs
-  execute_operator_eth: 30.0  # Executes batches
 
-# Default values for ownership operations
-ownership:
-  # Address to transfer ownership to after accepting
-  # Can be overridden with --new-owner flag
-  new_owner: "0x..."
-
-  # SECURITY: Use ADI_PRIVATE_KEY environment variable instead
-  # Private key for accepting ownership (new owner mode)
-  # Can be overridden with --private-key flag or ADI_PRIVATE_KEY env var
-  # private_key: "0x..."
+# DEPRECATED: Top-level ownership configuration
+# Use ecosystem.ownership for ecosystem-level ownership
+# Use ecosystem.chains[].ownership for chain-level ownership
+# ownership:
+#   new_owner: "0x..."
+#   # SECURITY: Use ADI_PRIVATE_KEY environment variable instead
+#   # private_key: "0x..."
 
 # Gas price multiplier percentage (default: 200 = 100% buffer).
 # Applied to all on-chain transactions (deploy, accept, transfer).
@@ -192,39 +215,37 @@ gas_multiplier: 200
 #   # Use a custom image tag instead of protocol version-derived tag
 #   image_tag: "latest"
 
-# OPTIONAL: Predefined operator addresses for validator role assignment
-# Use this to assign validator roles to externally managed addresses during deploy.
-# When specified, roles are revoked from default wallet operators and granted
-# to these addresses instead. Operators manage their own private keys externally.
+# DEPRECATED: Top-level operator configuration
+# Use ecosystem.chains[].operators instead for per-chain operator addresses
 # operators:
-#   operator: "0x..."         # PRECOMMITTER, COMMITTER, REVERTER roles
-#   prove_operator: "0x..."   # PROVER role
-#   execute_operator: "0x..." # EXECUTOR role
+#   operator: "0x..."
+#   prove_operator: "0x..."
+#   execute_operator: "0x..."
 ```
 
 ### Environment Variables
 
 For sensitive data like private keys, use environment variables instead of config files:
 
-| Variable                   | Purpose                                                                                                          |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `ADI_FUNDER_KEY`           | Private key (hex) of the wallet that funds ecosystem wallets. This is the only wallet you need to fund manually. |
-| `ADI_PRIVATE_KEY`          | Private key (hex) for accepting ownership as new owner. Used by the `accept` command.                            |
-| `ADI_RPC_URL`              | Settlement layer RPC endpoint. Useful for switching networks without editing config.                             |
-| `ADI_EXPLORER_URL`         | Block explorer API URL for contract verification during deploy and scan commands.                                |
-| `ADI_EXPLORER_API_KEY`     | Block explorer API key for contract verification (optional for public explorers).                                |
-| `ADI_CONFIG`               | Path to an alternative config file.                                                                              |
-| `ADI__PROTOCOL_VERSION`    | Default protocol version for init, add, and deploy commands (e.g., `v0.30.1`).                                   |
-| `ADI__TOOLKIT__IMAGE_TAG`  | Override Docker image tag for toolkit containers (e.g., `latest` or `custom-build`).                             |
-| `ADI_OPERATOR`             | Operator address for init (receives PRECOMMITTER, COMMITTER, REVERTER roles).                                    |
-| `ADI_PROVE_OPERATOR`       | Prove operator address for init (receives PROVER role).                                                          |
-| `ADI_EXECUTE_OPERATOR`     | Execute operator address for init (receives EXECUTOR role).                                                      |
-| `AWS_ACCESS_KEY_ID`        | AWS access key for S3 synchronization.                                                                           |
-| `AWS_SECRET_ACCESS_KEY`    | AWS secret key for S3 synchronization.                                                                           |
-| `ADI__S3__ENABLED`         | Enable S3 sync (`true`/`false`).                                                                                 |
-| `ADI__S3__TENANT_ID`       | Tenant identifier for S3 key prefix.                                                                             |
-| `ADI__S3__BUCKET`          | S3 bucket name.                                                                                                  |
-| `RUST_LOG`                 | Logging verbosity: `error`, `warn`, `info`, `debug`, `trace`                                                     |
+| Variable                  | Purpose                                                                                                          |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `ADI_FUNDER_KEY`          | Private key (hex) of the wallet that funds ecosystem wallets. This is the only wallet you need to fund manually. |
+| `ADI_PRIVATE_KEY`         | Private key (hex) for accepting ownership as new owner. Used by the `accept` command.                            |
+| `ADI_RPC_URL`             | Settlement layer RPC endpoint. Useful for switching networks without editing config.                             |
+| `ADI_EXPLORER_URL`        | Block explorer API URL for contract verification during deploy and scan commands.                                |
+| `ADI_EXPLORER_API_KEY`    | Block explorer API key for contract verification (optional for public explorers).                                |
+| `ADI_CONFIG`              | Path to an alternative config file.                                                                              |
+| `ADI__PROTOCOL_VERSION`   | Default protocol version for init, add, and deploy commands (e.g., `v0.30.1`).                                   |
+| `ADI__TOOLKIT__IMAGE_TAG` | Override Docker image tag for toolkit containers (e.g., `latest` or `custom-build`).                             |
+| `ADI_OPERATOR`            | Operator address for init (receives PRECOMMITTER, COMMITTER, REVERTER roles).                                    |
+| `ADI_PROVE_OPERATOR`      | Prove operator address for init (receives PROVER role).                                                          |
+| `ADI_EXECUTE_OPERATOR`    | Execute operator address for init (receives EXECUTOR role).                                                      |
+| `AWS_ACCESS_KEY_ID`       | AWS access key for S3 synchronization.                                                                           |
+| `AWS_SECRET_ACCESS_KEY`   | AWS secret key for S3 synchronization.                                                                           |
+| `ADI__S3__ENABLED`        | Enable S3 sync (`true`/`false`).                                                                                 |
+| `ADI__S3__TENANT_ID`      | Tenant identifier for S3 key prefix.                                                                             |
+| `ADI__S3__BUCKET`         | S3 bucket name.                                                                                                  |
+| `RUST_LOG`                | Logging verbosity: `error`, `warn`, `info`, `debug`, `trace`                                                     |
 
 You can also override any config value using the `ADI__` prefix with double underscores as path separators:
 
@@ -267,17 +288,17 @@ The `init` command creates the foundational configuration for your ZkSync ecosys
 
 **All arguments are optional** and fall back to values in `~/.adi.yml`:
 
-| Flag                     | Description                                            |
-| ------------------------ | ------------------------------------------------------ |
-| `--protocol-version`     | Protocol version (e.g., `v0.30.1`)                     |
-| `--ecosystem-name`       | Override the ecosystem name from config                |
-| `--l1-network`           | Settlement layer: `localhost`, `sepolia`, or `mainnet` |
-| `--chain-name`           | Name for the initial chain                             |
-| `--chain-id`             | Unique numeric chain identifier                        |
-| `--prover-mode`          | `no-proofs` for testing, `gpu` for production          |
-| `--operator`             | Operator address (PRECOMMITTER, COMMITTER, REVERTER)   |
-| `--prove-operator`       | Prove operator address (PROVER role)                   |
-| `--execute-operator`     | Execute operator address (EXECUTOR role)               |
+| Flag                 | Description                                            |
+| -------------------- | ------------------------------------------------------ |
+| `--protocol-version` | Protocol version (e.g., `v0.30.1`)                     |
+| `--ecosystem-name`   | Override the ecosystem name from config                |
+| `--l1-network`       | Settlement layer: `localhost`, `sepolia`, or `mainnet` |
+| `--chain-name`       | Name for the initial chain                             |
+| `--chain-id`         | Unique numeric chain identifier                        |
+| `--prover-mode`      | `no-proofs` for testing, `gpu` for production          |
+| `--operator`         | Operator address (PRECOMMITTER, COMMITTER, REVERTER)   |
+| `--prove-operator`   | Prove operator address (PROVER role)                   |
+| `--execute-operator` | Execute operator address (EXECUTOR role)               |
 
 **Example: Using config file defaults**
 
@@ -326,10 +347,13 @@ export ADI_PROVE_OPERATOR="0x5678..."
 adi init -p v0.30.1
 
 # Or via config file (~/.adi.yml)
-# operators:
-#   operator: "0x..."
-#   prove_operator: "0x..."
-#   execute_operator: "0x..."
+# ecosystem:
+#   chains:
+#     - name: my-chain
+#       operators:
+#         operator: "0x..."
+#         prove_operator: "0x..."
+#         execute_operator: "0x..."
 ```
 
 When operator addresses are specified, they override the randomly generated wallet addresses for role assignments.
