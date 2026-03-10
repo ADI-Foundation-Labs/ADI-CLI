@@ -42,9 +42,7 @@ pub fn verify_ecosystem_created(
     config: &EcosystemConfig,
     logger: &dyn Logger,
 ) -> Result<()> {
-    // zkstack normalizes names: hyphens become underscores
-    let ecosystem_name = crate::normalize_name(&config.name);
-    let ecosystem_dir = state_dir.join(&ecosystem_name);
+    let ecosystem_dir = state_dir.join(&config.name);
 
     let required_files = [
         ecosystem_dir.join("ZkStack.yaml"),
@@ -103,10 +101,8 @@ pub fn verify_chain_created(
     chain_name: &str,
     logger: &dyn Logger,
 ) -> Result<()> {
-    // zkstack normalizes ecosystem names: hyphens become underscores
-    let ecosystem_name = crate::normalize_name(ecosystem_name);
     let chain_dir = state_dir
-        .join(&ecosystem_name)
+        .join(ecosystem_name)
         .join("chains")
         .join(chain_name);
 

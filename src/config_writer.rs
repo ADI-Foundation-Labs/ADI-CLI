@@ -24,7 +24,7 @@ use crate::ui;
 ///
 /// # Errors
 ///
-/// Returns error if the chain already exists in config, or if read/write fails.
+/// Returns error if read/write fails. Idempotent: succeeds silently if chain exists.
 pub fn add_chain_to_config(chain: &ChainDefaults, config_path: &Path) -> Result<()> {
     // Serialize chain to minimal YAML (omitting default values)
     let chain_yaml = chain.to_minimal_yaml();
@@ -47,13 +47,10 @@ pub fn add_chain_to_config(chain: &ChainDefaults, config_path: &Path) -> Result<
     // Read existing content
     let content = std::fs::read_to_string(config_path).wrap_err("Failed to read config file")?;
 
-    // Parse to check if chain already exists
+    // Parse to check if chain already exists (idempotent - skip if exists)
     let config: Config = serde_yaml::from_str(&content).wrap_err("Failed to parse config file")?;
     if config.ecosystem.get_chain(&chain.name).is_some() {
-        return Err(eyre::eyre!(
-            "Chain '{}' already exists in config file",
-            chain.name
-        ));
+        return Ok(());
     }
 
     // Determine where to insert and build new content

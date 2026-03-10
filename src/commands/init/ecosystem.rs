@@ -362,6 +362,10 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
 
     ui::success(format!("State validated: {} chain(s) found", chains.len()))?;
 
+    // Offer to save chain config to config file
+    let chain_defaults = ecosystem_config_to_chain_defaults(&config);
+    config_writer::prompt_and_save_chain_config(&chain_defaults, context.config_path())?;
+
     // Sync to S3 once at the end (if enabled)
     if let Some(control) = s3_control {
         control
@@ -484,25 +488,25 @@ fn build_partial_chain_defaults(args: &InitArgs) -> PartialChainDefaults {
     }
 }
 
-/// Convert ChainDefaults to ChainConfig for ecosystem initialization.
+/// Convert ecosystem config to chain defaults for config file storage.
 ///
-/// This is used when we need to add chain config to the ecosystem config
-/// for initial ecosystem creation.
-#[allow(dead_code)]
-fn chain_defaults_to_ecosystem_chain(defaults: &ChainDefaults) -> EcosystemConfig {
-    EcosystemConfig {
-        name: String::new(), // Will be set by caller
-        l1_network: adi_ecosystem::L1Network::Sepolia,
-        chain_name: defaults.name.clone(),
-        chain_id: defaults.chain_id,
-        prover_mode: defaults.prover_mode,
-        base_token_address: defaults
-            .base_token_address
-            .unwrap_or(adi_types::ETH_TOKEN_ADDRESS),
-        base_token_price_nominator: defaults.base_token_price_nominator,
-        base_token_price_denominator: defaults.base_token_price_denominator,
-        evm_emulator: defaults.evm_emulator,
-        l3: true,
-        rpc_url: None,
+/// This extracts the chain-specific fields from EcosystemConfig to create
+/// a ChainDefaults struct for saving to the config file.
+fn ecosystem_config_to_chain_defaults(config: &EcosystemConfig) -> ChainDefaults {
+    ChainDefaults {
+        name: config.chain_name.clone(),
+        chain_id: config.chain_id,
+        prover_mode: config.prover_mode,
+        base_token_address: if config.base_token_address == adi_types::ETH_TOKEN_ADDRESS {
+            None
+        } else {
+            Some(config.base_token_address)
+        },
+        base_token_price_nominator: config.base_token_price_nominator,
+        base_token_price_denominator: config.base_token_price_denominator,
+        evm_emulator: config.evm_emulator,
+        operators: Default::default(),
+        funding: Default::default(),
+        ownership: Default::default(),
     }
 }
