@@ -112,12 +112,6 @@ ecosystem:
   # Default: false
   evm_emulator: false
 
-  # Deploy as L3 chain (settling on L2 instead of L1)
-  # When enabled, blobs are disabled and calldata DA is used
-  # Required for chains settling on ZKsync-based L2s
-  # Default: true
-  l3: true
-
   # Settlement layer RPC endpoint
   # For Anvil (local): http://host.docker.internal:8545
   # For Sepolia: https://sepolia.infura.io/v3/YOUR_KEY
@@ -527,29 +521,35 @@ adi deploy -p v0.30.1 --skip-deployment
 adi deploy -p v0.30.1 --skip-funding
 ```
 
-**Deploying L3 chains:**
+**Deploying L3 chains (calldata DA mode):**
 
-When deploying a chain that settles on an L2 (making it an L3), you must enable L3 mode. This is required because ZKsync OS on L2 settlement layers does not support EIP-4844 blobs—instead, the chain uses calldata-based data availability.
+When deploying a chain that settles on an L2 (making it an L3), you must disable blobs. This is required because ZKsync OS on L2 settlement layers does not support EIP-4844 blobs—instead, the chain uses calldata-based data availability.
 
-What L3 mode does:
+What calldata mode does:
 - Disables blob-based pubdata (EIP-4844)
 - Configures calldata-based data availability
 - Sends a transaction to set the DA validator pair on the Diamond proxy
 
-Enable L3 mode via CLI flag:
+By default, `blobs: false` (calldata mode) is used. To enable blobs for L2 chains settling on L1:
 
 ```bash
-adi deploy -p v0.30.1 --l3
+adi deploy -p v0.30.1 --blobs true
 ```
 
-Or via configuration file (`~/.adi.yml`):
+Or configure per-chain in `~/.adi.yml`:
 
 ```yaml
 ecosystem:
-  l3: true
+  chains:
+    - name: my_l3_chain
+      chain_id: 271
+      blobs: false  # Default, uses calldata (L3 mode)
+    - name: my_l2_chain
+      chain_id: 272
+      blobs: true   # Uses blobs (L2 mode)
 ```
 
-The CLI flag `--l3` takes precedence over the config file setting.
+The CLI flag `--blobs` takes precedence over the chain config.
 
 **Contract verification during deployment:**
 

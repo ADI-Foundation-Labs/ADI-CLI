@@ -103,6 +103,14 @@ pub struct ChainDefaults {
     #[serde(default)]
     pub evm_emulator: bool,
 
+    /// Use blob-based pubdata (EIP-4844).
+    ///
+    /// When `true`, uses blobs for pubdata (L2 chains settling on L1).
+    /// When `false`, uses calldata for pubdata (L3 chains settling on L2).
+    /// Default: `false` (calldata mode for L3 deployments)
+    #[serde(default)]
+    pub blobs: bool,
+
     /// Predefined operator addresses.
     #[serde(default)]
     pub operators: OperatorsDefaults,
@@ -134,6 +142,7 @@ impl Default for ChainDefaults {
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
             evm_emulator: false,
+            blobs: false,
             operators: OperatorsDefaults::default(),
             funding: ChainFundingDefaults::default(),
             ownership: ChainOwnershipDefaults::default(),
@@ -173,6 +182,9 @@ impl ChainDefaults {
         }
         if self.evm_emulator != defaults.evm_emulator {
             lines.push(format!("evm_emulator: {}", self.evm_emulator));
+        }
+        if self.blobs != defaults.blobs {
+            lines.push(format!("blobs: {}", self.blobs));
         }
         if self.operators != defaults.operators {
             lines.push("operators:".to_string());
@@ -237,10 +249,6 @@ pub struct EcosystemDefaults {
     #[serde(default)]
     pub l1_network: L1Network,
 
-    /// Deploy as L3 chain (uses calldata DA instead of blobs).
-    #[serde(default = "default_l3")]
-    pub l3: bool,
-
     /// Settlement layer RPC URL.
     #[serde(default)]
     pub rpc_url: Option<Url>,
@@ -258,16 +266,11 @@ fn default_ecosystem_name() -> String {
     "adi_ecosystem".to_string()
 }
 
-fn default_l3() -> bool {
-    true
-}
-
 impl Default for EcosystemDefaults {
     fn default() -> Self {
         Self {
             name: default_ecosystem_name(),
             l1_network: L1Network::Sepolia,
-            l3: true,
             rpc_url: None,
             ownership: EcosystemOwnershipDefaults::default(),
             chains: Vec::new(),
@@ -313,6 +316,7 @@ mod tests {
         assert_eq!(chain.prover_mode, ProverMode::NoProofs);
         assert!(chain.base_token_address.is_none());
         assert!(!chain.evm_emulator);
+        assert!(!chain.blobs);
     }
 
     #[test]
@@ -320,7 +324,6 @@ mod tests {
         let ecosystem = EcosystemDefaults::default();
         assert_eq!(ecosystem.name, "adi_ecosystem");
         assert_eq!(ecosystem.l1_network, L1Network::Sepolia);
-        assert!(ecosystem.l3);
         assert!(ecosystem.chains.is_empty());
     }
 
@@ -374,23 +377,24 @@ ownership:
         let yaml = r#"
 name: my_ecosystem
 l1_network: Sepolia
-l3: true
 rpc_url: "https://sepolia.example.com"
 ownership:
   new_owner: "0x1111111111111111111111111111111111111111"
 chains:
   - name: chain_a
     chain_id: 222
+    blobs: true
   - name: chain_b
     chain_id: 333
 "#;
         let ecosystem: EcosystemDefaults = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(ecosystem.name, "my_ecosystem");
         assert_eq!(ecosystem.l1_network, L1Network::Sepolia);
-        assert!(ecosystem.l3);
         assert!(ecosystem.ownership.new_owner.is_some());
         assert_eq!(ecosystem.chains.len(), 2);
         assert_eq!(ecosystem.chains[0].name, "chain_a");
+        assert!(ecosystem.chains[0].blobs);
         assert_eq!(ecosystem.chains[1].name, "chain_b");
+        assert!(!ecosystem.chains[1].blobs);
     }
 }

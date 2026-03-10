@@ -436,7 +436,6 @@ fn build_ecosystem_config(
             .evm_emulator
             .or_else(|| chain_defaults.map(|c| c.evm_emulator))
             .unwrap_or(false),
-        l3: defaults.l3,
         rpc_url: args.rpc_url.clone().or_else(|| defaults.rpc_url.clone()),
     }
 }
@@ -505,6 +504,7 @@ fn ecosystem_config_to_chain_defaults(config: &EcosystemConfig) -> ChainDefaults
         base_token_price_nominator: config.base_token_price_nominator,
         base_token_price_denominator: config.base_token_price_denominator,
         evm_emulator: config.evm_emulator,
+        blobs: false, // Default to calldata mode (L3)
         operators: Default::default(),
         funding: Default::default(),
         ownership: Default::default(),

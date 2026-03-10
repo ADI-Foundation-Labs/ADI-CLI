@@ -84,6 +84,7 @@ pub fn prompt_chain_defaults(
         base_token_price_nominator: nominator,
         base_token_price_denominator: denominator,
         evm_emulator,
+        blobs: false, // Default to calldata mode (L3)
         operators,
         funding,
         ownership,

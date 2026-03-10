@@ -127,15 +127,6 @@ pub struct EcosystemConfig {
     #[serde(default)]
     pub evm_emulator: bool,
 
-    /// Deploy as L3 chain (uses calldata DA instead of blobs).
-    ///
-    /// When enabled, the deployment will configure the chain to use
-    /// calldata-based pubdata instead of EIP-4844 blobs. Required for
-    /// L3 chains deploying on L2 settlement layers.
-    /// Default: `true`
-    #[serde(default = "default_l3")]
-    pub l3: bool,
-
     /// Settlement layer RPC URL.
     #[serde(default)]
     pub rpc_url: Option<Url>,
@@ -157,10 +148,6 @@ fn default_price_ratio() -> u64 {
     1
 }
 
-fn default_l3() -> bool {
-    true
-}
-
 impl Default for EcosystemConfig {
     fn default() -> Self {
         Self {
@@ -173,7 +160,6 @@ impl Default for EcosystemConfig {
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
             evm_emulator: false,
-            l3: true,
             rpc_url: None,
         }
     }
@@ -255,13 +241,6 @@ impl EcosystemConfigBuilder {
         self
     }
 
-    /// Set L3 deployment flag.
-    #[must_use]
-    pub fn l3(mut self, enabled: bool) -> Self {
-        self.config.l3 = enabled;
-        self
-    }
-
     /// Build the config.
     #[must_use]
     pub fn build(self) -> EcosystemConfig {
@@ -305,6 +284,14 @@ pub struct ChainConfig {
 
     /// Enable EVM emulator.
     pub evm_emulator: bool,
+
+    /// Use blob-based pubdata (EIP-4844).
+    ///
+    /// When `true`, uses blobs for pubdata (L2 chains settling on L1).
+    /// When `false`, uses calldata for pubdata (L3 chains settling on L2).
+    /// Default: `false` (calldata mode for L3 deployments)
+    #[serde(default)]
+    pub blobs: bool,
 }
 
 impl Default for ChainConfig {
@@ -317,6 +304,7 @@ impl Default for ChainConfig {
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
             evm_emulator: false,
+            blobs: false,
         }
     }
 }
@@ -383,6 +371,16 @@ impl ChainConfigBuilder {
         self
     }
 
+    /// Set blobs flag.
+    ///
+    /// When `true`, uses blobs for pubdata (L2 chains settling on L1).
+    /// When `false`, uses calldata for pubdata (L3 chains settling on L2).
+    #[must_use]
+    pub fn blobs(mut self, enabled: bool) -> Self {
+        self.config.blobs = enabled;
+        self
+    }
+
     /// Build the config.
     #[must_use]
     pub fn build(self) -> ChainConfig {
@@ -413,7 +411,6 @@ mod tests {
         assert_eq!(config.prover_mode, ProverMode::NoProofs);
         assert_eq!(config.base_token_address, ETH_TOKEN_ADDRESS);
         assert!(!config.evm_emulator);
-        assert!(config.l3);
     }
 
     #[test]
@@ -445,6 +442,7 @@ mod tests {
         assert_eq!(config.base_token_price_nominator, 1);
         assert_eq!(config.base_token_price_denominator, 1);
         assert!(!config.evm_emulator);
+        assert!(!config.blobs);
     }
 
     #[test]
@@ -454,12 +452,14 @@ mod tests {
             .chain_id(456)
             .prover_mode(ProverMode::Gpu)
             .evm_emulator(true)
+            .blobs(true)
             .build();
 
         assert_eq!(config.name, "my_chain");
         assert_eq!(config.chain_id, 456);
         assert_eq!(config.prover_mode, ProverMode::Gpu);
         assert!(config.evm_emulator);
+        assert!(config.blobs);
     }
 
     #[test]

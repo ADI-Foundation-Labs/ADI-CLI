@@ -143,12 +143,15 @@ pub struct DeployArgs {
     )]
     pub protocol_version: Option<String>,
 
-    /// Deploy as L3 chain (disables blobs, uses calldata DA)
+    /// Use blob-based pubdata (EIP-4844). Overrides chain config if specified.
+    ///
+    /// When `true`, uses blobs for pubdata (L2 chains settling on L1).
+    /// When `false`, uses calldata for pubdata (L3 chains settling on L2).
     #[arg(
         long,
-        help = "Deploy as L3 chain (disables blobs, uses calldata DA on L2 settlement layer)"
+        help = "Use blob-based pubdata (true=blobs for L2, false=calldata for L3)"
     )]
-    pub l3: bool,
+    pub blobs: Option<bool>,
 
     /// Enable contract verification during deployment.
     #[arg(long, help = "Enable contract verification during deployment")]
@@ -237,8 +240,8 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     ))?;
 
     // Display deployment info
-    let is_l3 = resolve_l3_mode(&args, context);
-    let chain_type = if is_l3 { "L3" } else { "L2" };
+    let use_blobs = resolve_blobs_mode(&args, context, &chain_name);
+    let chain_type = if use_blobs { "L2" } else { "L3" };
     ui::note(
         "Deployment target",
         format!(
@@ -974,10 +977,10 @@ async fn run_ecosystem_deployment(
         ))?;
     }
 
-    // Configure L3 DA mode if requested (disables blobs, uses calldata)
-    let is_l3 = resolve_l3_mode(args, context);
-    if is_l3 {
-        ui::section("Configuring L3 DA Mode")?;
+    // Configure calldata DA mode if blobs are disabled (L3 chains settling on L2)
+    let use_blobs = resolve_blobs_mode(args, context, chain_name);
+    if !use_blobs {
+        ui::section("Configuring Calldata DA Mode")?;
 
         let l1_da_validator = get_l1_da_validator_address(state_manager, chain_name)
             .await
@@ -993,10 +996,10 @@ async fn run_ecosystem_deployment(
             context.logger().as_ref(),
         )
         .await
-        .wrap_err("Failed to configure L3 DA mode")?;
+        .wrap_err("Failed to configure calldata DA mode")?;
 
         ui::success(format!(
-            "L3 DA mode configured (calldata): {}",
+            "Calldata DA mode configured: {}",
             ui::green(tx_hash)
         ))?;
     }
@@ -1162,11 +1165,24 @@ fn resolve_gas_multiplier(args: &DeployArgs, context: &Context) -> u64 {
         .unwrap_or_else(|| context.config().gas_multiplier)
 }
 
-/// Resolve L3 mode from args or config.
+/// Resolve blobs mode from args or chain config.
 ///
-/// Priority: CLI arg > config file
-fn resolve_l3_mode(args: &DeployArgs, context: &Context) -> bool {
-    args.l3 || context.config().ecosystem.l3
+/// Priority: CLI arg > chain config > default (false = calldata)
+///
+/// Returns `true` if blobs should be used (L2 behavior),
+/// `false` if calldata should be used (L3 behavior).
+fn resolve_blobs_mode(args: &DeployArgs, context: &Context, chain_name: &str) -> bool {
+    // CLI arg takes priority
+    if let Some(blobs) = args.blobs {
+        return blobs;
+    }
+    // Fall back to chain config
+    context
+        .config()
+        .ecosystem
+        .get_chain(chain_name)
+        .map(|c| c.blobs)
+        .unwrap_or(false)
 }
 
 /// Resolve verification options from CLI args and config.

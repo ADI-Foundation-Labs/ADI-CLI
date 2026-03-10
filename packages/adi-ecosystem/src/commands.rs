@@ -143,7 +143,6 @@ mod tests {
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
             evm_emulator: false,
-            l3: false,
             rpc_url: None,
         };
 
@@ -175,6 +174,7 @@ mod tests {
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
             evm_emulator: true,
+            blobs: false,
         };
 
         let args = build_chain_create_args(&config);
