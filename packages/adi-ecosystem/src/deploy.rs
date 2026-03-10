@@ -183,6 +183,11 @@ pub async fn add_validator_roles(
     let green = Style::new().green();
 
     for assignment in assignments {
+        logger.debug(&format!(
+            "Assigning roles to {} ({}): [{}]",
+            assignment.name, assignment.operator, assignment.roles
+        ));
+
         let spinner = cliclack::spinner();
         spinner.start(format!(
             "{} ({})",
@@ -219,6 +224,7 @@ pub async fn add_validator_roles(
         })?;
 
         let tx_hash = *pending.tx_hash();
+        logger.debug(&format!("Transaction sent: {}", tx_hash));
 
         // Wait for confirmation
         let receipt = pending.get_receipt().await.map_err(|e| {
@@ -244,6 +250,13 @@ pub async fn add_validator_roles(
             green.apply_to(assignment.operator),
             green.apply_to(receipt.block_number.unwrap_or_default()),
             receipt.gas_used
+        ));
+
+        logger.debug(&format!(
+            "Confirmed {} in block {}: tx_hash={}",
+            assignment.name,
+            receipt.block_number.unwrap_or_default(),
+            tx_hash
         ));
 
         tx_hashes.push(tx_hash);
@@ -366,6 +379,11 @@ pub async fn remove_validator_roles(
     let yellow = Style::new().yellow();
 
     for revocation in revocations {
+        logger.debug(&format!(
+            "Revoking roles from {} ({}): [{}]",
+            revocation.name, revocation.operator, revocation.roles
+        ));
+
         let spinner = cliclack::spinner();
         spinner.start(format!(
             "Revoking {} ({})",
@@ -402,6 +420,7 @@ pub async fn remove_validator_roles(
         })?;
 
         let tx_hash = *pending.tx_hash();
+        logger.debug(&format!("Transaction sent: {}", tx_hash));
 
         // Wait for confirmation
         let receipt = pending.get_receipt().await.map_err(|e| {
@@ -430,6 +449,13 @@ pub async fn remove_validator_roles(
             yellow.apply_to(revocation.operator),
             yellow.apply_to(receipt.block_number.unwrap_or_default()),
             receipt.gas_used
+        ));
+
+        logger.debug(&format!(
+            "Confirmed {} revocation in block {}: tx_hash={}",
+            revocation.name,
+            receipt.block_number.unwrap_or_default(),
+            tx_hash
         ));
 
         tx_hashes.push(tx_hash);
