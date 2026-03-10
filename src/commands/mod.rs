@@ -7,6 +7,8 @@ use crate::{context::Context, error::Result};
 
 mod accept;
 mod add;
+pub mod chain_ops;
+pub mod chain_prompts;
 mod config;
 mod deploy;
 mod ecosystem;

@@ -30,6 +30,7 @@ use url::Url;
 
 use crate::commands::helpers::{
     create_state_manager_with_s3, resolve_protocol_version, resolve_rpc_url,
+    select_chain_from_state,
 };
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
@@ -192,27 +193,25 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     // 1. Resolve ecosystem name
     let ecosystem_name = resolve_ecosystem_name(&args, context)?;
 
-    // 2. Resolve chain name
-    let chain_name = resolve_chain_name(&args, context)?;
-
-    // 3. Create state manager and validate ecosystem exists
+    // 2. Create state manager and validate ecosystem exists
     let state_manager = create_state_manager(&ecosystem_name, context).await?;
     validate_ecosystem_exists(&state_manager, &ecosystem_name).await?;
 
-    // 4. Validate chain exists
-    validate_chain_exists(&state_manager, &chain_name, &ecosystem_name).await?;
+    // 3. Select chain from state (validates chain exists)
+    let chain_name =
+        select_chain_from_state(args.chain_name.as_ref(), &state_manager, &ecosystem_name).await?;
 
-    // 5. Skip funding if requested
+    // 4. Skip funding if requested
     if args.skip_funding {
         ui::info("Skipping wallet funding (--skip-funding)")?;
         ui::outro("Ecosystem deployment complete (funding skipped)")?;
         return Ok(());
     }
 
-    // 6. Resolve RPC URL (args > ecosystem.rpc_url > funding.rpc_url)
+    // 5. Resolve RPC URL (args > ecosystem.rpc_url > funding.rpc_url)
     let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
 
-    // 7. Validate chain ID doesn't conflict with settlement layer
+    // 6. Validate chain ID doesn't conflict with settlement layer
     ui::info("Validating chain ID against settlement layer...")?;
     let chain_metadata = state_manager
         .chain(&chain_name)
@@ -1116,15 +1115,6 @@ fn resolve_ecosystem_name(args: &DeployArgs, context: &Context) -> Result<String
         })
 }
 
-/// Resolve chain name from args or config.
-fn resolve_chain_name(args: &DeployArgs, context: &Context) -> Result<String> {
-    args.chain_name
-        .clone()
-        .or_else(|| Some(context.config().ecosystem.chain_name.clone()))
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| eyre::eyre!("Chain name required: use --chain-name or set in config"))
-}
-
 /// Create state manager for the ecosystem with optional S3 sync.
 async fn create_state_manager(ecosystem_name: &str, context: &Context) -> Result<StateManager> {
     let (state_manager, _control) = create_state_manager_with_s3(ecosystem_name, context).await?;
@@ -1139,22 +1129,6 @@ async fn validate_ecosystem_exists(
     if !state_manager.exists().await? {
         return Err(eyre::eyre!(
             "Ecosystem '{}' not found. Run 'adi init' first.",
-            ecosystem_name
-        ));
-    }
-    Ok(())
-}
-
-/// Validate that chain exists within ecosystem.
-async fn validate_chain_exists(
-    state_manager: &StateManager,
-    chain_name: &str,
-    ecosystem_name: &str,
-) -> Result<()> {
-    if !state_manager.chain(chain_name).exists().await? {
-        return Err(eyre::eyre!(
-            "Chain '{}' not found in ecosystem '{}'. Initialize chain first.",
-            chain_name,
             ecosystem_name
         ));
     }
@@ -1320,21 +1294,25 @@ async fn build_funding_config(
         .base_token;
 
     // Determine token address to use (with fallback to config if chain has ETH but config has custom)
-    let ecosystem_defaults = &context.config().ecosystem;
+    let chain_defaults = context.config().ecosystem.get_chain(chain_name);
     let token_address = if base_token.is_eth() {
         // Chain metadata has ETH - check if config specifies a custom token
-        let config_token = ecosystem_defaults.base_token_address;
-        if config_token != adi_types::ETH_TOKEN_ADDRESS {
-            // Config has custom token but chain metadata has ETH
-            // This happens when zkstack ignores --base-token-address
-            context.logger().warning(&format!(
-                "Chain metadata has ETH as base_token, but config specifies {}. \
-                 Using config value (zkstack may have ignored --base-token-address).",
-                config_token
-            ));
-            Some(config_token)
+        let config_token = chain_defaults.and_then(|c| c.base_token_address);
+        if let Some(token) = config_token {
+            if token != adi_types::ETH_TOKEN_ADDRESS {
+                // Config has custom token but chain metadata has ETH
+                // This happens when zkstack ignores --base-token-address
+                context.logger().warning(&format!(
+                    "Chain metadata has ETH as base_token, but config specifies {}. \
+                     Using config value (zkstack may have ignored --base-token-address).",
+                    token
+                ));
+                Some(token)
+            } else {
+                None // Both are ETH, no custom token
+            }
         } else {
-            None // Both are ETH, no custom token
+            None // No custom token in config
         }
     } else {
         Some(base_token.address) // Chain has custom token
@@ -1387,19 +1365,16 @@ fn build_default_amounts(
         operator_eth: args
             .operator_eth
             .map(eth_to_wei)
-            .or_else(|| config.operator_eth.map(eth_to_wei))
             .unwrap_or(defaults.operator_eth),
         // Not configurable - use library defaults
         blob_operator_eth: defaults.blob_operator_eth,
         prove_operator_eth: args
             .prove_operator_eth
             .map(eth_to_wei)
-            .or_else(|| config.prove_operator_eth.map(eth_to_wei))
             .unwrap_or(defaults.prove_operator_eth),
         execute_operator_eth: args
             .execute_operator_eth
             .map(eth_to_wei)
-            .or_else(|| config.execute_operator_eth.map(eth_to_wei))
             .unwrap_or(defaults.execute_operator_eth),
         // Not configurable - use library defaults
         fee_account_eth: defaults.fee_account_eth,

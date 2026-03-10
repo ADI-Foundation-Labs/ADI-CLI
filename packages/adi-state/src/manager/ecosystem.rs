@@ -279,8 +279,8 @@ fn merge_ecosystem_metadata(
     if let Some(ref name) = partial.name {
         current.name.clone_from(name);
     }
-    if let Some(ref network) = partial.l1_network {
-        current.l1_network = network.clone();
+    if let Some(network) = partial.l1_network {
+        current.l1_network = network;
     }
     if let Some(ref link) = partial.link_to_code {
         current.link_to_code.clone_from(link);
@@ -297,8 +297,8 @@ fn merge_ecosystem_metadata(
     if let Some(era_chain_id) = partial.era_chain_id {
         current.era_chain_id = era_chain_id;
     }
-    if let Some(ref prover_version) = partial.prover_version {
-        current.prover_version = prover_version.clone();
+    if let Some(prover_version) = partial.prover_version {
+        current.prover_version = prover_version;
     }
     if let Some(ref wallet_creation) = partial.wallet_creation {
         current.wallet_creation = wallet_creation.clone();

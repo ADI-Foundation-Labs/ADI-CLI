@@ -5,7 +5,6 @@
 
 use crate::config::EcosystemConfig;
 use crate::error::{EcosystemError, Result};
-use crate::normalize_name;
 use adi_types::Logger;
 use std::path::Path;
 
@@ -43,17 +42,14 @@ pub fn verify_ecosystem_created(
     config: &EcosystemConfig,
     logger: &dyn Logger,
 ) -> Result<()> {
-    // zkstack normalizes names: hyphens become underscores
-    let ecosystem_name = normalize_name(&config.name);
-    let chain_name = normalize_name(&config.chain_name);
-    let ecosystem_dir = state_dir.join(&ecosystem_name);
+    let ecosystem_dir = state_dir.join(&config.name);
 
     let required_files = [
         ecosystem_dir.join("ZkStack.yaml"),
         ecosystem_dir.join("configs").join("wallets.yaml"),
         ecosystem_dir
             .join("chains")
-            .join(&chain_name)
+            .join(&config.chain_name)
             .join("configs")
             .join("wallets.yaml"),
     ];
@@ -105,13 +101,10 @@ pub fn verify_chain_created(
     chain_name: &str,
     logger: &dyn Logger,
 ) -> Result<()> {
-    // zkstack normalizes names: hyphens become underscores
-    let ecosystem_name = normalize_name(ecosystem_name);
-    let chain_name = normalize_name(chain_name);
     let chain_dir = state_dir
-        .join(&ecosystem_name)
+        .join(ecosystem_name)
         .join("chains")
-        .join(&chain_name);
+        .join(chain_name);
 
     let required_files = [
         chain_dir.join("ZkStack.yaml"),

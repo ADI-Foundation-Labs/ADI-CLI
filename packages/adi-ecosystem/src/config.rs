@@ -40,6 +40,49 @@ pub fn validate_chain_id(chain_id: u64, settlement_chain_id: u64) -> Result<(), 
     Ok(())
 }
 
+/// Validate that chain name is unique within the ecosystem.
+///
+/// # Arguments
+///
+/// * `name` - The chain name to validate.
+/// * `existing_names` - List of existing chain names in the ecosystem.
+///
+/// # Returns
+///
+/// `Ok(())` if unique, `Err` with descriptive message if name already exists.
+pub fn validate_chain_name_unique(name: &str, existing_names: &[String]) -> Result<(), String> {
+    if existing_names.iter().any(|n| n == name) {
+        return Err(format!(
+            "Chain name '{}' already exists in this ecosystem.",
+            name
+        ));
+    }
+    Ok(())
+}
+
+/// Validate that chain ID is unique within the ecosystem.
+///
+/// # Arguments
+///
+/// * `chain_id` - The chain ID to validate.
+/// * `existing_chains` - List of (name, chain_id) tuples for existing chains.
+///
+/// # Returns
+///
+/// `Ok(())` if unique, `Err` with descriptive message showing which chain uses the ID.
+pub fn validate_chain_id_unique(
+    chain_id: u64,
+    existing_chains: &[(String, u64)],
+) -> Result<(), String> {
+    if let Some((existing_name, _)) = existing_chains.iter().find(|(_, id)| *id == chain_id) {
+        return Err(format!(
+            "Chain ID {} is already used by chain '{}' in this ecosystem.",
+            chain_id, existing_name
+        ));
+    }
+    Ok(())
+}
+
 /// Configuration for ecosystem creation.
 ///
 /// This configuration is used to build zkstack ecosystem create command arguments.
@@ -437,5 +480,42 @@ mod tests {
         assert!(validate_chain_id(270, 1).is_ok());
         assert!(validate_chain_id(271, 1).is_ok());
         assert!(validate_chain_id(270, 11155111).is_ok());
+    }
+
+    #[test]
+    fn test_validate_chain_name_unique_conflict() {
+        let existing = vec!["chain_one".to_string(), "chain_two".to_string()];
+        let result = validate_chain_name_unique("chain_one", &existing);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("already exists"));
+    }
+
+    #[test]
+    fn test_validate_chain_name_unique_valid() {
+        let existing = vec!["chain_one".to_string(), "chain_two".to_string()];
+        assert!(validate_chain_name_unique("chain_three", &existing).is_ok());
+        assert!(validate_chain_name_unique("new_chain", &[]).is_ok());
+    }
+
+    #[test]
+    fn test_validate_chain_id_unique_conflict() {
+        let existing = vec![
+            ("chain_one".to_string(), 100),
+            ("chain_two".to_string(), 200),
+        ];
+        let result = validate_chain_id_unique(100, &existing);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("already used by chain 'chain_one'"));
+    }
+
+    #[test]
+    fn test_validate_chain_id_unique_valid() {
+        let existing = vec![
+            ("chain_one".to_string(), 100),
+            ("chain_two".to_string(), 200),
+        ];
+        assert!(validate_chain_id_unique(300, &existing).is_ok());
+        assert!(validate_chain_id_unique(100, &[]).is_ok());
     }
 }

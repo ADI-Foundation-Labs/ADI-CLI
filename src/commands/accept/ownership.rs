@@ -16,8 +16,8 @@ use url::Url;
 
 use crate::commands::helpers::{
     create_state_manager_with_context, derive_address_from_key, display_calldata_output,
-    display_ownership_status, display_summary, resolve_chain_name, resolve_ecosystem_name,
-    resolve_rpc_url,
+    display_ownership_status, display_summary, resolve_ecosystem_name, resolve_rpc_url,
+    select_chain_from_state, OwnershipScope,
 };
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
@@ -29,6 +29,19 @@ use crate::ui;
 /// ecosystem initialization.
 #[derive(Clone, Args, Debug, Serialize, Deserialize)]
 pub struct AcceptArgs {
+    /// Ownership scope: ecosystem, chain, or all (default: all).
+    ///
+    /// - `ecosystem`: Accept only ecosystem-level contracts (Governance, ValidatorTimelock, etc.)
+    /// - `chain`: Accept only chain-level contracts (requires --chain)
+    /// - `all`: Accept both ecosystem and chain contracts (default)
+    #[arg(
+        long,
+        value_enum,
+        default_value = "all",
+        help = "Ownership scope: ecosystem, chain, or all"
+    )]
+    pub scope: OwnershipScope,
+
     /// Ecosystem name (falls back to config file if not provided).
     #[arg(
         long,
@@ -92,11 +105,16 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
     // Resolve RPC URL
     let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
 
+    // Determine scope flags
+    let include_ecosystem = matches!(args.scope, OwnershipScope::Ecosystem | OwnershipScope::All);
+    let include_chain = matches!(args.scope, OwnershipScope::Chain | OwnershipScope::All);
+
     ui::note(
         "Accept configuration",
         format!(
-            "Ecosystem: {}\nRPC URL: {}",
+            "Ecosystem: {}\nScope: {}\nRPC URL: {}",
             ui::green(&ecosystem_name),
+            ui::green(&args.scope),
             ui::green(&rpc_url)
         ),
     )?;
@@ -104,16 +122,29 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
     // Create state manager
     let state_manager = create_state_manager_with_context(&ecosystem_name, context);
 
-    // Load ecosystem contracts
-    let ecosystem_contracts: EcosystemContracts = state_manager
-        .ecosystem()
-        .contracts()
-        .await
-        .wrap_err("Failed to load ecosystem contracts")?;
+    // Load ecosystem contracts (needed for ecosystem scope or all)
+    let ecosystem_contracts: Option<EcosystemContracts> = if include_ecosystem {
+        Some(
+            state_manager
+                .ecosystem()
+                .contracts()
+                .await
+                .wrap_err("Failed to load ecosystem contracts")?,
+        )
+    } else {
+        None
+    };
+
+    // Resolve chain name if needed for chain scope
+    let chain_name: Option<String> = if include_chain {
+        Some(select_chain_from_state(args.chain.as_ref(), &state_manager, &ecosystem_name).await?)
+    } else {
+        None
+    };
 
     // Resolve private key with priority:
     // 1. --private-key argument/env var (new owner mode)
-    // 2. Config ownership.private_key (new owner mode)
+    // 2. Config ownership.private_key for ecosystem, chains[].ownership.private_key for chain (new owner mode)
     // 3. --use-governor flag (use stored governor key)
     // 4. Interactive prompt: "Accept as governor?"
     //
@@ -189,80 +220,69 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
         }
     };
 
-    // Check ecosystem ownership status
-    // In governor mode: check all contracts (post-deploy acceptance)
-    // In new owner mode: check only directly-owned contracts (post-transfer acceptance)
-    ui::info("Checking ecosystem ownership status...")?;
-    let ecosystem_status = if is_governor_mode {
-        check_ecosystem_ownership_status(
-            rpc_url.as_str(),
-            &ecosystem_contracts,
-            key_address,
-            context.logger().as_ref(),
-        )
-        .await
-        .wrap_err("Failed to check ecosystem ownership status")?
-    } else {
-        check_ecosystem_ownership_status_for_new_owner(
-            rpc_url.as_str(),
-            &ecosystem_contracts,
-            key_address,
-            context.logger().as_ref(),
-        )
-        .await
-        .wrap_err("Failed to check ecosystem ownership status")?
-    };
-
-    // Display ecosystem contracts with pending status
-    display_ownership_status("Ecosystem contracts", &ecosystem_status)?;
-
-    // In new owner mode, automatically include chain contracts from config
-    // This ensures Chain Admin is accepted without requiring --chain flag
-    let effective_chain_name = if !is_governor_mode && args.chain.is_none() {
-        // Try to resolve chain from config, but don't error if not set
-        resolve_chain_name(args.chain.as_ref(), context.config()).ok()
-    } else {
-        args.chain.clone()
-    };
-
-    // Load and check chain contracts if chain name is available
-    let chain_contracts: Option<ChainContracts>;
-    let chain_status: Option<OwnershipStatusSummary>;
-
-    if let Some(ref chain_name) = effective_chain_name {
-        match state_manager.chain(chain_name).contracts().await {
-            Ok(contracts) => {
-                ui::info(format!(
-                    "Checking chain '{}' ownership status...",
-                    chain_name
-                ))?;
-                let status = check_chain_ownership_status(
+    // Check ecosystem ownership status (if scope includes ecosystem)
+    let ecosystem_status: Option<OwnershipStatusSummary> =
+        if let Some(ref contracts) = ecosystem_contracts {
+            // In governor mode: check all contracts (post-deploy acceptance)
+            // In new owner mode: check only directly-owned contracts (post-transfer acceptance)
+            ui::info("Checking ecosystem ownership status...")?;
+            let status = if is_governor_mode {
+                check_ecosystem_ownership_status(
                     rpc_url.as_str(),
-                    &contracts,
+                    contracts,
                     key_address,
                     context.logger().as_ref(),
                 )
                 .await
-                .wrap_err("Failed to check chain ownership status")?;
+                .wrap_err("Failed to check ecosystem ownership status")?
+            } else {
+                check_ecosystem_ownership_status_for_new_owner(
+                    rpc_url.as_str(),
+                    contracts,
+                    key_address,
+                    context.logger().as_ref(),
+                )
+                .await
+                .wrap_err("Failed to check ecosystem ownership status")?
+            };
+            display_ownership_status("Ecosystem contracts", &status)?;
+            Some(status)
+        } else {
+            None
+        };
 
-                display_ownership_status(&format!("Chain '{}' contracts", chain_name), &status)?;
+    // Load and check chain contracts if scope includes chain
+    let chain_contracts: Option<ChainContracts>;
+    let chain_status: Option<OwnershipStatusSummary>;
 
-                chain_contracts = Some(contracts);
-                chain_status = Some(status);
-            }
-            Err(e) => {
-                ui::warning(format!("Failed to load chain contracts: {}", e))?;
-                chain_contracts = None;
-                chain_status = None;
-            }
-        }
+    if let Some(ref name) = chain_name {
+        let contracts: ChainContracts = state_manager
+            .chain(name)
+            .contracts()
+            .await
+            .wrap_err(format!("Failed to load chain contracts for '{}'", name))?;
+
+        ui::info(format!("Checking chain '{}' ownership status...", name))?;
+        let status = check_chain_ownership_status(
+            rpc_url.as_str(),
+            &contracts,
+            key_address,
+            context.logger().as_ref(),
+        )
+        .await
+        .wrap_err("Failed to check chain ownership status")?;
+
+        display_ownership_status(&format!("Chain '{}' contracts", name), &status)?;
+
+        chain_contracts = Some(contracts);
+        chain_status = Some(status);
     } else {
         chain_contracts = None;
         chain_status = None;
     }
 
     // Show summary of pending contracts
-    let ecosystem_pending = ecosystem_status.pending_count();
+    let ecosystem_pending = ecosystem_status.as_ref().map_or(0, |s| s.pending_count());
     let chain_pending = chain_status.as_ref().map_or(0, |s| s.pending_count());
     let total_pending = ecosystem_pending + chain_pending;
 
@@ -286,16 +306,18 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
     if args.calldata {
         ui::info("Collecting calldata for pending contracts...")?;
 
-        let ecosystem_calldata = collect_all_ownership_calldata(
-            rpc_url.as_str(),
-            &ecosystem_contracts,
-            key_address,
-            context.logger().as_ref(),
-        )
-        .await
-        .wrap_err("Failed to collect ecosystem calldata")?;
+        if let Some(ref contracts) = ecosystem_contracts {
+            let ecosystem_calldata = collect_all_ownership_calldata(
+                rpc_url.as_str(),
+                contracts,
+                key_address,
+                context.logger().as_ref(),
+            )
+            .await
+            .wrap_err("Failed to collect ecosystem calldata")?;
 
-        display_calldata_output("Ecosystem Calldata", &ecosystem_calldata)?;
+            display_calldata_output("Ecosystem Calldata", &ecosystem_calldata)?;
+        }
 
         if let Some(ref contracts) = chain_contracts {
             let chain_calldata = collect_chain_ownership_calldata(
@@ -332,46 +354,47 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
         .gas_multiplier
         .or(Some(context.config().gas_multiplier));
 
-    // Execute ecosystem ownership acceptance
-    ui::info("Processing ecosystem contracts...")?;
-    let ecosystem_summary = accept_all_ownership(
-        rpc_url.as_str(),
-        &ecosystem_contracts,
-        &private_key,
-        gas_multiplier,
-        context.logger().as_ref(),
-    )
-    .await;
-
-    // Execute chain ownership acceptance if --chain was provided
-    let chain_summary = if let Some(contracts) = chain_contracts {
-        ui::info("Processing chain contracts...")?;
-        Some(
-            accept_chain_ownership(
-                rpc_url.as_str(),
-                &contracts,
-                &private_key,
-                gas_multiplier,
-                context.logger().as_ref(),
-            )
-            .await,
+    // Execute ecosystem ownership acceptance (if scope includes ecosystem)
+    let ecosystem_summary = if let Some(contracts) = ecosystem_contracts {
+        ui::info("Processing ecosystem contracts...")?;
+        let summary = accept_all_ownership(
+            rpc_url.as_str(),
+            &contracts,
+            &private_key,
+            gas_multiplier,
+            context.logger().as_ref(),
         )
+        .await;
+        display_summary("Ecosystem Summary", &summary)?;
+        Some(summary)
     } else {
         None
     };
 
-    // Display summaries
-    display_summary("Ecosystem Summary", &ecosystem_summary)?;
-
-    if let Some(ref summary) = chain_summary {
-        display_summary("Chain Summary", summary)?;
-    }
+    // Execute chain ownership acceptance (if scope includes chain)
+    let chain_summary = if let Some(contracts) = chain_contracts {
+        ui::info("Processing chain contracts...")?;
+        let summary = accept_chain_ownership(
+            rpc_url.as_str(),
+            &contracts,
+            &private_key,
+            gas_multiplier,
+            context.logger().as_ref(),
+        )
+        .await;
+        display_summary("Chain Summary", &summary)?;
+        Some(summary)
+    } else {
+        None
+    };
 
     // Return appropriate status
-    let total_successes = ecosystem_summary.successful_count()
+    let total_successes = ecosystem_summary
+        .as_ref()
+        .map_or(0, |s| s.successful_count())
         + chain_summary.as_ref().map_or(0, |s| s.successful_count());
-    let total_results =
-        ecosystem_summary.results.len() + chain_summary.as_ref().map_or(0, |s| s.results.len());
+    let total_results = ecosystem_summary.as_ref().map_or(0, |s| s.results.len())
+        + chain_summary.as_ref().map_or(0, |s| s.results.len());
 
     if total_successes > 0 {
         ui::outro("Ownership acceptance complete!")?;

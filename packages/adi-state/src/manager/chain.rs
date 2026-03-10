@@ -322,11 +322,11 @@ fn merge_chain_metadata(
     if let Some(chain_id) = partial.chain_id {
         current.chain_id = chain_id;
     }
-    if let Some(ref prover_version) = partial.prover_version {
-        current.prover_version = prover_version.clone();
+    if let Some(prover_version) = partial.prover_version {
+        current.prover_version = prover_version;
     }
-    if let Some(ref l1_network) = partial.l1_network {
-        current.l1_network = l1_network.clone();
+    if let Some(l1_network) = partial.l1_network {
+        current.l1_network = l1_network;
     }
     if let Some(ref link_to_code) = partial.link_to_code {
         current.link_to_code.clone_from(link_to_code);

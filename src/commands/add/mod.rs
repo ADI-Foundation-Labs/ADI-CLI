@@ -26,6 +26,11 @@ pub struct AddArgs {
     #[arg(long, short = 'p')]
     pub protocol_version: Option<String>,
 
+    /// Select chain configuration from config by name.
+    /// If provided, uses defaults from `ecosystem.chains[<name>]` in config.
+    #[arg(long, help = "Use chain config from ecosystem.chains[] by name")]
+    pub chain: Option<String>,
+
     /// Ecosystem name (falls back to config file if not provided).
     #[arg(
         long,
