@@ -15,9 +15,9 @@ use strum::{Display, EnumString};
 #[strum(serialize_all = "lowercase")]
 pub enum L1Network {
     /// Local development network.
-    #[default]
     Localhost,
     /// Sepolia testnet.
+    #[default]
     Sepolia,
     /// Ethereum mainnet.
     Mainnet,

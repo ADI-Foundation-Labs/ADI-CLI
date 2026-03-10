@@ -259,12 +259,12 @@ pub struct Config {
 impl Config {
     /// Load configuration from file and environment variables.
     ///
-    /// Configuration is loaded from multiple sources with the following priority:
-    /// 1. Environment variables with `ADI__` prefix (highest)
-    /// 2. CLI `--config` flag
-    /// 3. `ADI_CONFIG` environment variable
-    /// 4. Global config file at `~/.adi_cli/.adi.yml`
-    /// 5. Built-in defaults (lowest)
+    /// Configuration sources (mutually exclusive for files):
+    /// 1. CLI `--config` flag (if provided, used exclusively)
+    /// 2. `ADI_CONFIG` environment variable (if set, used exclusively)
+    /// 3. Global config file at `~/.adi.yml` (fallback)
+    ///
+    /// Environment variables with `ADI__` prefix always override any file config.
     ///
     /// # Arguments
     /// * `config_path` - Optional path to config file from CLI `--config` flag
@@ -274,22 +274,24 @@ impl Config {
     /// If a config path is explicitly provided (via CLI or `ADI_CONFIG` env var)
     /// and the file doesn't exist, an error is returned.
     pub fn new(config_path: Option<&Path>) -> Result<Self> {
-        // 1. Global config (lowest file priority)
-        let global_config_path = path_with_home_dir(DEFAULT_CONFIG_FILE_NAME);
-        let mut builder = config::Config::builder()
-            .add_source(config::File::from(Path::new(&global_config_path)).required(false));
+        let mut builder = config::Config::builder();
 
-        // 2. ADI_CONFIG environment variable (higher priority)
-        if let Ok(env_path) = std::env::var(CONFIG_ENV_VAR) {
-            builder = builder.add_source(config::File::from(Path::new(&env_path)).required(true));
-        }
-
-        // 3. CLI --config flag (highest file priority)
+        // Determine which config file to use (mutually exclusive, not merged)
+        // Priority: CLI --config > ADI_CONFIG env var > global ~/.adi.yml
         if let Some(path) = config_path {
+            // CLI --config flag takes highest priority
             builder = builder.add_source(config::File::from(path).required(true));
+        } else if let Ok(env_path) = std::env::var(CONFIG_ENV_VAR) {
+            // ADI_CONFIG environment variable
+            builder = builder.add_source(config::File::from(Path::new(&env_path)).required(true));
+        } else {
+            // Fall back to global config
+            let global_config_path = path_with_home_dir(DEFAULT_CONFIG_FILE_NAME);
+            builder = builder
+                .add_source(config::File::from(Path::new(&global_config_path)).required(false));
         }
 
-        // 4. Environment variables ADI__* (highest overall priority)
+        // Environment variables ADI__* always override (highest priority)
         let mut config: Self = builder
             .add_source(
                 config::Environment::with_prefix("ADI")
