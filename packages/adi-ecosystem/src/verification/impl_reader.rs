@@ -46,6 +46,18 @@ sol! {
         function AVAIL_BRIDGE() external view returns (address);
         function VECTOR_X() external view returns (address);
     }
+
+    /// Ownable2Step interface for reading owner.
+    interface IOwnable2Step {
+        function owner() external view returns (address);
+    }
+
+    /// DualVerifier mockVerify interface for testnet detection.
+    /// Production verifier reverts with MockVerifierNotSupported.
+    /// Testnet verifier returns true for valid inputs.
+    interface IVerifierMock {
+        function mockVerify(uint256[] memory _publicInputs, uint256[] memory _proof) external view returns (bool);
+    }
 }
 
 /// Collected implementation addresses for all known proxy contracts.
@@ -87,6 +99,15 @@ pub struct ImplementationAddresses {
     pub dummy_vector_x: Option<Address>,
     /// Server notifier proxy admin address.
     pub server_notifier_proxy_admin: Option<Address>,
+    /// Verifier owner address (for constructor arg).
+    pub verifier_owner: Option<Address>,
+    /// ChainAdmin owner address (for constructor arg).
+    pub chain_admin_owner: Option<Address>,
+    /// Whether the verifier is a testnet verifier (ZKsyncOSTestnetVerifier).
+    /// None = unknown (no owner, likely EraDualVerifier)
+    /// Some(true) = testnet verifier (ZKsyncOSTestnetVerifier or EraTestnetVerifier)
+    /// Some(false) = production verifier (ZKsyncOSDualVerifier or EraDualVerifier)
+    pub is_testnet_verifier: Option<bool>,
 }
 
 /// Read implementation address from a proxy contract's EIP-1967 storage slot.
@@ -265,6 +286,63 @@ pub async fn read_avail_addresses<P: Provider>(
     (bridge, vectorx)
 }
 
+/// Read owner address from Ownable2Step contract.
+///
+/// # Arguments
+///
+/// * `provider` - Alloy provider for RPC calls
+/// * `addr` - Address of the Ownable2Step contract
+///
+/// # Returns
+///
+/// Owner address if found and non-zero, None otherwise.
+pub async fn read_owner<P: Provider>(provider: &P, addr: Address) -> Option<Address> {
+    let call = IOwnable2Step::ownerCall {};
+    let data = Bytes::from(call.abi_encode());
+    call_contract_address(provider, addr, data).await
+}
+
+/// Check if a DualVerifier is a testnet verifier.
+///
+/// Testnet verifiers (ZKsyncOSTestnetVerifier, EraTestnetVerifier) support mock verification,
+/// while production verifiers (ZKsyncOSDualVerifier, EraDualVerifier) revert with MockVerifierNotSupported.
+///
+/// # Arguments
+///
+/// * `provider` - Alloy provider for RPC calls
+/// * `verifier_addr` - Address of the DualVerifier contract
+///
+/// # Returns
+///
+/// * `Some(true)` - Testnet verifier (mockVerify succeeds)
+/// * `Some(false)` - Production verifier (mockVerify reverts)
+/// * `None` - Unknown (call failed for other reasons)
+pub async fn is_testnet_verifier<P: Provider>(
+    provider: &P,
+    verifier_addr: Address,
+) -> Option<bool> {
+    // Call mockVerify with test inputs: publicInputs=[1], proof=[13, 1]
+    // ZKsyncOSTestnetVerifier: proof[0]=13, proof[1]=publicInputs[0]=1 → returns true
+    // ZKsyncOSDualVerifier: reverts with MockVerifierNotSupported
+    let public_inputs = vec![U256::from(1)];
+    let proof = vec![U256::from(13), U256::from(1)];
+
+    let call = IVerifierMock::mockVerifyCall {
+        _publicInputs: public_inputs,
+        _proof: proof,
+    };
+    let data = Bytes::from(call.abi_encode());
+
+    let tx = TransactionRequest::default()
+        .to(verifier_addr)
+        .input(data.into());
+
+    match provider.call(tx).await {
+        Ok(_) => Some(true),   // Call succeeded → testnet verifier
+        Err(_) => Some(false), // Call reverted → production verifier
+    }
+}
+
 /// Read all implementation addresses for known proxy contracts.
 ///
 /// Reads implementation addresses from the EIP-1967 storage slot for each
@@ -403,6 +481,38 @@ pub async fn read_all_implementations<P: Provider>(
             logger.debug(&format!("  VerifierPlonk: {}", addr));
             impls.verifier_plonk = Some(addr);
         }
+
+        // Read verifier owner (for constructor args)
+        logger.debug(&format!("Reading verifier owner from {}", verifier_addr));
+        if let Some(owner) = read_owner(provider, verifier_addr).await {
+            logger.debug(&format!("  VerifierOwner: {}", owner));
+            impls.verifier_owner = Some(owner);
+
+            // Detect if testnet verifier (only relevant when owner exists)
+            logger.debug(&format!(
+                "Detecting verifier type via mockVerify on {}",
+                verifier_addr
+            ));
+            if let Some(is_testnet) = is_testnet_verifier(provider, verifier_addr).await {
+                logger.debug(&format!(
+                    "  Verifier type: {}",
+                    if is_testnet { "testnet" } else { "production" }
+                ));
+                impls.is_testnet_verifier = Some(is_testnet);
+            }
+        }
+    }
+
+    // Read chain admin owner (for constructor args)
+    if let Some(chain_admin_addr) = ecosystem.chain_admin_addr() {
+        logger.debug(&format!(
+            "Reading ChainAdmin owner from {}",
+            chain_admin_addr
+        ));
+        if let Some(owner) = read_owner(provider, chain_admin_addr).await {
+            logger.debug(&format!("  ChainAdmin owner: {}", owner));
+            impls.chain_admin_owner = Some(owner);
+        }
     }
 
     // Read bridged token addresses from NativeTokenVault
@@ -491,7 +601,16 @@ pub fn apply_implementations(ecosystem: &mut EcosystemContracts, impls: &Impleme
         ctm.dummy_avail_bridge_addr = impls.dummy_avail_bridge;
         ctm.dummy_vector_x_addr = impls.dummy_vector_x;
         ctm.server_notifier_proxy_admin_addr = impls.server_notifier_proxy_admin;
+
+        // Verifier owner (for constructor args)
+        ctm.verifier_owner_addr = impls.verifier_owner;
+
+        // Testnet verifier flag
+        ctm.is_testnet_verifier = impls.is_testnet_verifier;
     }
+
+    // ChainAdmin owner (for constructor args)
+    ecosystem.chain_admin_owner = impls.chain_admin_owner;
 }
 
 #[cfg(test)]
@@ -533,5 +652,7 @@ mod tests {
         assert!(impls.dummy_avail_bridge.is_none());
         assert!(impls.dummy_vector_x.is_none());
         assert!(impls.server_notifier_proxy_admin.is_none());
+        assert!(impls.verifier_owner.is_none());
+        assert!(impls.chain_admin_owner.is_none());
     }
 }

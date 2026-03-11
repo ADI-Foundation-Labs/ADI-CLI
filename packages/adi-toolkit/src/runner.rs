@@ -303,7 +303,12 @@ impl ToolkitRunner {
 
         // Build the forge verify-contract command
         // Forge verify doesn't use src setting, so we prepend contracts/ to the path
-        let full_contract_path = format!("contracts/{}", contract_path);
+        // Exception: lib/ paths (e.g., OpenZeppelin contracts) are at project root level
+        let full_contract_path = if contract_path.starts_with("lib/") {
+            contract_path.to_string()
+        } else {
+            format!("contracts/{}", contract_path)
+        };
         let chain_id_str = chain_id.to_string();
         let mut args: Vec<&str> = vec![
             "forge",
@@ -320,6 +325,11 @@ impl ToolkitRunner {
             root_path,
             "--compiler-version",
             "0.8.28",
+            "--evm-version",
+            "cancun",
+            "--num-of-optimizations",
+            "28000",
+            "--watch", // Wait for verification to complete (not just submission accepted)
         ];
 
         if let Some(key) = api_key {

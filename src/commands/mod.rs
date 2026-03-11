@@ -15,10 +15,10 @@ mod ecosystem;
 pub mod helpers;
 mod init;
 mod owners;
-mod scan;
 mod server_params;
 mod state;
 mod transfer;
+mod verify;
 mod version;
 
 /// Available CLI commands.
@@ -43,8 +43,8 @@ pub enum Commands {
     Transfer(transfer::TransferArgs),
     /// Display owners of deployed L1 contracts
     Owners(owners::OwnersArgs),
-    /// Scan verification status of deployed contracts on block explorers
-    Scan(scan::ScanArgs),
+    /// Check and submit contract verification to block explorers
+    Verify(verify::VerifyArgs),
     /// Display server parameters for Docker Compose configuration
     ServerParams(server_params::ServerParamsArgs),
     /// Manage state synchronization with S3
@@ -64,7 +64,7 @@ impl Commands {
             Commands::Accept(args) => accept::run(args, context).await,
             Commands::Transfer(args) => transfer::run(args, context).await,
             Commands::Owners(args) => owners::run(&args, context).await,
-            Commands::Scan(args) => scan::run(args, context).await,
+            Commands::Verify(args) => verify::run(args, context).await,
             Commands::ServerParams(args) => server_params::run(&args, context).await,
             Commands::State(args) => state::run(&args, context).await,
         }

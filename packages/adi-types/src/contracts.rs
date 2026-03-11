@@ -241,6 +241,15 @@ pub struct ZkSyncOsCtm {
     /// Server notifier proxy admin address.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub server_notifier_proxy_admin_addr: Option<Address>,
+
+    /// Verifier owner address (for verification constructor args).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verifier_owner_addr: Option<Address>,
+
+    /// Whether the verifier is a testnet verifier (ZKsyncOSTestnetVerifier).
+    /// Detected at runtime via mockVerify call.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_testnet_verifier: Option<bool>,
 }
 
 /// Ecosystem contracts configuration from configs/contracts.yaml.
@@ -288,6 +297,10 @@ pub struct EcosystemContracts {
     /// L1 Rollup DA manager address.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub l1_rollup_da_manager: Option<Address>,
+
+    /// ChainAdmin owner (for verification constructor args).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chain_admin_owner: Option<Address>,
 
     /// Additional unmapped fields for forward compatibility.
     #[serde(flatten)]
@@ -385,6 +398,10 @@ pub struct ChainL1Contracts {
     /// Chain admin address.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chain_admin_addr: Option<Address>,
+
+    /// Chain admin owner (for verification constructor args).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chain_admin_owner: Option<Address>,
 
     /// Access control restriction address.
     #[serde(skip_serializing_if = "Option::is_none")]

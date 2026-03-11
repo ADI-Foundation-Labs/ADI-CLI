@@ -1,17 +1,17 @@
 //! Contract registry for verification.
 //!
-//! Maps contract types to their source file paths within era-contracts.
+//! Maps contract types to their source file paths within zksync-era contracts.
 
 use adi_types::{ChainContracts, EcosystemContracts};
 use alloy_primitives::Address;
 use serde::{Deserialize, Serialize};
 
-/// Root directory for contract sources within era-contracts.
+/// Root directory for contract sources within zksync-era.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContractsRoot {
-    /// L1 contracts: /deps/era-contracts/l1-contracts
+    /// L1 contracts: /deps/zksync-era/contracts/l1-contracts
     L1Contracts,
-    /// DA contracts: /deps/era-contracts/da-contracts
+    /// DA contracts: /deps/zksync-era/contracts/da-contracts
     DaContracts,
 }
 
@@ -19,8 +19,8 @@ impl ContractsRoot {
     /// Get the filesystem path for this root.
     pub fn path(self) -> &'static str {
         match self {
-            Self::L1Contracts => "/deps/era-contracts/l1-contracts",
-            Self::DaContracts => "/deps/era-contracts/da-contracts",
+            Self::L1Contracts => "/deps/zksync-era/contracts/l1-contracts",
+            Self::DaContracts => "/deps/zksync-era/contracts/da-contracts",
         }
     }
 }
@@ -45,6 +45,8 @@ pub enum ContractType {
     Governance,
     /// Chain admin contract.
     ChainAdmin,
+    /// Access control restriction.
+    AccessControlRestriction,
 
     // State transition contracts
     /// State transition proxy (Chain Type Manager).
@@ -164,6 +166,7 @@ impl ContractType {
             Self::NativeTokenVault => "Native Token Vault",
             Self::Governance => "Governance",
             Self::ChainAdmin => "Chain Admin",
+            Self::AccessControlRestriction => "Access Control Restriction",
             Self::StateTransitionProxy => "State Transition Manager",
             Self::ValidatorTimelock => "Validator Timelock",
             Self::ServerNotifier => "Server Notifier",
@@ -234,6 +237,38 @@ impl std::fmt::Display for ContractType {
     }
 }
 
+/// Proxy verification parameters for TransparentUpgradeableProxy contracts.
+#[derive(Debug, Clone)]
+pub struct ProxyVerificationInfo {
+    /// Implementation contract address (_logic parameter).
+    pub impl_addr: Address,
+    /// Proxy admin address (initialOwner parameter).
+    pub proxy_admin_addr: Address,
+    /// Initialization calldata (_data parameter). Empty bytes if no init.
+    pub init_data: alloy_primitives::Bytes,
+}
+
+/// Verifier verification parameters for DualVerifier contracts.
+/// Supports both ZKsyncOSDualVerifier (has owner) and EraDualVerifier (no owner).
+#[derive(Debug, Clone)]
+pub struct VerifierVerificationInfo {
+    /// Fflonk verifier address.
+    pub fflonk_addr: Address,
+    /// Plonk verifier address.
+    pub plonk_addr: Address,
+    /// Initial owner address. Some = ZKsyncOSDualVerifier, None = EraDualVerifier.
+    pub owner_addr: Option<Address>,
+}
+
+/// ChainAdminOwnable verification parameters.
+#[derive(Debug, Clone)]
+pub struct ChainAdminVerificationInfo {
+    /// Initial owner address.
+    pub owner_addr: Address,
+    /// Token multiplier setter address (typically zero).
+    pub token_multiplier_setter: Address,
+}
+
 /// Contract verification target with address and source info.
 #[derive(Debug, Clone)]
 pub struct VerificationTarget {
@@ -249,6 +284,12 @@ pub struct VerificationTarget {
     pub contract_name: &'static str,
     /// Whether this is a proxy contract.
     pub is_proxy: bool,
+    /// Proxy verification info (for TransparentUpgradeableProxy contracts).
+    pub proxy_info: Option<ProxyVerificationInfo>,
+    /// Verifier verification info (for ZKsyncOSDualVerifier).
+    pub verifier_info: Option<VerifierVerificationInfo>,
+    /// ChainAdmin verification info.
+    pub chain_admin_info: Option<ChainAdminVerificationInfo>,
 }
 
 impl VerificationTarget {
@@ -269,6 +310,81 @@ impl VerificationTarget {
             source_path,
             contract_name,
             is_proxy,
+            proxy_info: None,
+            verifier_info: None,
+            chain_admin_info: None,
+        }
+    }
+
+    /// Create a new verification target with proxy info.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_proxy(
+        contract_type: ContractType,
+        address: Address,
+        root_path: &'static str,
+        source_path: &'static str,
+        contract_name: &'static str,
+        is_proxy: bool,
+        proxy_info: Option<ProxyVerificationInfo>,
+    ) -> Self {
+        Self {
+            contract_type,
+            address,
+            root_path,
+            source_path,
+            contract_name,
+            is_proxy,
+            proxy_info,
+            verifier_info: None,
+            chain_admin_info: None,
+        }
+    }
+
+    /// Create a new verification target with verifier info.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_verifier(
+        contract_type: ContractType,
+        address: Address,
+        root_path: &'static str,
+        source_path: &'static str,
+        contract_name: &'static str,
+        is_proxy: bool,
+        verifier_info: Option<VerifierVerificationInfo>,
+    ) -> Self {
+        Self {
+            contract_type,
+            address,
+            root_path,
+            source_path,
+            contract_name,
+            is_proxy,
+            proxy_info: None,
+            verifier_info,
+            chain_admin_info: None,
+        }
+    }
+
+    /// Create a new verification target with chain admin info.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_chain_admin(
+        contract_type: ContractType,
+        address: Address,
+        root_path: &'static str,
+        source_path: &'static str,
+        contract_name: &'static str,
+        is_proxy: bool,
+        chain_admin_info: Option<ChainAdminVerificationInfo>,
+    ) -> Self {
+        Self {
+            contract_type,
+            address,
+            root_path,
+            source_path,
+            contract_name,
+            is_proxy,
+            proxy_info: None,
+            verifier_info: None,
+            chain_admin_info,
         }
     }
 
@@ -307,7 +423,8 @@ impl ContractRegistry {
             ContractType::StmDeploymentTracker => "bridgehub/CTMDeploymentTracker.sol",
             ContractType::NativeTokenVault => "bridge/ntv/L1NativeTokenVault.sol",
             ContractType::Governance => "governance/Governance.sol",
-            ContractType::ChainAdmin => "governance/ChainAdmin.sol",
+            ContractType::ChainAdmin => "governance/ChainAdminOwnable.sol",
+            ContractType::AccessControlRestriction => "governance/AccessControlRestriction.sol",
             ContractType::StateTransitionProxy => "state-transition/ZKsyncOSChainTypeManager.sol",
             ContractType::ValidatorTimelock => "state-transition/ValidatorTimelock.sol",
             ContractType::ServerNotifier => "governance/ServerNotifier.sol",
@@ -331,7 +448,7 @@ impl ContractRegistry {
             ContractType::L1Nullifier => "bridge/L1Nullifier.sol",
             ContractType::DiamondProxy => "state-transition/chain-deps/DiamondProxy.sol",
             ContractType::ChainGovernance => "governance/Governance.sol",
-            ContractType::ChainChainAdmin => "governance/ChainAdmin.sol",
+            ContractType::ChainChainAdmin => "governance/ChainAdminOwnable.sol",
             ContractType::ChainProxyAdmin => "transparent-proxy/TransparentUpgradeableProxy.sol",
             // Diamond facets
             ContractType::AdminFacet => "state-transition/chain-deps/facets/Admin.sol",
@@ -377,7 +494,8 @@ impl ContractRegistry {
             ContractType::StmDeploymentTracker => "CTMDeploymentTracker",
             ContractType::NativeTokenVault => "L1NativeTokenVault",
             ContractType::Governance => "Governance",
-            ContractType::ChainAdmin => "ChainAdmin",
+            ContractType::ChainAdmin => "ChainAdminOwnable",
+            ContractType::AccessControlRestriction => "AccessControlRestriction",
             ContractType::StateTransitionProxy => "ZKsyncOSChainTypeManager",
             ContractType::ValidatorTimelock => "ValidatorTimelock",
             ContractType::ServerNotifier => "ServerNotifier",
@@ -395,7 +513,7 @@ impl ContractRegistry {
             ContractType::L1Nullifier => "L1Nullifier",
             ContractType::DiamondProxy => "DiamondProxy",
             ContractType::ChainGovernance => "Governance",
-            ContractType::ChainChainAdmin => "ChainAdmin",
+            ContractType::ChainChainAdmin => "ChainAdminOwnable",
             ContractType::ChainProxyAdmin => "TransparentUpgradeableProxy",
             // Diamond facets
             ContractType::AdminFacet => "AdminFacet",
@@ -415,8 +533,8 @@ impl ContractRegistry {
             ContractType::L1NullifierImpl => "L1Nullifier",
             ContractType::ValidatorTimelockImpl => "ValidatorTimelock",
             // Verifier components
-            ContractType::VerifierFflonk => "ZKsyncOsVerifierFflonk",
-            ContractType::VerifierPlonk => "ZKsyncOsVerifierPlonk",
+            ContractType::VerifierFflonk => "ZKsyncOSVerifierFflonk",
+            ContractType::VerifierPlonk => "ZKsyncOSVerifierPlonk",
             // Bridge token contracts
             ContractType::BridgedStandardErc20 => "BridgedStandardERC20",
             ContractType::BridgedTokenBeacon => "BridgedTokenBeacon",
@@ -480,11 +598,15 @@ impl ContractRegistry {
     }
 
     /// Build verification target for a contract type and address.
-    /// Returns None if the contract is not available in the toolkit.
+    /// Returns None if the contract is not available in the toolkit or address is zero.
     pub fn build_target(
         contract_type: ContractType,
         address: Address,
     ) -> Option<VerificationTarget> {
+        // Skip zero addresses (contract not deployed)
+        if address.is_zero() {
+            return None;
+        }
         if !Self::is_available(contract_type) {
             return None;
         }
@@ -495,6 +617,122 @@ impl ContractRegistry {
             Self::source_path(contract_type),
             Self::contract_name(contract_type),
             Self::is_proxy(contract_type),
+        ))
+    }
+
+    /// Build verification target for a TransparentUpgradeableProxy contract.
+    /// Uses proxy source and includes constructor args for verification.
+    ///
+    /// The source path uses the @openzeppelin remapping defined in foundry.toml:
+    /// `@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/`
+    pub fn build_proxy_target(
+        contract_type: ContractType,
+        proxy_addr: Address,
+        impl_addr: Address,
+        proxy_admin_addr: Address,
+    ) -> Option<VerificationTarget> {
+        // Skip zero addresses
+        if proxy_addr.is_zero() || impl_addr.is_zero() || proxy_admin_addr.is_zero() {
+            return None;
+        }
+
+        let proxy_info = ProxyVerificationInfo {
+            impl_addr,
+            proxy_admin_addr,
+            init_data: alloy_primitives::Bytes::new(),
+        };
+
+        Some(VerificationTarget::new_with_proxy(
+            contract_type,
+            proxy_addr,
+            ContractsRoot::L1Contracts.path(),
+            "lib/openzeppelin-contracts-v4/contracts/proxy/transparent/TransparentUpgradeableProxy.sol",
+            "TransparentUpgradeableProxy",
+            true,
+            Some(proxy_info),
+        ))
+    }
+
+    /// Build verification target for ZKsyncOSDualVerifier contract.
+    /// Includes constructor args (fflonk, plonk, owner) for verification.
+    pub fn build_verifier_target(
+        verifier_addr: Address,
+        fflonk_addr: Address,
+        plonk_addr: Address,
+        owner_addr: Option<Address>,
+        is_testnet_verifier: Option<bool>,
+    ) -> Option<VerificationTarget> {
+        // Skip zero addresses
+        if verifier_addr.is_zero() || fflonk_addr.is_zero() || plonk_addr.is_zero() {
+            return None;
+        }
+
+        let verifier_info = VerifierVerificationInfo {
+            fflonk_addr,
+            plonk_addr,
+            owner_addr,
+        };
+
+        // Select source path and contract name based on verifier type
+        // - ZKsyncOS with testnet: ZKsyncOSTestnetVerifier
+        // - ZKsyncOS without testnet: ZKsyncOSDualVerifier
+        // - Era (no owner): EraDualVerifier or EraTestnetVerifier
+        let (source_path, contract_name) = match (owner_addr.is_some(), is_testnet_verifier) {
+            (true, Some(true)) => (
+                "state-transition/verifiers/ZKsyncOSTestnetVerifier.sol",
+                "ZKsyncOSTestnetVerifier",
+            ),
+            (true, _) => (
+                "state-transition/verifiers/ZKsyncOSDualVerifier.sol",
+                "ZKsyncOSDualVerifier",
+            ),
+            (false, Some(true)) => (
+                "state-transition/verifiers/EraTestnetVerifier.sol",
+                "EraTestnetVerifier",
+            ),
+            (false, _) => (
+                "state-transition/verifiers/EraDualVerifier.sol",
+                "EraDualVerifier",
+            ),
+        };
+
+        Some(VerificationTarget::new_with_verifier(
+            ContractType::Verifier,
+            verifier_addr,
+            ContractsRoot::L1Contracts.path(),
+            source_path,
+            contract_name,
+            false,
+            Some(verifier_info),
+        ))
+    }
+
+    /// Build verification target for ChainAdmin contract.
+    /// Includes constructor args (restrictions array) for verification.
+    pub fn build_chain_admin_target(
+        contract_type: ContractType,
+        addr: Address,
+        owner_addr: Address,
+    ) -> Option<VerificationTarget> {
+        // Skip zero addresses
+        if addr.is_zero() || owner_addr.is_zero() {
+            return None;
+        }
+
+        // ChainAdminOwnable is deployed with tokenMultiplierSetter = address(0)
+        let chain_admin_info = ChainAdminVerificationInfo {
+            owner_addr,
+            token_multiplier_setter: Address::ZERO,
+        };
+
+        Some(VerificationTarget::new_with_chain_admin(
+            contract_type,
+            addr,
+            ContractsRoot::L1Contracts.path(),
+            Self::source_path(contract_type),
+            Self::contract_name(contract_type),
+            false,
+            Some(chain_admin_info),
         ))
     }
 
@@ -528,22 +766,75 @@ impl ContractRegistry {
             };
         }
 
-        // Core ecosystem contracts
-        if let Some(addr) = contracts.bridgehub_addr() {
-            add_target!(ContractType::Bridgehub, addr);
+        // Helper macro to add proxy target with constructor args
+        macro_rules! add_proxy_target {
+            ($contract_type:expr, $proxy_addr:expr, $impl_addr:expr, $proxy_admin:expr) => {
+                if let Some(target) =
+                    Self::build_proxy_target($contract_type, $proxy_addr, $impl_addr, $proxy_admin)
+                {
+                    targets.push(target);
+                }
+            };
         }
-        if let Some(core) = &contracts.core_ecosystem_contracts {
-            if let Some(addr) = core.message_root_proxy_addr {
-                add_target!(ContractType::MessageRoot, addr);
+
+        // Get proxy admin address (used for all TransparentUpgradeableProxy contracts)
+        let proxy_admin_addr = contracts
+            .core_ecosystem_contracts
+            .as_ref()
+            .and_then(|c| c.transparent_proxy_admin_addr);
+
+        // Core ecosystem proxy contracts (with proxy verification info)
+        if let (Some(proxy_addr), Some(ctm)) =
+            (contracts.bridgehub_addr(), &contracts.zksync_os_ctm)
+        {
+            if let (Some(impl_addr), Some(admin)) = (ctm.bridgehub_impl_addr, proxy_admin_addr) {
+                add_proxy_target!(ContractType::Bridgehub, proxy_addr, impl_addr, admin);
             }
+        }
+
+        if let Some(core) = &contracts.core_ecosystem_contracts {
+            // Message Root proxy
+            if let (Some(proxy_addr), Some(ctm)) =
+                (core.message_root_proxy_addr, &contracts.zksync_os_ctm)
+            {
+                if let (Some(impl_addr), Some(admin)) =
+                    (ctm.message_root_impl_addr, proxy_admin_addr)
+                {
+                    add_proxy_target!(ContractType::MessageRoot, proxy_addr, impl_addr, admin);
+                }
+            }
+
+            // TransparentProxyAdmin (not a proxy itself, skip)
             if let Some(addr) = core.transparent_proxy_admin_addr {
                 add_target!(ContractType::TransparentProxyAdmin, addr);
             }
-            if let Some(addr) = core.stm_deployment_tracker_proxy_addr {
-                add_target!(ContractType::StmDeploymentTracker, addr);
+
+            // STM Deployment Tracker proxy
+            if let (Some(proxy_addr), Some(ctm)) = (
+                core.stm_deployment_tracker_proxy_addr,
+                &contracts.zksync_os_ctm,
+            ) {
+                if let (Some(impl_addr), Some(admin)) =
+                    (ctm.stm_deployment_tracker_impl_addr, proxy_admin_addr)
+                {
+                    add_proxy_target!(
+                        ContractType::StmDeploymentTracker,
+                        proxy_addr,
+                        impl_addr,
+                        admin
+                    );
+                }
             }
-            if let Some(addr) = core.native_token_vault_addr {
-                add_target!(ContractType::NativeTokenVault, addr);
+
+            // Native Token Vault proxy
+            if let (Some(proxy_addr), Some(ctm)) =
+                (core.native_token_vault_addr, &contracts.zksync_os_ctm)
+            {
+                if let (Some(impl_addr), Some(admin)) =
+                    (ctm.native_token_vault_impl_addr, proxy_admin_addr)
+                {
+                    add_proxy_target!(ContractType::NativeTokenVault, proxy_addr, impl_addr, admin);
+                }
             }
         }
 
@@ -551,23 +842,76 @@ impl ContractRegistry {
         if let Some(addr) = contracts.governance_addr() {
             add_target!(ContractType::Governance, addr);
         }
-        if let Some(addr) = contracts.chain_admin_addr() {
-            add_target!(ContractType::ChainAdmin, addr);
+
+        // ChainAdmin with constructor args (owner, tokenMultiplierSetter)
+        if let (Some(addr), Some(owner)) =
+            (contracts.chain_admin_addr(), contracts.chain_admin_owner)
+        {
+            if let Some(target) =
+                Self::build_chain_admin_target(ContractType::ChainAdmin, addr, owner)
+            {
+                targets.push(target);
+            }
         }
 
         // ZkSync OS CTM contracts
         if let Some(ctm) = &contracts.zksync_os_ctm {
-            if let Some(addr) = ctm.state_transition_proxy_addr {
-                add_target!(ContractType::StateTransitionProxy, addr);
+            // StateTransitionProxy (ChainTypeManager proxy)
+            if let (Some(proxy_addr), Some(impl_addr), Some(admin)) = (
+                ctm.state_transition_proxy_addr,
+                ctm.chain_type_manager_impl_addr,
+                proxy_admin_addr,
+            ) {
+                add_proxy_target!(
+                    ContractType::StateTransitionProxy,
+                    proxy_addr,
+                    impl_addr,
+                    admin
+                );
             }
-            if let Some(addr) = ctm.validator_timelock_addr {
-                add_target!(ContractType::ValidatorTimelock, addr);
+
+            // ValidatorTimelock proxy
+            if let (Some(proxy_addr), Some(impl_addr), Some(admin)) = (
+                ctm.validator_timelock_addr,
+                ctm.validator_timelock_impl_addr,
+                proxy_admin_addr,
+            ) {
+                add_proxy_target!(
+                    ContractType::ValidatorTimelock,
+                    proxy_addr,
+                    impl_addr,
+                    admin
+                );
             }
-            if let Some(addr) = ctm.server_notifier_proxy_addr {
-                add_target!(ContractType::ServerNotifier, addr);
+
+            // ServerNotifier proxy
+            if let (Some(proxy_addr), Some(impl_addr), Some(admin)) = (
+                ctm.server_notifier_proxy_addr,
+                ctm.server_notifier_impl_addr,
+                proxy_admin_addr,
+            ) {
+                add_proxy_target!(ContractType::ServerNotifier, proxy_addr, impl_addr, admin);
             }
-            if let Some(addr) = ctm.verifier_addr {
-                add_target!(ContractType::Verifier, addr);
+
+            // Verifier with constructor args
+            // ZKsyncOSDualVerifier: (fflonk, plonk, owner)
+            // ZKsyncOSTestnetVerifier: (fflonk, plonk, owner) - testnet variant
+            // EraDualVerifier: (fflonk, plonk) - owner is None
+            // EraTestnetVerifier: (fflonk, plonk) - testnet variant without owner
+            if let (Some(verifier_addr), Some(fflonk), Some(plonk)) = (
+                ctm.verifier_addr,
+                ctm.verifier_fflonk_addr,
+                ctm.verifier_plonk_addr,
+            ) {
+                if let Some(target) = Self::build_verifier_target(
+                    verifier_addr,
+                    fflonk,
+                    plonk,
+                    ctm.verifier_owner_addr,
+                    ctm.is_testnet_verifier,
+                ) {
+                    targets.push(target);
+                }
             }
             if let Some(addr) = ctm.l1_rollup_da_manager {
                 add_target!(ContractType::L1RollupDaManager, addr);
@@ -678,20 +1022,35 @@ impl ContractRegistry {
             }
         }
 
-        // Bridge contracts
-        if let Some(bridges) = &contracts.bridges {
+        // Bridge contracts (proxies)
+        if let (Some(bridges), Some(ctm)) = (&contracts.bridges, &contracts.zksync_os_ctm) {
+            // ERC20 Bridge proxy
             if let Some(erc20) = &bridges.erc20 {
-                if let Some(addr) = erc20.l1_address {
-                    add_target!(ContractType::Erc20Bridge, addr);
+                if let (Some(proxy_addr), Some(impl_addr), Some(admin)) = (
+                    erc20.l1_address,
+                    ctm.erc20_bridge_impl_addr,
+                    proxy_admin_addr,
+                ) {
+                    add_proxy_target!(ContractType::Erc20Bridge, proxy_addr, impl_addr, admin);
                 }
             }
+            // Shared Bridge (L1 Asset Router) proxy
             if let Some(shared) = &bridges.shared {
-                if let Some(addr) = shared.l1_address {
-                    add_target!(ContractType::SharedBridge, addr);
+                if let (Some(proxy_addr), Some(impl_addr), Some(admin)) = (
+                    shared.l1_address,
+                    ctm.shared_bridge_impl_addr,
+                    proxy_admin_addr,
+                ) {
+                    add_proxy_target!(ContractType::SharedBridge, proxy_addr, impl_addr, admin);
                 }
             }
-            if let Some(addr) = bridges.l1_nullifier_addr {
-                add_target!(ContractType::L1Nullifier, addr);
+            // L1 Nullifier proxy
+            if let (Some(proxy_addr), Some(impl_addr), Some(admin)) = (
+                bridges.l1_nullifier_addr,
+                ctm.l1_nullifier_impl_addr,
+                proxy_admin_addr,
+            ) {
+                add_proxy_target!(ContractType::L1Nullifier, proxy_addr, impl_addr, admin);
             }
         }
 
@@ -714,8 +1073,18 @@ impl ContractRegistry {
                     targets.push(target);
                 }
             }
-            if let Some(addr) = l1.chain_admin_addr {
-                if let Some(target) = Self::build_target(ContractType::ChainChainAdmin, addr) {
+            // Chain-level ChainAdmin with constructor args (owner, tokenMultiplierSetter)
+            if let (Some(addr), Some(owner)) = (l1.chain_admin_addr, l1.chain_admin_owner) {
+                if let Some(target) =
+                    Self::build_chain_admin_target(ContractType::ChainChainAdmin, addr, owner)
+                {
+                    targets.push(target);
+                }
+            }
+            if let Some(addr) = l1.access_control_restriction_addr {
+                if let Some(target) =
+                    Self::build_target(ContractType::AccessControlRestriction, addr)
+                {
                     targets.push(target);
                 }
             }
@@ -761,8 +1130,9 @@ mod tests {
 
     #[test]
     fn test_forge_contract_path() {
+        // Use build_target_unchecked to bypass zero address check
         let target =
-            ContractRegistry::build_target(ContractType::Governance, Address::ZERO).unwrap();
+            ContractRegistry::build_target_unchecked(ContractType::Governance, Address::ZERO);
         assert_eq!(
             target.forge_contract_path(),
             "governance/Governance.sol:Governance"
@@ -771,17 +1141,26 @@ mod tests {
 
     #[test]
     fn test_unavailable_contracts_skipped() {
+        // Use a non-zero address for testing
+        let test_addr = Address::repeat_byte(0x11);
+
         // TransparentProxyAdmin should be unavailable
         assert!(!ContractRegistry::is_available(
             ContractType::TransparentProxyAdmin
         ));
         assert!(
-            ContractRegistry::build_target(ContractType::TransparentProxyAdmin, Address::ZERO)
+            ContractRegistry::build_target(ContractType::TransparentProxyAdmin, test_addr)
                 .is_none()
         );
 
         // Governance should be available
         assert!(ContractRegistry::is_available(ContractType::Governance));
-        assert!(ContractRegistry::build_target(ContractType::Governance, Address::ZERO).is_some());
+        assert!(ContractRegistry::build_target(ContractType::Governance, test_addr).is_some());
+    }
+
+    #[test]
+    fn test_zero_address_skipped() {
+        // Zero address should be skipped even for available contracts
+        assert!(ContractRegistry::build_target(ContractType::Governance, Address::ZERO).is_none());
     }
 }

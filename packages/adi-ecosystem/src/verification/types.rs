@@ -30,6 +30,31 @@ impl std::fmt::Display for ExplorerType {
     }
 }
 
+impl std::str::FromStr for ExplorerType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "etherscan" => Ok(Self::Etherscan),
+            "blockscout" => Ok(Self::Blockscout),
+            "custom" => Ok(Self::Custom),
+            _ => Err(format!("unknown explorer type: {}", s)),
+        }
+    }
+}
+
+impl ExplorerType {
+    /// Get the verifier name for forge verify-contract command.
+    ///
+    /// Always returns "custom" to ensure `--verifier-url` is respected.
+    /// Forge ignores `--verifier-url` for non-custom verifiers (etherscan, blockscout)
+    /// and tries to look up URLs by chain ID, which fails for unknown chains.
+    pub fn forge_verifier_name(&self) -> &'static str {
+        // Always use "custom" to ensure --verifier-url is respected
+        "custom"
+    }
+}
+
 /// Verification status from explorer API.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VerificationStatus {
