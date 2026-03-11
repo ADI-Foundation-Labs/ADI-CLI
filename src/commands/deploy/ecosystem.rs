@@ -875,6 +875,32 @@ async fn run_ecosystem_deployment(
         .await
         .wrap_err("Failed to load chain wallets for operator role assignment")?;
 
+    // Always revoke blob_operator roles (zkstack assigns them by default)
+    if let Some(blob_op) = chain_wallets.blob_operator.as_ref() {
+        let blob_revoke = Operators {
+            blob_operator: Some(blob_op.address),
+            ..Default::default()
+        };
+
+        let revoke_hashes = remove_validator_roles(
+            &normalized_rpc,
+            &deployed,
+            &blob_revoke,
+            &governor_key,
+            validator_gas_multiplier,
+            context.logger().as_ref(),
+        )
+        .await
+        .wrap_err("Failed to revoke blob_operator validator roles")?;
+
+        if !revoke_hashes.is_empty() {
+            ui::success(format!(
+                "Revoked blob_operator validator roles: {} transactions",
+                ui::green(revoke_hashes.len())
+            ))?;
+        }
+    }
+
     // Load operators from config (.adi.yml - highest priority)
     let config_operators = &context.config().operators;
 
@@ -889,6 +915,7 @@ async fn run_ecosystem_deployment(
         execute_operator: config_operators
             .execute_operator
             .or_else(|| chain_wallets.execute_operator.as_ref().map(|w| w.address)),
+        ..Default::default()
     };
 
     // Save operators to state (record of what addresses were assigned)
@@ -938,6 +965,7 @@ async fn run_ecosystem_deployment(
             } else {
                 None
             },
+            ..Default::default()
         };
 
         // Revoke roles from default operators being replaced

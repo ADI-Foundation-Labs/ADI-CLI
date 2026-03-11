@@ -369,6 +369,14 @@ pub async fn remove_validator_roles(
         });
     }
 
+    if let Some(addr) = operators.blob_operator {
+        revocations.push(ValidatorRoleAssignment {
+            name: "blob_operator",
+            operator: addr,
+            roles: ValidatorRoles::commit_operator(),
+        });
+    }
+
     if revocations.is_empty() {
         logger.debug("No operators to revoke - skipping");
         return Ok(Vec::new());

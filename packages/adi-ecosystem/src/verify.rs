@@ -5,6 +5,7 @@
 
 use crate::config::EcosystemConfig;
 use crate::error::{EcosystemError, Result};
+use crate::normalize_name;
 use adi_types::Logger;
 use std::path::Path;
 
@@ -42,14 +43,14 @@ pub fn verify_ecosystem_created(
     config: &EcosystemConfig,
     logger: &dyn Logger,
 ) -> Result<()> {
-    let ecosystem_dir = state_dir.join(&config.name);
+    let ecosystem_dir = state_dir.join(normalize_name(&config.name));
 
     let required_files = [
         ecosystem_dir.join("ZkStack.yaml"),
         ecosystem_dir.join("configs").join("wallets.yaml"),
         ecosystem_dir
             .join("chains")
-            .join(&config.chain_name)
+            .join(normalize_name(&config.chain_name))
             .join("configs")
             .join("wallets.yaml"),
     ];

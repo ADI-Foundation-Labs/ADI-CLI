@@ -31,6 +31,11 @@ pub struct Operators {
     /// Execute operator address - receives EXECUTOR role.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execute_operator: Option<Address>,
+
+    /// Blob operator address - receives PRECOMMITTER, COMMITTER, REVERTER roles by default from zkstack.
+    /// This field is used for revoking these default roles.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blob_operator: Option<Address>,
 }
 
 impl Operators {
@@ -46,15 +51,23 @@ impl Operators {
 
     /// Check if any operator is configured.
     pub fn has_any(&self) -> bool {
-        self.operator.is_some() || self.prove_operator.is_some() || self.execute_operator.is_some()
+        self.operator.is_some()
+            || self.prove_operator.is_some()
+            || self.execute_operator.is_some()
+            || self.blob_operator.is_some()
     }
 
     /// Get all configured operator addresses.
     pub fn all_addresses(&self) -> Vec<Address> {
-        [self.operator, self.prove_operator, self.execute_operator]
-            .into_iter()
-            .flatten()
-            .collect()
+        [
+            self.operator,
+            self.prove_operator,
+            self.execute_operator,
+            self.blob_operator,
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
     }
 }
 
@@ -69,6 +82,7 @@ mod tests {
         assert!(ops.operator.is_none());
         assert!(ops.prove_operator.is_none());
         assert!(ops.execute_operator.is_none());
+        assert!(ops.blob_operator.is_none());
         assert!(!ops.is_complete());
         assert!(!ops.has_any());
     }
@@ -127,6 +141,7 @@ mod tests {
                     .unwrap(),
             ),
             execute_operator: None,
+            ..Default::default()
         };
 
         let addrs = ops.all_addresses();
@@ -155,6 +170,7 @@ prove_operator: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
             ),
             prove_operator: None,
             execute_operator: None,
+            ..Default::default()
         };
 
         let yaml = serde_yaml::to_string(&ops).unwrap();
