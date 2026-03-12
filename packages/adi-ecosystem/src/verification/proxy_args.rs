@@ -73,6 +73,7 @@ pub fn encode_chain_admin_constructor_args(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use std::str::FromStr;
