@@ -172,10 +172,11 @@ impl ExplorerClient {
             serde_json::from_str(body).map_err(|e| VerificationError::JsonParse(e.to_string()))?;
 
         // Log parsed fields for debugging
-        let result_preview = if response.result.len() > 100 {
-            format!("{}...", &response.result[..100])
+        let result_str = response.result.as_deref().unwrap_or("");
+        let result_preview = if result_str.len() > 100 {
+            format!("{}...", &result_str[..100])
         } else {
-            response.result.clone()
+            result_str.to_string()
         };
         self.logger.debug(&format!(
             "Parsed response: status={}, message={}, result={}",
@@ -242,19 +243,20 @@ impl ExplorerClient {
         let parsed: EtherscanResponse =
             serde_json::from_str(&body).map_err(|e| VerificationError::JsonParse(e.to_string()))?;
 
+        let result_str = parsed.result.as_deref().unwrap_or("");
         self.logger.debug(&format!(
             "Parsed submission response: status={}, message={}, result={}",
-            parsed.status, parsed.message, parsed.result
+            parsed.status, parsed.message, result_str
         ));
 
         match parsed.status.as_str() {
             "1" => Ok(VerificationStatus::Verified),
             "0" => {
-                let result = parsed.result.to_lowercase();
+                let result = result_str.to_lowercase();
                 if result.contains("pending") {
                     Ok(VerificationStatus::Pending)
                 } else if result.contains("fail") {
-                    Ok(VerificationStatus::Unknown(parsed.result))
+                    Ok(VerificationStatus::Unknown(result_str.to_string()))
                 } else {
                     Ok(VerificationStatus::NotVerified)
                 }
@@ -274,8 +276,9 @@ impl ExplorerClient {
 struct EtherscanResponse {
     status: String,
     message: String,
+    /// Result field - can be null in Blockscout responses for unverified contracts.
     #[serde(default)]
-    result: String,
+    result: Option<String>,
 }
 
 #[cfg(test)]
@@ -322,6 +325,23 @@ mod tests {
 
         let response =
             r#"{"status":"0","message":"Contract source code not verified","result":""}"#;
+        let status = client.parse_verification_response(response).unwrap();
+        assert_eq!(status, VerificationStatus::NotVerified);
+    }
+
+    #[test]
+    fn test_parse_blockscout_null_result() {
+        let config = ExplorerConfig {
+            explorer_type: ExplorerType::Blockscout,
+            api_url: Url::parse("https://blockscout.example.com/api").unwrap(),
+            api_key: None,
+            chain_id: 99999,
+        };
+        let client = ExplorerClient::new(config, Arc::new(NoopLogger));
+
+        // Blockscout returns null for result field when contract is not verified
+        let response =
+            r#"{"message":"Contract source code not verified","result":null,"status":"0"}"#;
         let status = client.parse_verification_response(response).unwrap();
         assert_eq!(status, VerificationStatus::NotVerified);
     }
