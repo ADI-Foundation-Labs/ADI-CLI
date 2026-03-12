@@ -70,5 +70,5 @@ pub use cleanup::cleanup_tmp_dir;
 pub use config::{ImageReference, ToolkitConfig};
 pub use config::{DEFAULT_IMAGE_NAME, DEFAULT_REGISTRY};
 pub use error::{Result, ToolkitError};
-pub use runner::{ToolkitRunner, VerificationOpts, GENESIS_FILENAME};
+pub use runner::{ToolkitRunner, GENESIS_FILENAME};
 pub use version::{ParseError, ProtocolVersion};

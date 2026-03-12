@@ -16,19 +16,6 @@ pub const GENESIS_FILENAME: &str = "genesis.json";
 /// Path where genesis.json should be copied in the container.
 pub const GENESIS_CONTAINER_PATH: &str = "/deps/zksync-era/etc/env/file_based/genesis.json";
 
-/// Options for contract verification during deployment.
-#[derive(Debug, Clone, Default)]
-pub struct VerificationOpts {
-    /// Enable verification (--verify flag).
-    pub enabled: bool,
-    /// Verifier type: etherscan, blockscout, sourcify, oklink.
-    pub verifier: Option<String>,
-    /// Verifier API URL.
-    pub verifier_url: Option<String>,
-    /// Verifier API key.
-    pub api_key: Option<String>,
-}
-
 /// Executes commands inside Docker toolkit containers.
 ///
 /// Container lifecycle: create -> start -> stream output -> wait -> remove
@@ -411,7 +398,6 @@ impl ToolkitRunner {
         protocol_version: &Version,
         deploy_ecosystem: bool,
         chain_name: &str,
-        verification: &VerificationOpts,
     ) -> Result<i64> {
         self.logger.debug(&format!(
             "Running zkstack ecosystem init (ecosystem_dir: {}, rpc: {}, deploy_ecosystem: {})",
@@ -448,24 +434,6 @@ impl ToolkitRunner {
 
         let container_rpc_url = transform_url_for_container(l1_rpc_url, self.logger.as_ref());
         zkstack_args.push_str(&format!(" --l1-rpc-url {}", container_rpc_url));
-
-        // Add verification flags if enabled
-        if verification.enabled {
-            zkstack_args.push_str(" --verify true");
-
-            if let Some(ref verifier) = verification.verifier {
-                zkstack_args.push_str(&format!(" --verifier {}", verifier));
-            }
-
-            if let Some(ref url) = verification.verifier_url {
-                let container_url = transform_url_for_container(url, self.logger.as_ref());
-                zkstack_args.push_str(&format!(" --verifier-url {}", container_url));
-            }
-
-            if let Some(ref key) = verification.api_key {
-                zkstack_args.push_str(&format!(" --verifier-api-key {}", key));
-            }
-        }
 
         let shell_cmd = format!(
             r#"cp /workspace/{genesis} {genesis_path} && {foundry_fix} && \
