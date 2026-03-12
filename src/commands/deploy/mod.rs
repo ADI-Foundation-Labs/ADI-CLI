@@ -12,5 +12,6 @@
 //! - **Funder**: User-provided wallet that funds all other wallets
 
 mod ecosystem;
+pub mod ownership;
 
 pub use ecosystem::{run, DeployArgs};

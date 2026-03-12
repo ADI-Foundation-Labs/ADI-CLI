@@ -4,6 +4,7 @@
 //! 1. Funds ecosystem and chain wallets
 //! 2. Deploys ecosystem contracts via zkstack
 //! 3. Configures validator roles for operators
+//! 4. Handles ownership acceptance and transfer (config-driven)
 
 use adi_ecosystem::verification::{
     apply_implementations, parse_diamond_cut_data, read_all_implementations,
@@ -28,6 +29,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use url::Url;
 
+use super::ownership::run_post_deploy_ownership;
 use crate::commands::helpers::{
     create_state_manager_with_s3, resolve_protocol_version, resolve_rpc_url,
     select_chain_from_state,
@@ -996,6 +998,16 @@ async fn run_ecosystem_deployment(
         ))?;
     }
 
+    // Post-deployment ownership operations (config-driven)
+    let ownership_result = run_post_deploy_ownership(
+        &normalized_rpc,
+        state_manager,
+        chain_name,
+        validator_gas_multiplier,
+        context,
+    )
+    .await?;
+
     // Final success message
     ui::note(
         "Deployment Summary",
@@ -1006,7 +1018,16 @@ async fn run_ecosystem_deployment(
             ui::green(deployed.diamond_proxy)
         ),
     )?;
-    ui::outro("Deployment complete! You can now start containers and operate the rollup.")?;
+
+    // Update outro based on ownership operations
+    let outro_msg = if ownership_result.new_owner_accepted {
+        "Deployment complete with ownership transferred and accepted!"
+    } else if ownership_result.transferred {
+        "Deployment complete with ownership transferred! New owner must run 'adi accept'."
+    } else {
+        "Deployment complete! You can now start containers and operate the rollup."
+    };
+    ui::outro(outro_msg)?;
 
     Ok(())
 }
