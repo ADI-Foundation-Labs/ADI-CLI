@@ -64,13 +64,19 @@ detect_arch() {
 # ---------------------------------------------------------------------------
 
 get_latest_version() {
-  local api_url="${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/releases"
-  local tag
-  tag="$(auth_curl -fsSL "${api_url}" | grep -o '"tag_name":"[^"]*"' | head -1 | cut -d'"' -f4)"
-  if [ -z "${tag}" ]; then
-    error "Could not determine the latest release. Check your GITLAB_TOKEN or specify a version explicitly: bash -s -- v0.1.0"
+  local api_url="${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/packages?package_name=${PACKAGE_NAME}&package_type=generic&sort=desc&order_by=version&per_page=1"
+  local response
+  response="$(auth_curl -fsSL "${api_url}" 2>&1)" \
+    || error "Failed to query package registry (HTTP error). Check your GITLAB_TOKEN has 'api' scope.
+
+  Create one at: ${GITLAB_URL}/-/user_settings/personal_access_tokens?name=adi-cli-install&scopes=api"
+
+  local version
+  version="$(echo "${response}" | grep -o '"version":"[^"]*"' | head -1 | cut -d'"' -f4)"
+  if [ -z "${version}" ]; then
+    error "No '${PACKAGE_NAME}' packages found in the registry. Check your GITLAB_TOKEN or specify a version explicitly: bash -s -- v0.1.0"
   fi
-  echo "${tag}"
+  echo "v${version}"
 }
 
 # ---------------------------------------------------------------------------
@@ -92,7 +98,7 @@ main() {
 
   local version="${1:-}"
   if [ -z "${version}" ]; then
-    info "Detecting latest release..."
+    info "Detecting latest version..."
     version="$(get_latest_version)"
   fi
 
