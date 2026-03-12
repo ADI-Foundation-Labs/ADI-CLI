@@ -8,7 +8,10 @@ spec:
 
 ---
 stages:
+  - check
   - build
+  - package
+  - release
 
 variables:
   DOCKER_DRIVER: overlay2
@@ -17,6 +20,11 @@ variables:
   DOCKER_BUILDKIT: "1"
   BUILDKIT_PROGRESS: plain
   RUNNER_SCRIPT_TIMEOUT: 4h
+  PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/adi-cli"
+
+# =============================================================================
+# Templates
+# =============================================================================
 
 # Base configuration for Docker jobs
 .docker-base:
@@ -46,7 +54,65 @@ variables:
       done
       docker info
 
-# Trigger job to start the multiarch build pipeline
+# Base configuration for native Rust builds
+.rust-base:
+  image: rust:latest
+  before_script:
+    - set -euo pipefail
+    - apt-get update -qq && apt-get install -y -qq musl-tools pkg-config libssl-dev
+
+# Base for macOS cross-compilation via osxcross.
+# joseluisq/rust-linux-darwin-builder bundles osxcross + macOS SDK.
+# cross-rs does not support darwin targets due to Apple SDK licensing.
+#
+# The osxcross env setup and cargo build MUST run in a single shell block
+# so that exported CC_*/AR_* variables are visible to cargo.
+.rust-darwin:
+  image: joseluisq/rust-linux-darwin-builder:latest
+  before_script:
+    - set -euo pipefail
+    - rustup update stable && rustup default stable
+
+# =============================================================================
+# Check stage
+# =============================================================================
+
+check-fmt:
+  stage: check
+  extends: .rust-base
+  tags: [k8s, azure, dev]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_TAG
+  script:
+    - rustup component add rustfmt
+    - cargo fmt --check
+
+check-clippy:
+  stage: check
+  extends: .rust-base
+  tags: [k8s, azure, dev]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_TAG
+  script:
+    - rustup component add clippy
+    - cargo clippy -- -D warnings
+
+check-test:
+  stage: check
+  extends: .rust-base
+  tags: [k8s, azure, dev]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_TAG
+  script:
+    - cargo test
+
+# =============================================================================
+# Build stage — Docker toolkit images (manual trigger)
+# =============================================================================
+
 trigger-build-docker:
   stage: build
   when: manual
@@ -87,3 +153,162 @@ build-docker-manifest:
     - build-docker-arm64
   script:
     - task build:docker:manifest TARGETS="$[[ inputs.build_target ]]"
+
+# =============================================================================
+# Build stage — CLI binary (auto on tags, manual trigger on branches)
+# =============================================================================
+
+trigger-build-binary:
+  stage: build
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+    - if: $CI_COMMIT_BRANCH
+      when: manual
+      allow_failure: true
+  script:
+    - echo "Starting CLI binary build..."
+
+build-binary-linux-amd64:
+  stage: build
+  extends: .rust-base
+  needs: ["trigger-build-binary"]
+  tags: [k8s, azure, dev]
+  script:
+    - rustup target add x86_64-unknown-linux-gnu
+    - cargo build --release --target x86_64-unknown-linux-gnu
+  artifacts:
+    paths:
+      - target/x86_64-unknown-linux-gnu/release/adi
+    expire_in: 1 day
+
+build-binary-linux-arm64:
+  stage: build
+  extends: .rust-base
+  needs: ["trigger-build-binary"]
+  tags: [k8s, azure-arm, dev]
+  script:
+    - rustup target add aarch64-unknown-linux-gnu
+    - cargo build --release --target aarch64-unknown-linux-gnu
+  artifacts:
+    paths:
+      - target/aarch64-unknown-linux-gnu/release/adi
+    expire_in: 1 day
+
+build-binary-darwin-amd64:
+  stage: build
+  extends: .rust-darwin
+  needs: ["trigger-build-binary"]
+  tags: [k8s, azure, dev]
+  variables:
+    CC_x86_64_apple_darwin: x86_64-apple-darwin22.4-clang
+    CXX_x86_64_apple_darwin: x86_64-apple-darwin22.4-clang++
+    AR_x86_64_apple_darwin: x86_64-apple-darwin22.4-ar
+  script:
+    - rustup target add x86_64-apple-darwin
+    - cargo build --release --target x86_64-apple-darwin
+  artifacts:
+    paths:
+      - target/x86_64-apple-darwin/release/adi
+    expire_in: 1 day
+
+build-binary-darwin-arm64:
+  stage: build
+  extends: .rust-darwin
+  needs: ["trigger-build-binary"]
+  tags: [k8s, azure, dev]
+  variables:
+    CC_aarch64_apple_darwin: aarch64-apple-darwin22.4-clang
+    CXX_aarch64_apple_darwin: aarch64-apple-darwin22.4-clang++
+    AR_aarch64_apple_darwin: aarch64-apple-darwin22.4-ar
+  script:
+    - rustup target add aarch64-apple-darwin
+    - cargo build --release --target aarch64-apple-darwin
+  artifacts:
+    paths:
+      - target/aarch64-apple-darwin/release/adi
+    expire_in: 1 day
+
+# =============================================================================
+# Package stage — create archives and upload to Generic Package Registry
+# =============================================================================
+
+package-binaries:
+  stage: package
+  image: alpine:3.21
+  tags: [k8s, azure, dev]
+  needs:
+    - build-binary-linux-amd64
+    - build-binary-linux-arm64
+    - build-binary-darwin-amd64
+    - build-binary-darwin-arm64
+  before_script:
+    - apk add --no-cache curl tar
+  script:
+    - |
+      # Determine version
+      if [ -n "${CI_COMMIT_TAG:-}" ]; then
+        VERSION="${CI_COMMIT_TAG#v}"
+      else
+        VERSION="0.0.0-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+      fi
+      echo "Package version: ${VERSION}"
+
+      # Create archives
+      create_archive() {
+        local target="$1" archive="$2"
+        chmod +x "target/${target}/release/adi"
+        tar -czf "${archive}" -C "target/${target}/release" adi
+        echo "Created ${archive}"
+      }
+
+      create_archive x86_64-unknown-linux-gnu adi-linux-amd64.tar.gz
+      create_archive aarch64-unknown-linux-gnu adi-linux-arm64.tar.gz
+      create_archive x86_64-apple-darwin adi-darwin-amd64.tar.gz
+      create_archive aarch64-apple-darwin adi-darwin-arm64.tar.gz
+
+      # Upload to Generic Package Registry
+      upload_package() {
+        local file="$1"
+        echo "Uploading ${file}..."
+        curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+             --upload-file "${file}" \
+             "${PACKAGE_REGISTRY_URL}/${VERSION}/${file}"
+      }
+
+      upload_package adi-linux-amd64.tar.gz
+      upload_package adi-linux-arm64.tar.gz
+      upload_package adi-darwin-amd64.tar.gz
+      upload_package adi-darwin-arm64.tar.gz
+
+# =============================================================================
+# Release stage — create GitLab Release with asset links
+# =============================================================================
+
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  tags: [k8s, azure, dev]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+  needs:
+    - package-binaries
+  script:
+    - echo "Creating release for ${CI_COMMIT_TAG}"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: "Release $CI_COMMIT_TAG"
+    description: "Release $CI_COMMIT_TAG of the adi CLI."
+    assets:
+      links:
+        - name: "adi-linux-amd64.tar.gz"
+          url: "${PACKAGE_REGISTRY_URL}/${CI_COMMIT_TAG#v}/adi-linux-amd64.tar.gz"
+          link_type: "package"
+        - name: "adi-linux-arm64.tar.gz"
+          url: "${PACKAGE_REGISTRY_URL}/${CI_COMMIT_TAG#v}/adi-linux-arm64.tar.gz"
+          link_type: "package"
+        - name: "adi-darwin-amd64.tar.gz"
+          url: "${PACKAGE_REGISTRY_URL}/${CI_COMMIT_TAG#v}/adi-darwin-amd64.tar.gz"
+          link_type: "package"
+        - name: "adi-darwin-arm64.tar.gz"
+          url: "${PACKAGE_REGISTRY_URL}/${CI_COMMIT_TAG#v}/adi-darwin-arm64.tar.gz"
+          link_type: "package"

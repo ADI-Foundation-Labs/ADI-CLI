@@ -24,14 +24,30 @@
 
 ## Installation
 
+### Quick Install (recommended)
+
+The installer requires a GitLab personal access token with **`api`** scope.
+[Create a token here](https://gitlab.sre.ideasoft.io/-/user_settings/personal_access_tokens?name=adi-cli-install&scopes=api).
+
 ```bash
-CARGO_NET_GIT_FETCH_WITH_CLI=true cargo install --git ssh://git@gitlab.sre.ideasoft.io/adi-foundation/adi-chain/cli.git
+export GITLAB_TOKEN="glpat-..."
+curl -fsSL --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+  "https://gitlab.sre.ideasoft.io/api/v4/projects/348/repository/files/install.sh/raw?ref=main" | bash
 ```
 
-Verify installation:
+To install a specific version:
 
 ```bash
-adi version
+curl -fsSL --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+  "https://gitlab.sre.ideasoft.io/api/v4/projects/348/repository/files/install.sh/raw?ref=main" | bash -s -- v0.1.0
+```
+
+The installer detects your OS and architecture, downloads the correct binary, and places it in `~/.cargo/bin/`.
+
+### Install via Cargo
+
+```bash
+CARGO_NET_GIT_FETCH_WITH_CLI=true cargo install --git ssh://git@gitlab.sre.ideasoft.io/adi-foundation/adi-chain/cli.git
 ```
 
 ### Building from Source
@@ -41,6 +57,12 @@ git clone ssh://git@gitlab.sre.ideasoft.io/adi-foundation/adi-chain/cli.git adi-
 cd adi-cli
 cargo build --release
 cp ./target/release/adi ~/.local/bin/
+```
+
+### Verify
+
+```bash
+adi version
 ```
 
 ## Configuration
@@ -1155,6 +1177,8 @@ task fmt            # Format code
 task fmt:check      # Verify formatting
 task check          # Run all checks (fmt, lint, test)
 task install        # Install adi binary from current repo
+
+# Docker toolkit images
 task build:docker:amd64 TARGETS=toolkit-v0-30-1
 task build:docker:arm64 TARGETS=toolkit-v0-30-1
 task build:docker:manifest TARGETS=toolkit-v0-30-1 CI_COMMIT_REF_SLUG=main
