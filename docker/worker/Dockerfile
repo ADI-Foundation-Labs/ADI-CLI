@@ -69,6 +69,16 @@ RUN if [ -n "$ZKSYNC_ERA_OS_INTEGRATION_COMMIT" ]; then \
   git submodule update --init --recursive; \
   fi
 
+# Pre-build l1-contracts to generate forge cache for verification
+WORKDIR /deps/zksync-era/contracts/l1-contracts
+RUN forge build --sizes || true
+
+# Pre-build da-contracts to generate forge cache for verification
+WORKDIR /deps/zksync-era/contracts/da-contracts
+RUN forge build --sizes || true
+
+WORKDIR /deps/zksync-era
+
 # Install era-contracts (for upgrade scripts) - only if ERA_CONTRACTS_TAG is set
 RUN --mount=type=cache,target=/root/.cache/yarn,sharing=locked \
   if [ -n "$ERA_CONTRACTS_TAG" ]; then \

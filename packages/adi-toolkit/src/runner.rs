@@ -83,7 +83,7 @@ impl ToolkitRunner {
         log_command: &str,
         log_label: &str,
     ) -> Result<i64> {
-        self.run_command_with_log_dir(
+        self.run_command_internal(
             command,
             state_dir,
             state_dir,
@@ -91,6 +91,7 @@ impl ToolkitRunner {
             env_vars,
             log_command,
             log_label,
+            false,
         )
         .await
     }
@@ -108,13 +109,41 @@ impl ToolkitRunner {
         log_command: &str,
         log_label: &str,
     ) -> Result<i64> {
+        self.run_command_internal(
+            command,
+            state_dir,
+            log_dir,
+            protocol_version,
+            env_vars,
+            log_command,
+            log_label,
+            false,
+        )
+        .await
+    }
+
+    /// Internal command runner with quiet mode support.
+    #[allow(clippy::too_many_arguments)]
+    async fn run_command_internal(
+        &self,
+        command: &[&str],
+        state_dir: &Path,
+        log_dir: &Path,
+        protocol_version: &Version,
+        env_vars: &[(&str, &str)],
+        log_command: &str,
+        log_label: &str,
+        quiet: bool,
+    ) -> Result<i64> {
         let image_ref = self
             .config
             .image_reference(protocol_version, self.logger.as_ref());
         let image_uri = image_ref.full_uri();
 
-        self.logger
-            .info(&format!("Using toolkit image: {}", image_uri.green()));
+        if !quiet {
+            self.logger
+                .info(&format!("Using toolkit image: {}", image_uri.green()));
+        }
         self.logger.debug(&format!(
             "Running command: {:?} (state_dir: {}, log_dir: {})",
             command,
@@ -135,6 +164,7 @@ impl ToolkitRunner {
             log_dir: log_dir.to_path_buf(),
             log_command: log_command.to_string(),
             log_label: log_label.to_string(),
+            quiet,
             ..Default::default()
         };
 
@@ -344,7 +374,9 @@ impl ToolkitRunner {
 
         let temp_dir = std::env::temp_dir();
 
-        self.run_command_with_log_dir(
+        // Run in quiet mode - output is suppressed during batch verification
+        // (progress bar shows status, logs are saved to file)
+        self.run_command_internal(
             &args,
             &temp_dir,
             log_dir,
@@ -352,6 +384,7 @@ impl ToolkitRunner {
             &[("CI", "true")], // Suppress interactive prompts like telemetry
             "forge-verify",
             &format!("Verifying {}...", address),
+            true, // quiet mode
         )
         .await
     }

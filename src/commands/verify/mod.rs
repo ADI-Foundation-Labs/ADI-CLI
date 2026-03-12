@@ -724,10 +724,8 @@ async fn submit_verifications(
         let name = target.contract_type.display_name();
         let address = target.address;
 
-        // Submit verification via forge
-        context
-            .logger()
-            .info(&format!("Submitting verification for {}", name));
+        // Update progress bar label with current contract
+        progress.start(format!("Verifying {}...", name));
 
         // Compute constructor args based on contract type
         let constructor_args = target
@@ -776,25 +774,9 @@ async fn submit_verifications(
             .await;
 
         let result = match exit_code {
-            Ok(0) => {
-                context
-                    .logger()
-                    .info(&format!("{} verification submitted successfully", name));
-                VerificationResult::submitted(name, address, "submitted".to_string())
-            }
-            Ok(code) => {
-                context.logger().warning(&format!(
-                    "{} verification failed with exit code: {}",
-                    name, code
-                ));
-                VerificationResult::failed(name, address, format!("Exit code: {}", code))
-            }
-            Err(e) => {
-                context
-                    .logger()
-                    .warning(&format!("{} verification error: {}", name, e));
-                VerificationResult::failed(name, address, e.to_string())
-            }
+            Ok(0) => VerificationResult::submitted(name, address, "submitted".to_string()),
+            Ok(code) => VerificationResult::failed(name, address, format!("Exit code: {}", code)),
+            Err(e) => VerificationResult::failed(name, address, e.to_string()),
         };
 
         let is_failure = matches!(result.outcome, VerificationOutcome::Failed { .. });

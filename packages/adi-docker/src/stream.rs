@@ -130,12 +130,15 @@ impl OutputStreamer {
     ///
     /// Prints a static header immediately, then shows the last 10 lines of output
     /// updating in real-time. Full output is saved to a log file.
+    ///
+    /// When `quiet` is true, suppresses terminal output but still saves logs.
     pub async fn stream_logs(
         &self,
         container_id: &str,
         log_dir: &Path,
         command: &str,
         label: &str,
+        quiet: bool,
     ) -> Result<()> {
         let options = LogsOptions::<String> {
             follow: true,
@@ -158,16 +161,20 @@ impl OutputStreamer {
             .join(format!("{}_{}.log", command, timestamp));
 
         // Print header immediately (static, never redrawn)
-        cliclack::log::step(label)
-            .map_err(|e| DockerError::StreamError(format!("Failed to log step: {}", e)))?;
+        if !quiet {
+            cliclack::log::step(label)
+                .map_err(|e| DockerError::StreamError(format!("Failed to log step: {}", e)))?;
+        }
 
         let mut display = LogDisplay::new();
 
         let stream_result: Result<()> = loop {
             tokio::select! {
                 _ = tokio::signal::ctrl_c() => {
-                    display.clear().ok();
-                    Self::save_log(&buffer, &log_path)?;
+                    if !quiet {
+                        display.clear().ok();
+                    }
+                    Self::save_log(&buffer, &log_path, quiet)?;
                     break Err(DockerError::StreamError("Interrupted by CTRL+C".to_string()));
                 }
 
@@ -176,12 +183,14 @@ impl OutputStreamer {
                         Some(Ok(output)) => {
                             let bytes = output.into_bytes();
                             if let Ok(text) = std::str::from_utf8(&bytes) {
-                                for line in text.lines() {
-                                    if !line.is_empty() {
-                                        display.push_line(line);
+                                if !quiet {
+                                    for line in text.lines() {
+                                        if !line.is_empty() {
+                                            display.push_line(line);
+                                        }
                                     }
+                                    display.render().ok();
                                 }
-                                display.render().ok();
                             }
                             buffer.extend(bytes);
                         }
@@ -199,16 +208,20 @@ impl OutputStreamer {
 
         // Normal completion - clear display and show completion message
         if stream_result.is_ok() {
-            display.clear().ok();
-            cliclack::log::success(format!("Completed in {}s", start.elapsed().as_secs()))
-                .map_err(|e| DockerError::StreamError(format!("Failed to log success: {}", e)))?;
-            Self::save_log(&buffer, &log_path)?;
+            if !quiet {
+                display.clear().ok();
+                cliclack::log::success(format!("Completed in {}s", start.elapsed().as_secs()))
+                    .map_err(|e| {
+                        DockerError::StreamError(format!("Failed to log success: {}", e))
+                    })?;
+            }
+            Self::save_log(&buffer, &log_path, quiet)?;
         }
 
         stream_result
     }
 
-    fn save_log(buffer: &[u8], log_path: &Path) -> Result<()> {
+    fn save_log(buffer: &[u8], log_path: &Path, quiet: bool) -> Result<()> {
         if let Some(parent) = log_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
                 DockerError::StreamError(format!("Failed to create log dir: {}", e))
@@ -216,9 +229,11 @@ impl OutputStreamer {
         }
         std::fs::write(log_path, buffer)
             .map_err(|e| DockerError::StreamError(format!("Failed to write log: {}", e)))?;
-        let path_styled = Style::new().green().apply_to(log_path.display());
-        cliclack::log::info(format!("Full output saved to: {}", path_styled))
-            .map_err(|e| DockerError::StreamError(format!("Failed to log: {}", e)))?;
+        if !quiet {
+            let path_styled = Style::new().green().apply_to(log_path.display());
+            cliclack::log::info(format!("Full output saved to: {}", path_styled))
+                .map_err(|e| DockerError::StreamError(format!("Failed to log: {}", e)))?;
+        }
         Ok(())
     }
 }

@@ -48,6 +48,7 @@ impl ContainerManager {
                 &config.log_dir,
                 &config.log_command,
                 &config.log_label,
+                config.quiet,
             )
             .await;
 
@@ -166,6 +167,7 @@ impl ContainerManager {
         log_dir: &Path,
         log_command: &str,
         log_label: &str,
+        quiet: bool,
     ) -> Result<i64> {
         self.logger.debug(&format!(
             "Starting container: {} (timeout: {}s)",
@@ -185,7 +187,7 @@ impl ContainerManager {
         // Stream logs with static header and updating log lines
         let stream_result = timeout(
             duration,
-            streamer.stream_logs(container_id, log_dir, log_command, log_label),
+            streamer.stream_logs(container_id, log_dir, log_command, log_label, quiet),
         )
         .await;
 

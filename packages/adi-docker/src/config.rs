@@ -34,6 +34,9 @@ pub struct ContainerConfig {
 
     /// Label to show in progress messages (e.g., "Initializing...").
     pub log_label: String,
+
+    /// Suppress terminal output (still saves logs to file).
+    pub quiet: bool,
 }
 
 impl Default for ContainerConfig {
@@ -48,6 +51,7 @@ impl Default for ContainerConfig {
             log_dir: PathBuf::new(),
             log_command: "container".to_string(),
             log_label: "Running...".to_string(),
+            quiet: false,
         }
     }
 }
