@@ -228,9 +228,9 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
     let rpc_url = get_rpc_url(&args, context);
     if let Some(ref url) = rpc_url {
         if !is_local_network_url(url) {
-            context
-                .logger()
-                .debug("Reading implementation addresses from RPC...");
+            let spinner = cliclack::spinner();
+            spinner.start("Reading contract implementations from RPC...");
+
             let provider = alloy_provider::ProviderBuilder::new().connect_http(url.clone());
             let impls =
                 read_all_implementations(&provider, &ecosystem_contracts, context.logger().clone())
@@ -241,15 +241,14 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
             if let Some(ref mut chain) = chain_contracts.as_mut() {
                 if let Some(ref mut l1) = chain.l1.as_mut() {
                     if let Some(chain_admin_addr) = l1.chain_admin_addr {
-                        context
-                            .logger()
-                            .debug("Reading chain-level ChainAdmin owner...");
                         if let Some(owner) = read_owner(&provider, chain_admin_addr).await {
                             l1.chain_admin_owner = Some(owner);
                         }
                     }
                 }
             }
+
+            spinner.stop("Contract implementations loaded");
         }
     }
 
