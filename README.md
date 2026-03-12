@@ -232,7 +232,7 @@ For sensitive data like private keys, use environment variables instead of confi
 | `ADI_FUNDER_KEY`          | Private key (hex) of the wallet that funds ecosystem wallets. This is the only wallet you need to fund manually. |
 | `ADI_PRIVATE_KEY`         | Private key (hex) for accepting ownership as new owner. Used by the `accept` command.                            |
 | `ADI_RPC_URL`             | Settlement layer RPC endpoint. Useful for switching networks without editing config.                             |
-| `ADI_EXPLORER_URL`        | Block explorer API URL for contract verification during deploy and scan commands.                                |
+| `ADI_EXPLORER_URL`        | Block explorer API URL for contract verification (verify command).                                               |
 | `ADI_EXPLORER_API_KEY`    | Block explorer API key for contract verification (optional for public explorers).                                |
 | `ADI_CONFIG`              | Path to an alternative config file.                                                                              |
 | `ADI__PROTOCOL_VERSION`   | Default protocol version for init, add, and deploy commands (e.g., `v0.30.1`).                                   |
@@ -575,40 +575,6 @@ ecosystem:
 
 The CLI flag `--blobs` takes precedence over the chain config.
 
-**Contract verification during deployment:**
-
-Enable automatic contract verification on block explorers (Etherscan, Blockscout) during deployment:
-
-```bash
-# Enable verification with Blockscout
-adi deploy -p v0.30.1 --verify --explorer blockscout --explorer-url https://explorer.example.com/api
-
-# Enable verification with Etherscan (uses V2 API, auto-detected URL)
-adi deploy -p v0.30.1 --verify --explorer etherscan --explorer-api-key YOUR_API_KEY
-
-# Disable verification even if configured in ~/.adi.yml
-adi deploy -p v0.30.1 --no-verify
-```
-
-Verification flags:
-
-| Flag                 | Description                                            |
-| -------------------- | ------------------------------------------------------ |
-| `--verify`           | Enable contract verification during deployment         |
-| `--no-verify`        | Disable verification (overrides config)                |
-| `--explorer`         | Explorer type: `etherscan`, `blockscout`, or `custom`  |
-| `--explorer-url`     | Block explorer API URL                                 |
-| `--explorer-api-key` | Block explorer API key (optional for public explorers) |
-
-You can also configure verification defaults in `~/.adi.yml`:
-
-```yaml
-verification:
-  explorer: blockscout
-  explorer_url: https://explorer.example.com/api
-  # api_key: optional
-```
-
 ### Step 4: Accept Ownership Transfers
 
 After deployment, some contracts have pending ownership transfers that must be accepted. ZkSync contracts use the Ownable2Step pattern: ownership isn't transferred in one transaction—instead, new ownership is proposed, then the new owner must accept.
@@ -785,25 +751,25 @@ adi owners
 adi owners --chain my-chain
 ```
 
-### Step 8: Scan Verification Status
+### Step 8: Verify Contracts
 
-The `scan` command checks the verification status of deployed contracts on block explorers. This is useful to see which contracts are verified and which need verification.
+The `verify` command checks verification status and submits unverified contracts to block explorers.
 
 ```bash
-# Scan ecosystem contracts on Etherscan
-adi scan --explorer etherscan --chain-id 11155111
+# Verify ecosystem contracts on Etherscan
+adi verify --explorer etherscan --chain-id 11155111
 
-# Scan with Blockscout
-adi scan --explorer blockscout --explorer-url https://explorer.example.com/api
+# Verify with Blockscout
+adi verify --explorer blockscout --explorer-url https://explorer.example.com/api
 
 # Include chain-level contracts
-adi scan --chain my-chain --explorer blockscout --explorer-url https://explorer.example.com/api
+adi verify --chain my-chain --explorer blockscout --explorer-url https://explorer.example.com/api
 
 # Check only specific contracts
-adi scan --contracts BridgehubProxy,Governance --explorer etherscan
+adi verify --contracts BridgehubProxy,Governance --explorer etherscan
 ```
 
-The command displays a summary showing which contracts are verified and which are not. If contracts need verification, use `adi deploy --verify` during your next deployment.
+The command displays verification status for each contract and automatically submits unverified contracts for verification.
 
 ## State Management
 

@@ -73,10 +73,10 @@ cargo test               # Run tests
 - `adi owners` - Display owners of deployed L1 contracts
 - `adi init` - Initialize new ecosystem configuration
 - `adi add` - Add a new chain to an existing ecosystem
-- `adi deploy` - Deploy ecosystem contracts to settlement layer (supports `--verify` for contract verification)
+- `adi deploy` - Deploy ecosystem contracts to settlement layer
 - `adi accept` - Accept pending ownership transfers for deployed contracts
 - `adi transfer` - Accept ownership and transfer to a new owner address
-- `adi scan` - Check verification status of deployed contracts on block explorers
+- `adi verify` - Check and submit contract verification to block explorers
 
 ## Architecture
 

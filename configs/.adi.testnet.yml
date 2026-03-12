@@ -1,13 +1,13 @@
 ecosystem:
   name: "l3"
   rpc_url: "https://rpc.ab.testnet.adifoundation.ai"
-  chain_name: "adi"
-  chain_id: 222
+  chains:
+    - name: aditest
 funding:
   funder_key: ""
 verification:
   explorer: "blockscout"
-  explorer_url: "https://explorer-api.ab.testnet.adifoundation.ai/api"
+  explorer_url: https://explorer-api.ab.testnet.adifoundation.ai/api
 s3:
   enabled: true
   bucket: "adi-state"
