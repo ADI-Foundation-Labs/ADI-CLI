@@ -309,6 +309,7 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
 
     let mut verified_count = 0;
     let mut unverified_count = 0;
+    let mut error_count = 0;
 
     let progress = cliclack::progress_bar(targets.len() as u64);
     progress.start("Checking verification status...");
@@ -376,9 +377,8 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
     for (_, name, result) in indexed_results {
         match &result {
             CheckResult::Verified => verified_count += 1,
-            CheckResult::NotVerified | CheckResult::Unknown(_) | CheckResult::Error(_) => {
-                unverified_count += 1;
-            }
+            CheckResult::NotVerified | CheckResult::Unknown(_) => unverified_count += 1,
+            CheckResult::Error(_) => error_count += 1,
             CheckResult::Pending => {}
         }
         results.push((name, result));
@@ -398,11 +398,24 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
     ui::note(
         "Status Summary",
         format!(
-            "Verified: {}  Unverified: {}",
+            "Verified: {}  Unverified: {}  Errors: {}",
             ui::green(verified_count),
-            ui::yellow(unverified_count)
+            ui::yellow(unverified_count),
+            if error_count > 0 {
+                ui::red(error_count).to_string()
+            } else {
+                ui::dim("0").to_string()
+            }
         ),
     )?;
+
+    // Exit early if any checks failed with errors - indicates API misconfiguration
+    if error_count > 0 {
+        ui::outro_cancel(
+            "Status checks failed. Please verify the explorer URL and API key are correct.",
+        )?;
+        return Ok(());
+    }
 
     // If --submit flag is set and there are unverified contracts
     if args.submit && unverified_count > 0 {
