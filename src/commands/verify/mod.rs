@@ -15,6 +15,7 @@ use adi_toolkit::{ProtocolVersion, ToolkitRunner};
 use adi_types::{ChainContracts, EcosystemContracts};
 use alloy_provider::Provider;
 use clap::Args;
+use futures_util::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use url::Url;
@@ -26,6 +27,9 @@ use crate::commands::helpers::{
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
 use crate::ui;
+
+/// Maximum concurrent verification status checks.
+const MAX_CONCURRENT_CHECKS: usize = 5;
 
 /// Result of a verification status check for display purposes.
 enum CheckResult {
@@ -312,62 +316,72 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
     let mut results: Vec<(String, CheckResult)> = Vec::new();
     let mut interrupted = false;
 
-    for target in &targets {
-        if interrupted {
-            break;
-        }
+    // Wrap explorer client in Arc for shared access across concurrent tasks
+    let explorer_client = Arc::new(explorer_client);
 
+    // Create indexed futures for all targets
+    let check_futures = targets.iter().enumerate().map(|(idx, target)| {
+        let client = Arc::clone(&explorer_client);
         let name = target.contract_type.display_name().to_string();
+        let address = target.address;
 
-        let result = tokio::select! {
-            biased;
+        async move {
+            let api_result = client.check_verification_status(address).await;
+            let result = match api_result {
+                Ok(VerificationStatus::Verified) => CheckResult::Verified,
+                Ok(VerificationStatus::NotVerified) => CheckResult::NotVerified,
+                Ok(VerificationStatus::Pending) => CheckResult::Pending,
+                Ok(VerificationStatus::Unknown(msg)) => CheckResult::Unknown(msg),
+                Err(e) => CheckResult::Error(e.to_string()),
+            };
+            (idx, name, result)
+        }
+    });
 
-            _ = tokio::signal::ctrl_c() => {
-                interrupted = true;
-                progress.stop("Interrupted by user");
-                break;
-            }
+    // Process with bounded concurrency
+    let mut check_stream = stream::iter(check_futures).buffer_unordered(MAX_CONCURRENT_CHECKS);
 
-            api_result = explorer_client.check_verification_status(target.address) => {
-                match api_result {
-                    Ok(VerificationStatus::Verified) => {
-                        verified_count += 1;
-                        CheckResult::Verified
-                    }
-                    Ok(VerificationStatus::NotVerified) => {
-                        unverified_count += 1;
-                        CheckResult::NotVerified
-                    }
-                    Ok(VerificationStatus::Pending) => CheckResult::Pending,
-                    Ok(VerificationStatus::Unknown(msg)) => {
-                        unverified_count += 1;
-                        CheckResult::Unknown(msg)
-                    }
-                    Err(e) => {
-                        unverified_count += 1;
-                        CheckResult::Error(e.to_string())
-                    }
-                }
-            }
-        };
+    let mut indexed_results: Vec<(usize, String, CheckResult)> = Vec::with_capacity(targets.len());
 
-        results.push((name, result));
-        progress.inc(1);
-
-        // Interruptible rate limit delay
+    loop {
         tokio::select! {
             biased;
+
             _ = tokio::signal::ctrl_c() => {
                 interrupted = true;
                 progress.stop("Interrupted by user");
                 break;
             }
-            _ = explorer_client.rate_limit_delay() => {}
+
+            result = check_stream.next() => {
+                match result {
+                    Some((idx, name, check_result)) => {
+                        indexed_results.push((idx, name, check_result));
+                        progress.inc(1);
+                    }
+                    None => break, // Stream exhausted
+                }
+            }
         }
     }
 
     if !interrupted {
         progress.stop("Verification status check complete");
+    }
+
+    // Sort by original index for consistent display ordering
+    indexed_results.sort_by_key(|(idx, _, _)| *idx);
+
+    // Count results and convert to final format
+    for (_, name, result) in indexed_results {
+        match &result {
+            CheckResult::Verified => verified_count += 1,
+            CheckResult::NotVerified | CheckResult::Unknown(_) | CheckResult::Error(_) => {
+                unverified_count += 1;
+            }
+            CheckResult::Pending => {}
+        }
+        results.push((name, result));
     }
 
     // Exit early if interrupted
@@ -392,7 +406,14 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
 
     // If --submit flag is set and there are unverified contracts
     if args.submit && unverified_count > 0 {
-        return submit_verifications(&args, &targets, &results, explorer_client, context).await;
+        return submit_verifications(
+            &args,
+            &targets,
+            &results,
+            Arc::clone(&explorer_client),
+            context,
+        )
+        .await;
     }
 
     // Final message based on status
@@ -409,7 +430,14 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
         .wrap_err("Failed to read confirmation")?;
 
         if submit {
-            return submit_verifications(&args, &targets, &results, explorer_client, context).await;
+            return submit_verifications(
+                &args,
+                &targets,
+                &results,
+                Arc::clone(&explorer_client),
+                context,
+            )
+            .await;
         }
 
         ui::outro(format!(
@@ -620,7 +648,7 @@ async fn submit_verifications(
     args: &VerifyArgs,
     targets: &[VerificationTarget],
     status_results: &[(String, CheckResult)],
-    explorer_client: ExplorerClient,
+    explorer_client: Arc<ExplorerClient>,
     context: &Context,
 ) -> Result<()> {
     // Filter to only unverified targets

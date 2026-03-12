@@ -208,6 +208,7 @@ hex = { workspace = true }
 secrecy = { workspace = true }
 url = { workspace = true }
 reqwest = { workspace = true }
+futures-util = { workspace = true }
 
 # Utils
 tempfile = { workspace = true }

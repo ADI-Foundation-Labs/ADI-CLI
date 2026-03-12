@@ -25,6 +25,7 @@ dependencies = [
  "dirs",
  "env_logger",
  "eyre",
+ "futures-util",
  "hex",
  "log",
  "reqwest",
