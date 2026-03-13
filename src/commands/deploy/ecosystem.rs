@@ -19,7 +19,7 @@ use adi_funding::{
     FundingPlanBuilder, FundingTargetStatus, LoggingEventHandler, SpinnerEventHandler,
 };
 use adi_state::StateManager;
-use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
+use adi_toolkit::{ProtocolVersion, ToolkitRunner};
 use adi_types::{Operators, Wallets};
 use alloy_primitives::{Address, U256};
 use clap::Args;
@@ -720,22 +720,6 @@ async fn run_ecosystem_deployment(
     .wrap_err("Failed to create toolkit runner")?;
 
     let ecosystem_path = context.config().state_dir.join(ecosystem_name);
-
-    // Copy genesis.json to ecosystem directory if not present
-    let genesis_src = context.config().state_dir.join(GENESIS_FILENAME);
-    let genesis_dst = ecosystem_path.join(GENESIS_FILENAME);
-    if !genesis_dst.exists() {
-        if !genesis_src.exists() {
-            return Err(eyre::eyre!(
-                "genesis.json not found.\n\
-                 Please place the genesis.json file at: {}",
-                genesis_src.display()
-            ));
-        }
-        std::fs::copy(&genesis_src, &genesis_dst)
-            .wrap_err("Failed to copy genesis.json to ecosystem directory")?;
-        ui::info("Copied genesis.json to ecosystem directory")?;
-    }
 
     // Resolve gas multiplier from args or config
     let gas_multiplier = resolve_gas_multiplier(args, context);
@@ -1461,7 +1445,6 @@ fn eth_to_wei(eth: f64) -> U256 {
 /// Config files that CLI actively parses and uses at ecosystem level.
 const KNOWN_ECOSYSTEM_FILES: &[&str] = &[
     "ZkStack.yaml",
-    "genesis.json",
     "configs/contracts.yaml",
     "configs/wallets.yaml",
     "configs/initial_deployments.yaml",

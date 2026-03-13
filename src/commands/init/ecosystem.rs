@@ -6,7 +6,7 @@ use adi_ecosystem::{
 };
 use adi_funding::FundingProvider;
 use adi_state::import_ecosystem_state;
-use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
+use adi_toolkit::{ProtocolVersion, ToolkitRunner};
 use std::sync::Arc;
 use tempfile::TempDir;
 
@@ -29,12 +29,11 @@ use crate::ui;
 /// 2. Merges CLI args with config defaults
 /// 3. Checks if ecosystem already exists (prompts for confirmation to reinitialize)
 /// 4. Creates a temporary directory for zkstack output
-/// 5. Copies genesis.json to temp directory
-/// 6. Runs zkstack ecosystem create pointing to temp dir
-/// 7. Verifies ecosystem was created in temp dir
-/// 8. Imports state from temp dir through StateManager to configured backend
-/// 9. Validates imported state
-/// 10. TempDir is automatically cleaned up on drop
+/// 5. Runs zkstack ecosystem create pointing to temp dir
+/// 6. Verifies ecosystem was created in temp dir
+/// 7. Imports state from temp dir through StateManager to configured backend
+/// 8. Validates imported state
+/// 9. TempDir is automatically cleaned up on drop
 pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     ui::intro("ADI Init")?;
     context.logger().debug("Starting ecosystem initialization");
@@ -259,32 +258,8 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
         .logger()
         .debug(&format!("Using temp directory: {}", temp_path.display()));
 
-    // 6. Check genesis.json exists in state directory, download if missing
+    // 6. Create state directory
     std::fs::create_dir_all(state_dir).wrap_err("Failed to create state directory")?;
-
-    let genesis_src = state_dir.join(GENESIS_FILENAME);
-    if !genesis_src.exists() {
-        let genesis_url = version.genesis_url();
-        ui::info(format!(
-            "Downloading genesis.json from {}...",
-            ui::green(&genesis_url)
-        ))?;
-
-        download_genesis(&genesis_url, &genesis_src)
-            .await
-            .wrap_err("Failed to download genesis.json")?;
-
-        ui::success("Genesis file downloaded")?;
-    } else {
-        context
-            .logger()
-            .debug("genesis.json already exists, skipping download");
-    }
-
-    let genesis_dst = temp_path.join(GENESIS_FILENAME);
-    std::fs::copy(&genesis_src, &genesis_dst)
-        .wrap_err("Failed to copy genesis.json to temp dir")?;
-    ui::success("Genesis file copied to temp directory")?;
 
     // 7. Create toolkit runner and execute pointing to temp dir
     ui::info("Connecting to Docker...")?;
@@ -438,29 +413,6 @@ fn build_ecosystem_config(
             .unwrap_or(false),
         rpc_url: args.rpc_url.clone().or_else(|| defaults.rpc_url.clone()),
     }
-}
-
-/// Download genesis.json from the given URL to the destination path.
-async fn download_genesis(url: &str, dest: &std::path::Path) -> Result<()> {
-    let response = reqwest::get(url)
-        .await
-        .wrap_err("Failed to fetch genesis.json")?;
-
-    if !response.status().is_success() {
-        return Err(eyre::eyre!(
-            "Failed to download genesis.json: HTTP {}",
-            response.status()
-        ));
-    }
-
-    let content = response
-        .bytes()
-        .await
-        .wrap_err("Failed to read response body")?;
-
-    std::fs::write(dest, &content).wrap_err("Failed to write genesis.json to disk")?;
-
-    Ok(())
 }
 
 /// Build partial chain defaults from CLI arguments.

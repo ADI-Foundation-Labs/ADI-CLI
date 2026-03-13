@@ -4,7 +4,7 @@
 
 use adi_ecosystem::{build_chain_create_args, verify_chain_created, ChainConfig, ChainDefaults};
 use adi_state::{export_ecosystem_state, import_chain_state, StateManager};
-use adi_toolkit::{ProtocolVersion, ToolkitRunner, GENESIS_FILENAME};
+use adi_toolkit::{ProtocolVersion, ToolkitRunner};
 use std::sync::Arc;
 use tempfile::TempDir;
 
@@ -18,11 +18,10 @@ use crate::ui;
 /// This function:
 /// 1. Builds zkstack chain create arguments
 /// 2. Creates temp directory and exports ecosystem state
-/// 3. Copies genesis.json to temp directory
-/// 4. Runs zkstack chain create via Docker toolkit
-/// 5. Verifies chain files were created
-/// 6. Imports chain state through StateManager
-/// 7. Syncs to S3 if enabled
+/// 3. Runs zkstack chain create via Docker toolkit
+/// 4. Verifies chain files were created
+/// 5. Imports chain state through StateManager
+/// 6. Syncs to S3 if enabled
 ///
 /// # Arguments
 ///
@@ -68,17 +67,6 @@ pub async fn create_chain(
     export_ecosystem_state(state_manager, &ecosystem_temp_path)
         .await
         .wrap_err("Failed to export ecosystem state")?;
-
-    // Copy genesis.json to ecosystem temp directory
-    let genesis_src = state_dir.join(GENESIS_FILENAME);
-    if !genesis_src.exists() {
-        return Err(eyre::eyre!(
-            "genesis.json not found at {}. Run 'adi init' first.",
-            genesis_src.display()
-        ));
-    }
-    let genesis_dst = ecosystem_temp_path.join(GENESIS_FILENAME);
-    std::fs::copy(&genesis_src, &genesis_dst).wrap_err("Failed to copy genesis.json")?;
 
     // Create toolkit runner and execute zkstack chain create
     ui::info("Connecting to Docker...")?;

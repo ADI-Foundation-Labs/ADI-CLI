@@ -14,7 +14,6 @@ pub use ecosystem::run;
 ///
 /// Creates ecosystem configuration with an initial chain.
 /// Generates ZkStack.yaml, wallet keys, and chain config in the state directory.
-/// Requires genesis.json in state dir (download from protocol version URL).
 ///
 /// All arguments are optional and will fall back to values from the config file
 /// (.adi.yml) if not provided.

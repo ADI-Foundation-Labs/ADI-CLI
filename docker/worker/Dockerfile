@@ -5,6 +5,7 @@ ARG ZKSYNC_ERA_OS_INTEGRATION_COMMIT=""
 ARG CONTRACTS_COMMIT=""
 ARG FOUNDRY_ZKSYNC_VERSION
 ARG ERA_CONTRACTS_TAG=""
+ARG GENESIS_COMMIT
 
 # Install dependencies
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -68,6 +69,11 @@ RUN if [ -n "$ZKSYNC_ERA_OS_INTEGRATION_COMMIT" ]; then \
   git checkout --force ${ZKSYNC_ERA_OS_INTEGRATION_COMMIT} && \
   git submodule update --init --recursive; \
   fi
+
+# Download genesis.json from zksync-os-server repository
+RUN mkdir -p /deps/zksync-era/etc/env/file_based && \
+  curl -sSf -o /deps/zksync-era/etc/env/file_based/genesis.json \
+  "https://raw.githubusercontent.com/matter-labs/zksync-os-server/${GENESIS_COMMIT}/genesis/genesis.json"
 
 # Pre-build l1-contracts to generate forge cache for verification
 WORKDIR /deps/zksync-era/contracts/l1-contracts

@@ -31,7 +31,7 @@
 //! let version = ProtocolVersion::parse("v30.0.2").expect("valid version");
 //! let state_dir = Path::new("/home/user/.adi_cli/state");
 //!
-//! // Run zkstack command (genesis.json must be in state_dir)
+//! // Run zkstack command
 //! let exit_code = runner.run_zkstack(
 //!     &["ecosystem", "init"],
 //!     state_dir,
@@ -70,5 +70,5 @@ pub use cleanup::cleanup_tmp_dir;
 pub use config::{ImageReference, ToolkitConfig};
 pub use config::{DEFAULT_IMAGE_NAME, DEFAULT_REGISTRY};
 pub use error::{Result, ToolkitError};
-pub use runner::{ToolkitRunner, GENESIS_FILENAME};
+pub use runner::ToolkitRunner;
 pub use version::{ParseError, ProtocolVersion};

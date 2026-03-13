@@ -59,5 +59,6 @@ target "toolkit-v0-30-1" {
     ZKSYNC_ERA_COMMIT = "a48fd5f99a3fad0542b514fc9c508094230b35f4"
     CONTRACTS_COMMIT = "9ddc915c85d1f44c79b5d55e160d384138ed5105"
     FOUNDRY_ZKSYNC_VERSION = "latest"
+    GENESIS_COMMIT = "a8e6de4f4f260ab33bb2ac57c441c0bec4a8fb2c"
   }
 }

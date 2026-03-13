@@ -10,12 +10,6 @@ use semver::Version;
 use std::path::Path;
 use std::sync::Arc;
 
-/// Genesis file name expected in state directory.
-pub const GENESIS_FILENAME: &str = "genesis.json";
-
-/// Path where genesis.json should be copied in the container.
-pub const GENESIS_CONTAINER_PATH: &str = "/deps/zksync-era/etc/env/file_based/genesis.json";
-
 /// Executes commands inside Docker toolkit containers.
 ///
 /// Container lifecycle: create -> start -> stream output -> wait -> remove
@@ -213,18 +207,8 @@ impl ToolkitRunner {
         self.logger
             .debug(&format!("Running zkstack with args: {:?}", args));
 
-        let zkstack_cmd = format!("zkstack {}", args.join(" "));
-        let shell_cmd = format!(
-            "cp /workspace/{} {} && {}",
-            GENESIS_FILENAME, GENESIS_CONTAINER_PATH, zkstack_cmd
-        );
-
-        self.logger.debug(&format!(
-            "Copying genesis.json to {}",
-            GENESIS_CONTAINER_PATH
-        ));
-
-        let command = vec!["sh", "-c", &shell_cmd];
+        let mut command = vec!["zkstack"];
+        command.extend(args);
         let label = format!("Running zkstack {}...", args.first().unwrap_or(&""));
 
         self.run_command_with_log_dir(
@@ -436,7 +420,7 @@ impl ToolkitRunner {
         zkstack_args.push_str(&format!(" --l1-rpc-url {}", container_rpc_url));
 
         let shell_cmd = format!(
-            r#"cp /workspace/{genesis} {genesis_path} && {foundry_fix} && \
+            r#"{foundry_fix} && \
 stdbuf -oL expect -c 'set timeout 3600
 log_user 1
 spawn {zkstack}
@@ -449,8 +433,6 @@ while 1 {{
 }}
 catch wait result
 exit [lindex $result 3]'"#,
-            genesis = GENESIS_FILENAME,
-            genesis_path = GENESIS_CONTAINER_PATH,
             foundry_fix = foundry_fix,
             zkstack = zkstack_args
         );

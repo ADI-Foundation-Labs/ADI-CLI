@@ -7,12 +7,6 @@ use std::fmt;
 use strum::{EnumIter, EnumString};
 use thiserror::Error;
 
-/// Base URL for genesis file downloads from zksync-os-server repository.
-const GENESIS_BASE_URL: &str = "https://raw.githubusercontent.com/matter-labs/zksync-os-server";
-
-/// Default path to genesis.json within the repository.
-const GENESIS_PATH: &str = "genesis/genesis.json";
-
 /// Error type for version parsing failures.
 #[derive(Error, Debug)]
 pub enum ParseError {
@@ -120,52 +114,6 @@ impl ProtocolVersion {
             .collect::<Vec<_>>()
             .join(", ")
     }
-
-    /// Get the git commit hash for the genesis.json file for this protocol version.
-    ///
-    /// Each protocol version requires a specific genesis.json file from the
-    /// zksync-os-server repository at a particular commit.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use adi_toolkit::ProtocolVersion;
-    ///
-    /// let version = ProtocolVersion::V0_30_1;
-    /// let hash = version.genesis_commit_hash();
-    /// assert!(!hash.is_empty());
-    /// ```
-    #[must_use]
-    pub fn genesis_commit_hash(&self) -> &'static str {
-        match self {
-            ProtocolVersion::V0_30_1 => "a8e6de4f4f260ab33bb2ac57c441c0bec4a8fb2c",
-        }
-    }
-
-    /// Get the full URL to download the genesis.json file for this protocol version.
-    ///
-    /// Returns the GitHub raw URL for the genesis.json file at the correct commit
-    /// for this protocol version.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use adi_toolkit::ProtocolVersion;
-    ///
-    /// let version = ProtocolVersion::V0_30_1;
-    /// let url = version.genesis_url();
-    /// assert!(url.starts_with("https://raw.githubusercontent.com/"));
-    /// assert!(url.ends_with("genesis/genesis.json"));
-    /// ```
-    #[must_use]
-    pub fn genesis_url(&self) -> String {
-        format!(
-            "{}/{}/{}",
-            GENESIS_BASE_URL,
-            self.genesis_commit_hash(),
-            GENESIS_PATH
-        )
-    }
 }
 
 impl fmt::Display for ProtocolVersion {
@@ -208,42 +156,5 @@ mod tests {
     fn test_display() {
         let version = ProtocolVersion::V0_30_1;
         assert_eq!(format!("{}", version), "v0.30.1");
-    }
-
-    #[test]
-    fn test_genesis_commit_hash() {
-        let version = ProtocolVersion::V0_30_1;
-        assert_eq!(
-            version.genesis_commit_hash(),
-            "a8e6de4f4f260ab33bb2ac57c441c0bec4a8fb2c"
-        );
-    }
-
-    #[test]
-    fn test_genesis_url() {
-        let version = ProtocolVersion::V0_30_1;
-        assert_eq!(
-            version.genesis_url(),
-            "https://raw.githubusercontent.com/matter-labs/zksync-os-server/a8e6de4f4f260ab33bb2ac57c441c0bec4a8fb2c/genesis/genesis.json"
-        );
-    }
-
-    #[test]
-    fn test_all_versions_have_genesis_hash() {
-        use strum::IntoEnumIterator;
-        for version in ProtocolVersion::iter() {
-            let hash = version.genesis_commit_hash();
-            assert!(
-                !hash.is_empty(),
-                "Version {:?} has empty genesis hash",
-                version
-            );
-            assert_eq!(
-                hash.len(),
-                40,
-                "Version {:?} has invalid hash length",
-                version
-            );
-        }
     }
 }
