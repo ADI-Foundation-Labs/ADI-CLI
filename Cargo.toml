@@ -64,6 +64,7 @@ clap = { version = "4", default-features = false, features = [
   "error-context",
   "env",
 ] }
+clap_complete = { version = "4", default-features = false }
 config = { version = "0.15", default-features = false, features = ["yaml"] }
 
 # Async
@@ -178,6 +179,7 @@ workspace = true
 
 [dependencies]
 clap = { workspace = true }
+clap_complete = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 eyre = { workspace = true }
 serde = { workspace = true }

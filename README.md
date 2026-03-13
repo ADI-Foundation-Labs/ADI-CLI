@@ -9,6 +9,7 @@
 
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
+- [Shell Completions](#shell-completions)
 - [Configuration](#configuration)
 - [Usage Guide](#usage-guide)
 - [State Management](#state-management)
@@ -64,6 +65,30 @@ cp ./target/release/adi ~/.local/bin/
 ```bash
 adi version
 ```
+
+## Shell Completions
+
+Enable tab-completion for commands, flags, and arguments:
+
+**Bash:**
+```bash
+mkdir -p ~/.local/share/bash-completion/completions
+adi completions bash > ~/.local/share/bash-completion/completions/adi
+```
+
+**Zsh (Oh My Zsh):**
+```bash
+mkdir -p ~/.oh-my-zsh/completions
+adi completions zsh > ~/.oh-my-zsh/completions/_adi
+```
+
+**Fish:**
+```bash
+mkdir -p ~/.config/fish/completions
+adi completions fish > ~/.config/fish/completions/adi.fish
+```
+
+Restart your shell or run `source ~/.zshrc` (for zsh) to activate.
 
 ## Configuration
 

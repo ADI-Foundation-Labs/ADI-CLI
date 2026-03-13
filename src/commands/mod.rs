@@ -9,6 +9,7 @@ mod accept;
 mod add;
 pub mod chain_ops;
 pub mod chain_prompts;
+mod completions;
 mod config;
 mod deploy;
 mod ecosystem;
@@ -49,6 +50,8 @@ pub enum Commands {
     ServerParams(server_params::ServerParamsArgs),
     /// Manage state synchronization with S3
     State(state::StateArgs),
+    /// Generate shell completion scripts
+    Completions(completions::CompletionsArgs),
 }
 
 impl Commands {
@@ -67,6 +70,7 @@ impl Commands {
             Commands::Verify(args) => verify::run(args, context).await,
             Commands::ServerParams(args) => server_params::run(&args, context).await,
             Commands::State(args) => state::run(&args, context).await,
+            Commands::Completions(args) => completions::run(&args).await,
         }
     }
 }
