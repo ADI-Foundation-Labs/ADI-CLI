@@ -16,15 +16,16 @@ version = "0.1.0"
 edition = "2021"
 
 [profile.release]
-opt-level = "s"
+opt-level = "z"
 debug = false
 rpath = false
-lto = "thin"
+lto = "fat"
 debug-assertions = false
 codegen-units = 1
 panic = "abort"
 incremental = false
 overflow-checks = false
+strip = true
 
 [workspace.lints.rust]
 unused_must_use = "deny"
@@ -109,7 +110,6 @@ strum = { version = "0.26", default-features = false, features = ["derive"] }
 dirs = { version = "6.0", default-features = false }
 cliclack = { version = "0.3", default-features = false }
 console = { version = "0.15", default-features = false }
-colored = { version = "3", default-features = false }
 
 # Build
 built = { version = "0.7", default-features = false, features = ["git2"] }
@@ -124,7 +124,6 @@ secrecy = { version = "0.10", default-features = false, features = ["serde"] }
 alloy-provider = { version = "1.5", default-features = false, features = [
   "reqwest",
 ] }
-alloy-signer = { version = "1.5", default-features = false }
 alloy-signer-local = { version = "1.5", default-features = false }
 alloy-network = { version = "1.5", default-features = false }
 alloy-rpc-types = { version = "1.5", default-features = false, features = [
@@ -141,15 +140,9 @@ hex = { version = "0.4", default-features = false, features = ["std"] }
 # Testing
 tempfile = { version = "3", default-features = false }
 
-# S3 support
-aws-sdk-s3 = { version = "1", default-features = false, features = [
-  "behavior-version-latest",
-  "rt-tokio",
-] }
-aws-config = { version = "1", default-features = false, features = [
-  "behavior-version-latest",
-  "rt-tokio",
-  "rustls",
+# S3 support (lightweight alternative to aws-sdk-s3)
+rust-s3 = { version = "0.37", default-features = false, features = [
+  "tokio-rustls-tls",
 ] }
 
 # Archive support
@@ -180,7 +173,7 @@ workspace = true
 [dependencies]
 clap = { workspace = true }
 clap_complete = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
+tokio = { workspace = true }
 eyre = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -8,10 +8,9 @@
 
 use crate::error::{Result, StateError};
 use adi_types::Logger;
-use aws_config::BehaviorVersion;
-use aws_sdk_s3::config::{Credentials, Region};
-use aws_sdk_s3::primitives::ByteStream;
-use aws_sdk_s3::Client;
+use s3::bucket::Bucket;
+use s3::creds::Credentials;
+use s3::region::Region;
 use std::sync::Arc;
 
 /// Configuration for S3 synchronization.
@@ -33,8 +32,7 @@ pub struct S3Config {
 
 /// S3 client for state uploads and downloads.
 pub struct S3Client {
-    client: Client,
-    bucket: String,
+    bucket: Box<Bucket>,
     key_prefix: String,
     #[allow(dead_code)]
     logger: Arc<dyn Logger>,
@@ -56,40 +54,46 @@ impl S3Client {
     /// Returns error if client initialization fails.
     pub async fn new(config: S3Config, logger: Arc<dyn Logger>) -> Result<Self> {
         let credentials = Credentials::new(
-            &config.access_key_id,
-            &config.secret_access_key,
+            Some(&config.access_key_id),
+            Some(&config.secret_access_key),
+            None, // security token
             None, // session token
-            None, // expiry
-            "adi-cli",
-        );
-
-        // Load base SDK config with proper runtime support
-        let sdk_config = aws_config::defaults(BehaviorVersion::latest())
-            .region(Region::new(config.region.clone()))
-            .credentials_provider(credentials)
-            .load()
-            .await;
+            None, // profile
+        )
+        .map_err(|e| StateError::S3UploadFailed {
+            key: "credentials".to_string(),
+            reason: e.to_string(),
+        })?;
 
         // Use tenant_id as key prefix for multi-tenant bucket usage
         let key_prefix = format!("{}/", config.tenant_id);
         logger.debug(&format!("S3 key prefix: {}", key_prefix));
 
-        // Build S3 client config from SDK config
-        let mut s3_config_builder =
-            aws_sdk_s3::config::Builder::from(&sdk_config).region(Region::new(config.region));
+        // Determine region: custom endpoint or standard AWS region
+        let region = if let Some(endpoint) = &config.endpoint_url {
+            Region::Custom {
+                region: config.region.clone(),
+                endpoint: endpoint.clone(),
+            }
+        } else {
+            config.region.parse().unwrap_or(Region::UsEast1)
+        };
 
-        // Custom endpoint for S3-compatible services
-        if let Some(endpoint) = &config.endpoint_url {
-            s3_config_builder = s3_config_builder
-                .endpoint_url(endpoint)
-                .force_path_style(true);
+        // Create bucket with path-style addressing for S3-compatible services
+        let mut bucket = Bucket::new(&config.bucket, region, credentials).map_err(|e| {
+            StateError::S3UploadFailed {
+                key: "bucket".to_string(),
+                reason: e.to_string(),
+            }
+        })?;
+
+        // Enable path-style for custom endpoints (MinIO, LocalStack, etc.)
+        if config.endpoint_url.is_some() {
+            bucket = bucket.with_path_style();
         }
 
-        let client = Client::from_conf(s3_config_builder.build());
-
         Ok(Self {
-            client,
-            bucket: config.bucket,
+            bucket,
             key_prefix,
             logger,
         })
@@ -119,12 +123,8 @@ impl S3Client {
     pub async fn upload(&self, key: &str, data: Vec<u8>) -> Result<()> {
         let full_key = self.full_key(key);
 
-        self.client
-            .put_object()
-            .bucket(&self.bucket)
-            .key(&full_key)
-            .body(ByteStream::from(data))
-            .send()
+        self.bucket
+            .put_object(&full_key, &data)
             .await
             .map_err(|e| StateError::S3UploadFailed {
                 key: full_key,
@@ -150,28 +150,16 @@ impl S3Client {
     pub async fn download(&self, key: &str) -> Result<Vec<u8>> {
         let full_key = self.full_key(key);
 
-        let response = self
-            .client
-            .get_object()
-            .bucket(&self.bucket)
-            .key(&full_key)
-            .send()
-            .await
-            .map_err(|e| StateError::S3DownloadFailed {
-                key: full_key.clone(),
-                reason: e.to_string(),
-            })?;
+        let response =
+            self.bucket
+                .get_object(&full_key)
+                .await
+                .map_err(|e| StateError::S3DownloadFailed {
+                    key: full_key,
+                    reason: e.to_string(),
+                })?;
 
-        let data = response
-            .body
-            .collect()
-            .await
-            .map_err(|e| StateError::S3DownloadFailed {
-                key: full_key,
-                reason: e.to_string(),
-            })?;
-
-        Ok(data.into_bytes().to_vec())
+        Ok(response.to_vec())
     }
 
     /// Check if an object exists in S3.
@@ -186,24 +174,17 @@ impl S3Client {
     pub async fn exists(&self, key: &str) -> Result<bool> {
         let full_key = self.full_key(key);
 
-        match self
-            .client
-            .head_object()
-            .bucket(&self.bucket)
-            .key(&full_key)
-            .send()
-            .await
-        {
+        match self.bucket.head_object(&full_key).await {
             Ok(_) => Ok(true),
             Err(e) => {
-                // Check if it's a "not found" error
-                let service_error = e.into_service_error();
-                if service_error.is_not_found() {
+                // Check if it's a "not found" error (HTTP 404)
+                let error_str = e.to_string();
+                if error_str.contains("404") || error_str.contains("NoSuchKey") {
                     Ok(false)
                 } else {
                     Err(StateError::S3DownloadFailed {
                         key: full_key,
-                        reason: service_error.to_string(),
+                        reason: error_str,
                     })
                 }
             }

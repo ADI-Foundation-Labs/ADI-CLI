@@ -16,7 +16,7 @@ adi-docker = { workspace = true }
 adi-types = { workspace = true }
 tokio = { workspace = true }
 eyre = { workspace = true }
-colored = { workspace = true }
+console = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }
 semver = { workspace = true }

@@ -4,7 +4,7 @@ use crate::error::{DockerError, Result};
 use adi_types::Logger;
 use bollard::image::CreateImageOptions;
 use bollard::Docker;
-use colored::Colorize;
+use console::style;
 use futures_util::StreamExt;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -67,7 +67,7 @@ impl ImageManager {
         let mut layer_progress: HashMap<String, (u64, u64)> = HashMap::new();
         let progress = cliclack::progress_bar(0).with_download_template();
         let short_name = short_image_name(image_uri);
-        progress.start(format!("Pulling {}", short_name.green()));
+        progress.start(format!("Pulling {}", style(short_name).green()));
 
         while let Some(result) = stream.next().await {
             match result {
@@ -115,7 +115,7 @@ impl ImageManager {
             }
         }
 
-        progress.stop(format!("Pulled {}", short_name.green()));
+        progress.stop(format!("Pulled {}", style(short_name).green()));
         Ok(())
     }
 }

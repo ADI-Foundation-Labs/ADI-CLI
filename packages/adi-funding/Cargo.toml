@@ -33,7 +33,6 @@ cliclack = { workspace = true }
 # Alloy EVM stack
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
-alloy-signer = { workspace = true }
 alloy-signer-local = { workspace = true }
 alloy-network = { workspace = true }
 alloy-rpc-types = { workspace = true }

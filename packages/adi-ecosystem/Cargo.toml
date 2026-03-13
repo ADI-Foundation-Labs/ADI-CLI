@@ -30,7 +30,6 @@ url = { workspace = true }
 hex = { workspace = true }
 console = { workspace = true }
 cliclack = { workspace = true }
-colored = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }
 
