@@ -1,7 +1,7 @@
 //! Chain addition command implementation.
 
 use adi_ecosystem::{validate_chain_id, validate_chain_id_unique, ChainDefaults};
-use adi_funding::FundingProvider;
+use adi_funding::{normalize_rpc_url, FundingProvider};
 use adi_toolkit::ProtocolVersion;
 
 use super::AddArgs;
@@ -88,7 +88,8 @@ pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
     // 7. Validate chain ID doesn't conflict with settlement layer
     ui::info("Validating chain ID against settlement layer...")?;
     let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
-    let provider = FundingProvider::new(rpc_url.as_str())
+    let normalized_rpc = normalize_rpc_url(rpc_url.as_str());
+    let provider = FundingProvider::new(&normalized_rpc)
         .wrap_err("Failed to connect to settlement layer RPC")?;
     let settlement_chain_id = provider
         .get_chain_id()

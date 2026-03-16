@@ -4,7 +4,7 @@ use adi_ecosystem::{
     build_ecosystem_create_args, normalize_name, validate_chain_id, verify_ecosystem_created,
     ChainDefaults, EcosystemConfig, EcosystemDefaults,
 };
-use adi_funding::FundingProvider;
+use adi_funding::{normalize_rpc_url, FundingProvider};
 use adi_state::import_ecosystem_state;
 use adi_toolkit::{ProtocolVersion, ToolkitRunner};
 use std::sync::Arc;
@@ -59,7 +59,8 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     // 4. Validate chain ID doesn't conflict with settlement layer
     ui::info("Validating chain ID against settlement layer...")?;
     let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
-    let provider = FundingProvider::new(rpc_url.as_str())
+    let normalized_rpc = normalize_rpc_url(rpc_url.as_str());
+    let provider = FundingProvider::new(&normalized_rpc)
         .wrap_err("Failed to connect to settlement layer RPC")?;
     let settlement_chain_id = provider
         .get_chain_id()
