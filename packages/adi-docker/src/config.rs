@@ -37,6 +37,9 @@ pub struct ContainerConfig {
 
     /// Suppress terminal output (still saves logs to file).
     pub quiet: bool,
+
+    /// User to run container as (format: "uid:gid"). Unix-only.
+    pub user: Option<String>,
 }
 
 impl Default for ContainerConfig {
@@ -52,6 +55,7 @@ impl Default for ContainerConfig {
             log_command: "container".to_string(),
             log_label: "Running...".to_string(),
             quiet: false,
+            user: None,
         }
     }
 }

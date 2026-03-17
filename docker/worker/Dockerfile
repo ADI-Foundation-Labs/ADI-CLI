@@ -31,10 +31,11 @@ RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
 # Install yarn globally (needed for era-contracts build)
 RUN npm install -g yarn
 
-# Install foundry-zksync
+# Install foundry-zksync and copy to system path (accessible by non-root users)
 RUN curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/install-foundry-zksync | bash
 ENV PATH="/root/.foundry/bin:${PATH}"
-RUN foundryup-zksync
+RUN foundryup-zksync \
+    && cp /root/.foundry/bin/* /usr/local/bin/
 
 # Install zkstack CLI from specific commit
 # Set global cargo target dir for caching
@@ -95,6 +96,13 @@ RUN --mount=type=cache,target=/root/.cache/yarn,sharing=locked \
     git submodule update --init --recursive && \
     yarn install --cache-folder /root/.cache/yarn; \
   fi
+
+# Allow non-root users to write to deps (needed for --user mapping)
+RUN git config --system --add safe.directory '*' \
+    && chmod -R a+w /deps
+
+# Set HOME for non-root users (forge/yarn cache)
+ENV HOME=/tmp
 
 WORKDIR /workspace
 ENTRYPOINT ["/bin/bash"]

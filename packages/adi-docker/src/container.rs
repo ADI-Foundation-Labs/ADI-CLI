@@ -132,6 +132,7 @@ impl ContainerManager {
         let container_config = Config {
             image: Some(image_uri.to_string()),
             cmd: Some(config.command.clone()),
+            user: config.user.clone(),
             entrypoint: Some(vec![]),
             working_dir: Some(config.working_dir.clone()),
             env: Some(env_vars),

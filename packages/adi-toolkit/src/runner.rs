@@ -10,6 +10,30 @@ use semver::Version;
 use std::path::Path;
 use std::sync::Arc;
 
+/// Get current user UID:GID for container user mapping (Unix only).
+#[cfg(unix)]
+fn get_current_user() -> Option<String> {
+    use std::process::Command;
+
+    let uid = Command::new("id").arg("-u").output().ok()?;
+    let gid = Command::new("id").arg("-g").output().ok()?;
+
+    let uid = String::from_utf8_lossy(&uid.stdout).trim().to_string();
+    let gid = String::from_utf8_lossy(&gid.stdout).trim().to_string();
+
+    if uid.is_empty() || gid.is_empty() {
+        return None;
+    }
+
+    Some(format!("{}:{}", uid, gid))
+}
+
+/// Get current user UID:GID for container user mapping (non-Unix stub).
+#[cfg(not(unix))]
+fn get_current_user() -> Option<String> {
+    None
+}
+
 /// Executes commands inside Docker toolkit containers.
 ///
 /// Container lifecycle: create -> start -> stream output -> wait -> remove
@@ -148,6 +172,7 @@ impl ToolkitRunner {
             log_command: log_command.to_string(),
             log_label: log_label.to_string(),
             quiet,
+            user: get_current_user(),
             ..Default::default()
         };
 
