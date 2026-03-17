@@ -76,14 +76,6 @@ RUN mkdir -p /deps/zksync-era/etc/env/file_based && \
   curl -sSf -o /deps/zksync-era/etc/env/file_based/genesis.json \
   "https://raw.githubusercontent.com/matter-labs/zksync-os-server/${GENESIS_COMMIT}/genesis/genesis.json"
 
-# Pre-build l1-contracts to generate forge cache for verification
-WORKDIR /deps/zksync-era/contracts/l1-contracts
-RUN forge build --sizes || true
-
-# Pre-build da-contracts to generate forge cache for verification
-WORKDIR /deps/zksync-era/contracts/da-contracts
-RUN forge build --sizes || true
-
 WORKDIR /deps/zksync-era
 
 # Install era-contracts (for upgrade scripts) - only if ERA_CONTRACTS_TAG is set
