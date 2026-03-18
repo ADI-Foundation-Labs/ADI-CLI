@@ -113,17 +113,9 @@ COPY --from=builder /usr/local/bin/zkstack /usr/local/bin/zkstack
 COPY --from=foundry /root/.foundry/bin/forge /usr/local/bin/forge
 COPY --from=foundry /root/.foundry/bin/cast /usr/local/bin/cast
 
-# Configure forge globally: fs_permissions, suppress zksolc errors
-# RUN mkdir -p /etc/foundry && \
-#     printf '[profile.default]\nfs_permissions = [{ access = "read-write", path = "/" }]\n\n[profile.default.zksync]\nsuppressed_errors = ["sendtransfer"]\nsuppressed_warnings = ["txorigin", "assemblycreate"]\n' > /etc/foundry/foundry.toml
-# ENV FOUNDRY_CONFIG=/etc/foundry/foundry.toml
-
 # Copy zksync-era (full repo needed - zkstack runs git commands at runtime)
 # Use --chmod to avoid separate chmod layer (saves ~800MB)
 COPY --from=builder --chmod=a+w /build/zksync-era /deps/zksync-era
-
-# # Remove broken invariant tests (import non-existent _SharedL2ContractL1Deployer.sol)
-# RUN rm -rf /deps/zksync-era/contracts/l1-contracts/test/invariant
 
 # Download genesis.json
 RUN mkdir -p /deps/zksync-era/etc/env/file_based && \
