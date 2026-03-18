@@ -119,4 +119,8 @@ pub struct InitArgs {
         help = "Force reinitialization without confirmation"
     )]
     pub force: bool,
+
+    /// Answer yes to all prompts (non-interactive mode)
+    #[arg(long, short = 'y', help = "Answer yes to all prompts")]
+    pub yes: bool,
 }

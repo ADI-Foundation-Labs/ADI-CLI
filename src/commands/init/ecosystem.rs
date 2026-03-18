@@ -120,28 +120,34 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
             Cancel,
         }
 
-        let items = vec![
-            (
-                ExistingEcosystemAction::AddChain,
-                "Add a new chain to this ecosystem",
-                "Keep existing ecosystem, add another chain".to_string(),
-            ),
-            (
-                ExistingEcosystemAction::Reinitialize,
-                "Delete and reinitialize ecosystem",
-                "Remove all existing data and start fresh".to_string(),
-            ),
-            (
-                ExistingEcosystemAction::Cancel,
-                "Cancel",
-                "Exit without making changes".to_string(),
-            ),
-        ];
+        // With -y flag, auto-select reinitialize
+        let action = if args.yes {
+            ui::info("Auto-selecting reinitialize (--yes flag)")?;
+            ExistingEcosystemAction::Reinitialize
+        } else {
+            let items = vec![
+                (
+                    ExistingEcosystemAction::AddChain,
+                    "Add a new chain to this ecosystem",
+                    "Keep existing ecosystem, add another chain".to_string(),
+                ),
+                (
+                    ExistingEcosystemAction::Reinitialize,
+                    "Delete and reinitialize ecosystem",
+                    "Remove all existing data and start fresh".to_string(),
+                ),
+                (
+                    ExistingEcosystemAction::Cancel,
+                    "Cancel",
+                    "Exit without making changes".to_string(),
+                ),
+            ];
 
-        let action: ExistingEcosystemAction = ui::select("What would you like to do?")
-            .items(&items)
-            .interact()
-            .wrap_err("Selection cancelled")?;
+            ui::select("What would you like to do?")
+                .items(&items)
+                .interact()
+                .wrap_err("Selection cancelled")?
+        };
 
         match action {
             ExistingEcosystemAction::AddChain => {
@@ -176,6 +182,7 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
                 config_writer::prompt_and_save_chain_config(
                     &chain_defaults,
                     context.config_path(),
+                    false,
                 )?;
 
                 // Run chain creation
@@ -207,8 +214,8 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
                     .join("\n");
                 ui::note("Files to be deleted", file_list)?;
 
-                if args.force {
-                    ui::info("Force flag set, skipping confirmation")?;
+                if args.force || args.yes {
+                    ui::info("Skipping confirmation (--force or --yes flag)")?;
                 } else {
                     // Require typing ecosystem name to confirm deletion
                     let prompt = format!(
@@ -340,7 +347,7 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
 
     // Offer to save chain config to config file
     let chain_defaults = ecosystem_config_to_chain_defaults(&config);
-    config_writer::prompt_and_save_chain_config(&chain_defaults, context.config_path())?;
+    config_writer::prompt_and_save_chain_config(&chain_defaults, context.config_path(), args.yes)?;
 
     // Sync to S3 once at the end (if enabled)
     if let Some(control) = s3_control {
