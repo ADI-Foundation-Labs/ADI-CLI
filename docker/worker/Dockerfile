@@ -1,4 +1,4 @@
-FROM rust:1.93.0
+FROM rust:1.93-slim-bookworm AS build
 
 ARG ZKSYNC_ERA_COMMIT
 ARG ZKSYNC_ERA_OS_INTEGRATION_COMMIT=""
@@ -7,21 +7,18 @@ ARG FOUNDRY_ZKSYNC_VERSION
 ARG ERA_CONTRACTS_TAG=""
 ARG GENESIS_COMMIT
 
-# Install dependencies
+# Install build dependencies
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   apt-get update && apt-get install -y \
   git \
-  clang \
+  bash \
+  ca-certificates \
   curl \
-  build-essential \
   pkg-config \
   libssl-dev \
+  python3-pip \
   nodejs \
   npm \
-  python3-pip \
-  docker.io \
-  docker-compose \
-  expect \
   && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies for upgrade scripts
@@ -44,13 +41,13 @@ WORKDIR /deps
 RUN git clone https://github.com/matter-labs/zksync-era.git zksync-era
 WORKDIR /deps/zksync-era
 RUN git checkout ${ZKSYNC_ERA_COMMIT}
-RUN git submodule update --init --recursive
+RUN git submodule update --init --recursive --jobs "$(nproc || echo 4)"
 # Override contracts submodule to specific commit if provided
 RUN if [ -n "$CONTRACTS_COMMIT" ]; then \
   echo "Overriding contracts submodule to ${CONTRACTS_COMMIT}"; \
   git -C contracts checkout "$CONTRACTS_COMMIT" && \
   git add contracts && \
-  git -C contracts submodule update --init --recursive; \
+  git -C contracts submodule update --init --recursive --jobs "$(nproc || echo 4)"; \
   fi
 # Patch yanked parity-scale-codec version
 RUN echo "[patch.crates-io]" >> Cargo.toml && \
@@ -68,7 +65,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
 RUN if [ -n "$ZKSYNC_ERA_OS_INTEGRATION_COMMIT" ]; then \
   git fetch && \
   git checkout --force ${ZKSYNC_ERA_OS_INTEGRATION_COMMIT} && \
-  git submodule update --init --recursive; \
+  git submodule update --init --recursive --jobs "$(nproc || echo 4)"; \
   fi
 
 # Download genesis.json from zksync-os-server repository
@@ -80,18 +77,58 @@ WORKDIR /deps/zksync-era
 
 # Install era-contracts (for upgrade scripts) - only if ERA_CONTRACTS_TAG is set
 RUN --mount=type=cache,target=/root/.cache/yarn,sharing=locked \
+  mkdir -p /deps/era-contracts && \
   if [ -n "$ERA_CONTRACTS_TAG" ]; then \
-    mkdir -p /deps/era-contracts && \
     git clone https://github.com/matter-labs/era-contracts.git /deps/era-contracts && \
     cd /deps/era-contracts && \
     git checkout ${ERA_CONTRACTS_TAG} && \
-    git submodule update --init --recursive && \
+    git submodule update --init --recursive --jobs "$(nproc || echo 4)" && \
     yarn install --cache-folder /root/.cache/yarn; \
   fi
+
+# Drop VCS metadata before copying repositories into runtime image.
+RUN find /deps/zksync-era /deps/era-contracts -type d -name .git -prune -exec rm -rf '{}' + && \
+    find /deps/zksync-era /deps/era-contracts -type f -name .git -delete
 
 # Allow non-root users to write to deps (needed for --user mapping)
 RUN git config --system --add safe.directory '*' \
     && chmod -R a+w /deps
+
+# Set HOME for non-root users (forge/yarn cache)
+ENV HOME=/tmp
+
+FROM docker:27-cli AS docker-bins
+FROM rust:1.93-slim-bookworm AS runtime
+
+# Copy docker CLI and compose plugin from the official docker image.
+COPY --from=docker-bins /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=docker-bins /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/lib/docker/cli-plugins/docker-compose
+
+# Install nodejs + npm for yarn.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  apt-get update && apt-get install -y \
+  nodejs \
+  npm \
+  expect \
+  && rm -rf /var/lib/apt/lists/*
+RUN npm install -g yarn
+
+# Runtime tooling exposed from /usr/local/bin.
+COPY --from=build /usr/local/bin/zkstack /usr/local/bin/zkstack
+COPY --from=build /usr/local/bin/forge /usr/local/bin/forge
+COPY --from=build /usr/local/bin/cast /usr/local/bin/cast
+
+# Fake git command (returns 0 for any invocation).
+RUN echo '#!/bin/bash' > /usr/local/bin/git && \
+    echo 'exit 0' >> /usr/local/bin/git && \
+    chmod +x /usr/local/bin/git
+
+# Upgrade scripts and supporting files.
+COPY --from=build /deps/era-contracts /deps/era-contracts
+COPY --from=build /deps/zksync-era /deps/zksync-era
+
+# Keep writable deps for --user mapping.
+RUN chmod -R a+w /deps
 
 # Set HOME for non-root users (forge/yarn cache)
 ENV HOME=/tmp
