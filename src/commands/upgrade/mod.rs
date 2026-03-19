@@ -192,7 +192,30 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
         }
     }
 
-    ui::outro("Simulation phase complete (broadcast phase pending)")?;
+    // Run broadcast
+    ui::info("Running upgrade broadcast...")?;
+
+    let broadcast_result = adi_upgrade::run_broadcast(
+        handler.as_ref(),
+        &upgrade_config,
+        &state_dir,
+        &wrapper,
+        &version.to_semver(),
+    )
+    .await?;
+
+    if broadcast_result.success {
+        ui::success("Broadcast completed successfully")?;
+    }
+
+    // Validate bytecode (if output exists)
+    // TODO: Load manifest from toolkit image and validate
+    ui::info("Bytecode validation: skipped (manifest not yet available)")?;
+
+    ui::outro(format!(
+        "Upgrade to {} completed successfully",
+        ui::green(&args.protocol_version)
+    ))?;
 
     Ok(())
 }

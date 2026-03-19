@@ -21,3 +21,7 @@ pub use config::UpgradeConfig;
 mod simulation;
 
 pub use simulation::{run_simulation, SimulationResult, ToolkitRunnerTrait};
+
+mod broadcast;
+
+pub use broadcast::{run_broadcast, BroadcastResult};
