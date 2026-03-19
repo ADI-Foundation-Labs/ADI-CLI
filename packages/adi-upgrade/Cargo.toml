@@ -12,5 +12,6 @@ name = "adi_upgrade"
 path = "src/lib.rs"
 
 [dependencies]
+adi-toolkit = { workspace = true }
 thiserror = { workspace = true }
 eyre = { workspace = true }

@@ -159,6 +159,7 @@ dependencies = [
 name = "adi-upgrade"
 version = "0.1.0"
 dependencies = [
+ "adi-toolkit",
  "eyre",
  "thiserror",
 ]
