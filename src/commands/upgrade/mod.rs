@@ -1,5 +1,7 @@
 //! Upgrade command for ecosystem and chain contracts.
 
+mod prompts;
+
 use std::path::Path;
 use std::sync::Arc;
 
@@ -211,6 +213,24 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
     // Validate bytecode (if output exists)
     // TODO: Load manifest from toolkit image and validate
     ui::info("Bytecode validation: skipped (manifest not yet available)")?;
+
+    // Chain upgrades (if target includes chains)
+    let upgrade_chains = matches!(args.target, UpgradeTarget::Chain | UpgradeTarget::Both);
+
+    if upgrade_chains {
+        let chain_names = state_manager.list_chains().await?;
+
+        if chain_names.is_empty() {
+            ui::warning("No chains found in ecosystem, skipping chain upgrade")?;
+        } else {
+            let selected_chains = prompts::select_chains(&chain_names, args.chain.as_ref())?;
+
+            for chain_name in &selected_chains {
+                ui::info(format!("Upgrading chain: {}", ui::green(chain_name)))?;
+                // TODO: Implement chain upgrade
+            }
+        }
+    }
 
     ui::outro(format!(
         "Upgrade to {} completed successfully",
