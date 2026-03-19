@@ -82,7 +82,7 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
     use crate::error::WrapErr;
     use crate::ui;
     use adi_toolkit::ProtocolVersion;
-    use adi_upgrade::{get_handler, is_supported, UpgradeConfig};
+    use adi_upgrade::{get_handler, is_supported, UpgradeConfig, UpgradeOrchestrator};
 
     let ecosystem_name = resolve_ecosystem_name(args.ecosystem_name.as_ref(), context.config())?;
 
@@ -153,7 +153,7 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
         ),
     )?;
 
-    // Create toolkit runner
+    // Create toolkit runner and orchestrator
     let runner = adi_toolkit::ToolkitRunner::with_config_and_logger(
         context.toolkit_config(),
         Arc::clone(context.logger()),
@@ -163,18 +163,19 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
     let wrapper = ToolkitRunnerWrapper(runner);
     let state_dir = context.config().state_dir.join(&ecosystem_name);
 
-    // Run simulation unless skipped
+    let orchestrator = UpgradeOrchestrator::new(
+        handler.as_ref(),
+        &upgrade_config,
+        &state_dir,
+        &wrapper,
+        version.to_semver(),
+    );
+
+    // Simulation phase
     if !args.skip_simulation {
         ui::info("Running upgrade simulation...")?;
 
-        let simulation_result = adi_upgrade::run_simulation(
-            handler.as_ref(),
-            &upgrade_config,
-            &state_dir,
-            &wrapper,
-            &version.to_semver(),
-        )
-        .await?;
+        let simulation_result = orchestrator.simulate().await?;
 
         if !simulation_result.success {
             return Err(eyre::eyre!(simulation_result.summary));
@@ -182,7 +183,6 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
 
         ui::note("Simulation Result", &simulation_result.summary)?;
 
-        // Confirmation prompt
         let proceed: bool = ui::confirm("Proceed with broadcast?")
             .initial_value(false)
             .interact()
@@ -194,17 +194,9 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
         }
     }
 
-    // Run broadcast
+    // Broadcast phase
     ui::info("Running upgrade broadcast...")?;
-
-    let broadcast_result = adi_upgrade::run_broadcast(
-        handler.as_ref(),
-        &upgrade_config,
-        &state_dir,
-        &wrapper,
-        &version.to_semver(),
-    )
-    .await?;
+    let broadcast_result = orchestrator.broadcast().await?;
 
     if broadcast_result.success {
         ui::success("Broadcast completed successfully")?;

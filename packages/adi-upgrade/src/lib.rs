@@ -33,3 +33,7 @@ pub use validation::{validate_upgrade_output, BytecodeManifest, ValidationReport
 pub mod governance;
 
 pub use governance::EcosystemGovernance;
+
+mod orchestrator;
+
+pub use orchestrator::UpgradeOrchestrator;
