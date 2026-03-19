@@ -170,7 +170,6 @@ tasks:
     cmds:
       - |
         PLATFORM={{.PLATFORM}} \
-        NO_CACHE=1 \
         TAG_SUFFIX="" \
         docker buildx bake -f docker/docker-bake.hcl --load {{.TARGETS}}
 
