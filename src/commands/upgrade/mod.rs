@@ -1,5 +1,8 @@
 //! Upgrade command for ecosystem and chain contracts.
 
+use std::path::Path;
+use std::sync::Arc;
+
 use clap::{Args, ValueEnum};
 use serde::{Deserialize, Serialize};
 
@@ -49,6 +52,24 @@ pub struct UpgradeArgs {
     /// Ecosystem name
     #[arg(long)]
     pub ecosystem_name: Option<String>,
+}
+
+/// Wrapper to adapt ToolkitRunner to ToolkitRunnerTrait.
+struct ToolkitRunnerWrapper(adi_toolkit::ToolkitRunner);
+
+#[async_trait::async_trait]
+impl adi_upgrade::ToolkitRunnerTrait for ToolkitRunnerWrapper {
+    async fn run_forge(
+        &self,
+        args: &[&str],
+        state_dir: &Path,
+        protocol_version: &semver::Version,
+    ) -> std::result::Result<i64, Box<dyn std::error::Error + Send + Sync>> {
+        self.0
+            .run_forge(args, state_dir, protocol_version)
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+    }
 }
 
 /// Execute the upgrade command.
@@ -130,7 +151,48 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
         ),
     )?;
 
-    ui::outro("Config loaded (simulation phase pending)")?;
+    // Create toolkit runner
+    let runner = adi_toolkit::ToolkitRunner::with_config_and_logger(
+        context.toolkit_config(),
+        Arc::clone(context.logger()),
+    )
+    .await
+    .wrap_err("Failed to create toolkit runner")?;
+    let wrapper = ToolkitRunnerWrapper(runner);
+    let state_dir = context.config().state_dir.join(&ecosystem_name);
+
+    // Run simulation unless skipped
+    if !args.skip_simulation {
+        ui::info("Running upgrade simulation...")?;
+
+        let simulation_result = adi_upgrade::run_simulation(
+            handler.as_ref(),
+            &upgrade_config,
+            &state_dir,
+            &wrapper,
+            &version.to_semver(),
+        )
+        .await?;
+
+        if !simulation_result.success {
+            return Err(eyre::eyre!(simulation_result.summary));
+        }
+
+        ui::note("Simulation Result", &simulation_result.summary)?;
+
+        // Confirmation prompt
+        let proceed: bool = ui::confirm("Proceed with broadcast?")
+            .initial_value(false)
+            .interact()
+            .wrap_err("Confirmation cancelled")?;
+
+        if !proceed {
+            ui::outro_cancel("Upgrade cancelled by user")?;
+            return Ok(());
+        }
+    }
+
+    ui::outro("Simulation phase complete (broadcast phase pending)")?;
 
     Ok(())
 }

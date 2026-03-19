@@ -207,6 +207,8 @@ url = { workspace = true }
 reqwest = { workspace = true }
 futures-util = { workspace = true }
 
+semver = { workspace = true }
+
 # Utils
 tempfile = { workspace = true }
 
