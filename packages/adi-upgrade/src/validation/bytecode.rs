@@ -82,7 +82,8 @@ fn extract_hashes(text: &str) -> Vec<String> {
 
     while let Some(marker_pos) = text[search_from..].find(HASH_MARKER) {
         let abs_pos = search_from + marker_pos + HASH_MARKER.len();
-        let candidate = text.get(abs_pos..abs_pos + HASH_HEX_LEN).unwrap_or("");
+        let end = abs_pos.saturating_add(HASH_HEX_LEN);
+        let candidate = text.get(abs_pos..end).unwrap_or("");
 
         if candidate.len() == HASH_HEX_LEN && candidate.chars().all(|c| c.is_ascii_hexdigit()) {
             hashes.push(candidate.to_lowercase());

@@ -82,7 +82,7 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
     use crate::error::WrapErr;
     use crate::ui;
     use adi_toolkit::ProtocolVersion;
-    use adi_upgrade::{get_handler, is_supported, UpgradeConfig, UpgradeOrchestrator};
+    use adi_upgrade::{get_handler, UpgradeConfig, UpgradeOrchestrator};
 
     let ecosystem_name = resolve_ecosystem_name(args.ecosystem_name.as_ref(), context.config())?;
 
@@ -96,15 +96,8 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
     let version =
         ProtocolVersion::parse(&args.protocol_version).wrap_err("Invalid protocol version")?;
 
-    if !is_supported(&version) {
-        return Err(eyre::eyre!(
-            "Protocol version {} is not supported for upgrades",
-            version
-        ));
-    }
-
-    let handler =
-        get_handler(&version).ok_or_else(|| eyre::eyre!("No handler for version {}", version))?;
+    let handler = get_handler(&version)
+        .ok_or_else(|| eyre::eyre!("Protocol version {} is not supported for upgrades", version))?;
 
     ui::info(format!(
         "Using upgrade script: {}",

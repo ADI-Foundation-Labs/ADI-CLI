@@ -12,7 +12,7 @@ pub use error::{Result, UpgradeError};
 
 pub mod versions;
 
-pub use versions::{get_handler, is_supported, PostUpgradeHook, VersionHandler};
+pub use versions::{get_handler, PostUpgradeHook, VersionHandler};
 
 mod config;
 
