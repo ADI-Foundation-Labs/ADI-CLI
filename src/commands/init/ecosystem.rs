@@ -119,7 +119,6 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
             Reinitialize,
             Cancel,
         }
-
         // With -y flag, auto-select reinitialize
         let action = if args.yes {
             ui::info("Auto-selecting reinitialize (--yes flag)")?;

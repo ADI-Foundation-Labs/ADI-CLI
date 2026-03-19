@@ -206,7 +206,6 @@ pub fn prompt_and_save_chain_config(
         add_chain_to_config(chain, config_path)?;
         return Ok(true);
     }
-
     let save: bool = ui::confirm(format!(
         "Save chain configuration to {}?",
         ui::green(config_path.display())
