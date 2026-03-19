@@ -19,6 +19,7 @@ mod owners;
 mod server_params;
 mod state;
 mod transfer;
+mod upgrade;
 mod verify;
 mod version;
 
@@ -52,6 +53,8 @@ pub enum Commands {
     State(state::StateArgs),
     /// Generate shell completion scripts
     Completions(completions::CompletionsArgs),
+    /// Upgrade ecosystem and chain contracts to a new protocol version
+    Upgrade(upgrade::UpgradeArgs),
 }
 
 impl Commands {
@@ -71,6 +74,7 @@ impl Commands {
             Commands::ServerParams(args) => server_params::run(&args, context).await,
             Commands::State(args) => state::run(&args, context).await,
             Commands::Completions(args) => completions::run(&args).await,
+            Commands::Upgrade(args) => upgrade::run(args, context).await,
         }
     }
 }

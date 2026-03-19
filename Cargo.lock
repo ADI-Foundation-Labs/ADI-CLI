@@ -11,6 +11,7 @@ dependencies = [
  "adi-state",
  "adi-toolkit",
  "adi-types",
+ "adi-upgrade",
  "alloy-primitives",
  "alloy-provider",
  "alloy-rpc-types",

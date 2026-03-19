@@ -193,6 +193,7 @@ adi-ecosystem = { workspace = true }
 adi-state = { workspace = true }
 adi-funding = { workspace = true }
 adi-types = { workspace = true }
+adi-upgrade = { workspace = true }
 
 # EVM types
 alloy-primitives = { workspace = true }
