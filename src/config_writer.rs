@@ -197,7 +197,15 @@ fn insert_chains_under_ecosystem(content: &str, chain_yaml: &str) -> Result<Stri
 /// * `Ok(true)` - User confirmed and save succeeded
 /// * `Ok(false)` - User declined to save
 /// * `Err(_)` - Save failed
-pub fn prompt_and_save_chain_config(chain: &ChainDefaults, config_path: &Path) -> Result<bool> {
+pub fn prompt_and_save_chain_config(
+    chain: &ChainDefaults,
+    config_path: &Path,
+    force: bool,
+) -> Result<bool> {
+    if force {
+        add_chain_to_config(chain, config_path)?;
+        return Ok(true);
+    }
     let save: bool = ui::confirm(format!(
         "Save chain configuration to {}?",
         ui::green(config_path.display())

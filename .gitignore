@@ -19,3 +19,4 @@ target/
 .adi.yml
 .state
 anvil-zksync.log
+zksync-era

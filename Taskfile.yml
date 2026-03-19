@@ -36,8 +36,8 @@ tasks:
   install:
     desc: Install the adi CLI to ~/.cargo/bin (requires ~/.cargo/bin in PATH)
     preconditions:
-    - sh: 'echo "$PATH" | grep -q "$HOME/.cargo/bin"'
-      msg: "$HOME/.cargo/bin is not in PATH"
+      - sh: 'echo "$PATH" | grep -q "$HOME/.cargo/bin"'
+        msg: "$HOME/.cargo/bin is not in PATH"
     deps:
       - _install_rust
     cmds:
@@ -107,7 +107,7 @@ tasks:
     vars:
       ARCH_SLUG: '{{default "arm64" .ARCH_SLUG}}'
       REF_SLUG: '{{default "main" .CI_COMMIT_REF_SLUG}}'
-      CACHE_TO_REF: '{{.REGISTRY}}/adi-toolkit:cache-{{.ARCH_SLUG}}-{{.REF_SLUG}}'
+      CACHE_TO_REF: "{{.REGISTRY}}/adi-toolkit:cache-{{.ARCH_SLUG}}-{{.REF_SLUG}}"
       LOAD: '{{default "true" .LOAD}}'
       PUSH: '{{default "false" .PUSH}}'
     cmds:
@@ -133,7 +133,7 @@ tasks:
     desc: Build Docker image for linux/amd64 (load/push configurable)
     vars:
       REF_SLUG: '{{default "main" .CI_COMMIT_REF_SLUG}}'
-      CACHE_TO_REF: '{{.REGISTRY}}/adi-toolkit:cache-amd64-{{.REF_SLUG}}'
+      CACHE_TO_REF: "{{.REGISTRY}}/adi-toolkit:cache-amd64-{{.REF_SLUG}}"
       LOAD: '{{default "true" .LOAD}}'
       PUSH: '{{default "false" .PUSH}}'
     cmds:
@@ -150,7 +150,7 @@ tasks:
     desc: Build Docker image for linux/arm64 (load/push configurable)
     vars:
       REF_SLUG: '{{default "main" .CI_COMMIT_REF_SLUG}}'
-      CACHE_TO_REF: '{{.REGISTRY}}/adi-toolkit:cache-arm64-{{.REF_SLUG}}'
+      CACHE_TO_REF: "{{.REGISTRY}}/adi-toolkit:cache-arm64-{{.REF_SLUG}}"
       LOAD: '{{default "true" .LOAD}}'
       PUSH: '{{default "false" .PUSH}}'
     cmds:
@@ -164,14 +164,18 @@ tasks:
           PUSH: "{{.PUSH}}"
 
   build:docker:local:
-    desc: Build Docker image locally (no registry access required)
+    desc: Build Docker image locally (no registry access required). Use NO_CACHE=1 to disable layer cache.
     vars:
       PLATFORM: '{{default "linux/arm64" .PLATFORM}}'
+      NO_CACHE: '{{default "" .NO_CACHE}}'
     cmds:
       - |
         PLATFORM={{.PLATFORM}} \
+        NO_CACHE={{.NO_CACHE}} \
         TAG_SUFFIX="" \
-        docker buildx bake -f docker/docker-bake.hcl --load {{.TARGETS}}
+        docker buildx bake -f docker/docker-bake.hcl \
+        {{if eq .NO_CACHE "1"}}--no-cache{{end}} \
+        --load {{.TARGETS}}
 
   build:docker:manifest:
     desc: Create and push multiarch manifest

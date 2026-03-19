@@ -184,7 +184,11 @@ pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
     }
 
     // 11. Offer to save chain config (before Docker operations)
-    config_writer::prompt_and_save_chain_config(&chain_defaults, context.config_path())?;
+    config_writer::prompt_and_save_chain_config(
+        &chain_defaults,
+        context.config_path(),
+        args.force,
+    )?;
 
     // 12. Create chain using shared chain_ops module
     chain_ops::create_chain(
