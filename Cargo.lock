@@ -159,9 +159,17 @@ dependencies = [
 name = "adi-upgrade"
 version = "0.1.0"
 dependencies = [
+ "adi-state",
  "adi-toolkit",
+ "adi-types",
+ "alloy-primitives",
  "eyre",
+ "log",
+ "serde",
+ "serde_yaml",
  "thiserror",
+ "tokio",
+ "url",
 ]
 
 [[package]]
