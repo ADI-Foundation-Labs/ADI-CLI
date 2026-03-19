@@ -53,11 +53,13 @@ pub struct UpgradeArgs {
 
 /// Execute the upgrade command.
 pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
-    use crate::commands::helpers::resolve_ecosystem_name;
+    use crate::commands::helpers::{
+        create_state_manager_with_s3, resolve_ecosystem_name, resolve_rpc_url,
+    };
     use crate::error::WrapErr;
     use crate::ui;
     use adi_toolkit::ProtocolVersion;
-    use adi_upgrade::{get_handler, is_supported};
+    use adi_upgrade::{get_handler, is_supported, UpgradeConfig};
 
     let ecosystem_name = resolve_ecosystem_name(args.ecosystem_name.as_ref(), context.config())?;
 
@@ -86,10 +88,37 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
         ui::green(handler.upgrade_script())
     ))?;
 
-    let hooks = handler.post_upgrade_hooks();
-    if !hooks.is_empty() {
-        ui::info(format!("Post-upgrade hooks: {:?}", hooks))?;
-    }
+    // Resolve RPC URL
+    let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
+    ui::info(format!("RPC URL: {}", ui::green(&rpc_url)))?;
+
+    // Load ecosystem state
+    let (state_manager, _s3_control) =
+        create_state_manager_with_s3(&ecosystem_name, context).await?;
+
+    // Build upgrade config
+    let upgrade_config = UpgradeConfig::from_state(
+        &state_manager,
+        &ecosystem_name,
+        rpc_url,
+        args.gas_multiplier,
+    )
+    .await
+    .wrap_err("Failed to build upgrade config")?;
+
+    ui::note(
+        "Upgrade Configuration",
+        format!(
+            "Governor: {}\nDeployer: {}\nBridgehub: {}\nGas multiplier: {}",
+            ui::green(upgrade_config.governor_address),
+            ui::green(upgrade_config.deployer_address),
+            upgrade_config
+                .bridgehub_address
+                .map(|a| ui::green(a).to_string())
+                .unwrap_or_else(|| "(not deployed)".to_string()),
+            upgrade_config.gas_multiplier
+        ),
+    )?;
 
     ui::note(
         "Upgrade Target",
@@ -101,7 +130,7 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
         ),
     )?;
 
-    ui::outro("Upgrade command registered (implementation pending)")?;
+    ui::outro("Config loaded (simulation phase pending)")?;
 
     Ok(())
 }
