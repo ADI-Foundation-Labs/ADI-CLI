@@ -29,3 +29,7 @@ pub use broadcast::{run_broadcast, BroadcastResult};
 pub mod validation;
 
 pub use validation::{validate_upgrade_output, BytecodeManifest, ValidationReport};
+
+pub mod governance;
+
+pub use governance::EcosystemGovernance;

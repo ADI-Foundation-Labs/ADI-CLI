@@ -16,9 +16,17 @@ adi-state = { workspace = true }
 adi-toolkit = { workspace = true }
 adi-types = { workspace = true }
 alloy-primitives = { workspace = true }
+alloy-provider = { workspace = true }
+alloy-network = { workspace = true }
+alloy-signer-local = { workspace = true }
+alloy-sol-types = { workspace = true }
+alloy-rpc-types = { workspace = true }
+alloy-contract = { workspace = true }
 async-trait = { workspace = true }
 eyre = { workspace = true }
+hex = { workspace = true }
 log = { workspace = true }
+secrecy = { workspace = true }
 semver = { workspace = true }
 serde = { workspace = true }
 serde_yaml = { workspace = true }
