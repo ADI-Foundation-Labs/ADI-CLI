@@ -16,8 +16,10 @@ adi-state = { workspace = true }
 adi-toolkit = { workspace = true }
 adi-types = { workspace = true }
 alloy-primitives = { workspace = true }
+async-trait = { workspace = true }
 eyre = { workspace = true }
 log = { workspace = true }
+semver = { workspace = true }
 serde = { workspace = true }
 serde_yaml = { workspace = true }
 thiserror = { workspace = true }

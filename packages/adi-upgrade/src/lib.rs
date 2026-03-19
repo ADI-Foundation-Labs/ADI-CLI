@@ -17,3 +17,7 @@ pub use versions::{get_handler, is_supported, PostUpgradeHook, VersionHandler};
 mod config;
 
 pub use config::UpgradeConfig;
+
+mod simulation;
+
+pub use simulation::{run_simulation, SimulationResult, ToolkitRunnerTrait};
