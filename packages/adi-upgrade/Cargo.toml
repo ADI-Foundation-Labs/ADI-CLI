@@ -1,0 +1,16 @@
+[package]
+name = "adi-upgrade"
+version.workspace = true
+edition.workspace = true
+description = "SDK for upgrading ZkSync ecosystem contracts"
+
+[lints]
+workspace = true
+
+[lib]
+name = "adi_upgrade"
+path = "src/lib.rs"
+
+[dependencies]
+thiserror = { workspace = true }
+eyre = { workspace = true }

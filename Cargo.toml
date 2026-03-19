@@ -166,6 +166,7 @@ adi-ecosystem = { path = "packages/adi-ecosystem" }
 adi-types = { path = "packages/adi-types" }
 adi-state = { path = "packages/adi-state" }
 adi-funding = { path = "packages/adi-funding" }
+adi-upgrade = { path = "packages/adi-upgrade" }
 
 [lints]
 workspace = true
