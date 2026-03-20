@@ -30,10 +30,32 @@ pub mod validation;
 
 pub use validation::{validate_upgrade_output, BytecodeManifest, ValidationReport};
 
-pub mod governance;
-
-pub use governance::EcosystemGovernance;
-
 mod orchestrator;
 
 pub use orchestrator::UpgradeOrchestrator;
+
+pub mod onchain;
+
+pub mod chain_toml;
+
+pub use chain_toml::{
+    generate_chain_toml, write_chain_toml, ChainTomlConfig, PreviousUpgradeValues,
+};
+
+pub mod upgrade_yaml;
+
+pub use upgrade_yaml::{load_previous_upgrade_values, save_upgrade_yaml};
+
+pub mod governance;
+
+pub use governance::{
+    encode_governance_calls, execute_governance, extract_stage1_calls,
+    resolve_governance_contracts, GovernanceAddresses, GovernanceCalldata, GovernanceResult,
+};
+
+pub mod chain_upgrade;
+
+pub use chain_upgrade::{
+    extract_chain_calldatas, resolve_chain_contracts, run_chain_upgrade, verify_protocol_versions,
+    version_to_protocol_uint, ChainCalldatas, ChainContracts, ChainUpgradeResult,
+};

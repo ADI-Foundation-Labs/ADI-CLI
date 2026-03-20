@@ -54,6 +54,10 @@ pub struct UpgradeArgs {
     /// Ecosystem name
     #[arg(long)]
     pub ecosystem_name: Option<String>,
+
+    /// Path to previous upgrade YAML (for [state_transition] values)
+    #[arg(long)]
+    pub previous_upgrade_yaml: Option<std::path::PathBuf>,
 }
 
 /// Wrapper to adapt ToolkitRunner to ToolkitRunnerTrait.
@@ -72,6 +76,39 @@ impl adi_upgrade::ToolkitRunnerTrait for ToolkitRunnerWrapper {
             .await
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
     }
+
+    async fn run_command(
+        &self,
+        command: &[&str],
+        state_dir: &Path,
+        protocol_version: &semver::Version,
+        env_vars: &[(&str, &str)],
+    ) -> std::result::Result<i64, Box<dyn std::error::Error + Send + Sync>> {
+        self.0
+            .run_command(
+                command,
+                state_dir,
+                protocol_version,
+                env_vars,
+                "upgrade",
+                "Running upgrade...",
+            )
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+    }
+
+    async fn run_zkstack(
+        &self,
+        args: &[&str],
+        state_dir: &Path,
+        log_dir: &Path,
+        protocol_version: &semver::Version,
+    ) -> std::result::Result<i64, Box<dyn std::error::Error + Send + Sync>> {
+        self.0
+            .run_zkstack(args, state_dir, log_dir, protocol_version)
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+    }
 }
 
 /// Execute the upgrade command.
@@ -82,7 +119,10 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
     use crate::error::WrapErr;
     use crate::ui;
     use adi_toolkit::ProtocolVersion;
-    use adi_upgrade::{get_handler, UpgradeConfig, UpgradeOrchestrator};
+    use adi_upgrade::{
+        get_handler, load_previous_upgrade_values, onchain, UpgradeConfig, UpgradeOrchestrator,
+    };
+    use alloy_provider::Provider;
 
     let ecosystem_name = resolve_ecosystem_name(args.ecosystem_name.as_ref(), context.config())?;
 
@@ -113,11 +153,13 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
         create_state_manager_with_s3(&ecosystem_name, context).await?;
 
     // Build upgrade config
+    let state_dir = context.config().state_dir.join(&ecosystem_name);
     let upgrade_config = UpgradeConfig::from_state(
         &state_manager,
         &ecosystem_name,
-        rpc_url,
+        rpc_url.clone(),
         args.gas_multiplier,
+        state_dir.clone(),
     )
     .await
     .wrap_err("Failed to build upgrade config")?;
@@ -128,25 +170,15 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
             "Governor: {}\nDeployer: {}\nBridgehub: {}\nGas multiplier: {}",
             ui::green(upgrade_config.governor_address),
             ui::green(upgrade_config.deployer_address),
-            upgrade_config
-                .bridgehub_address
-                .map(|a| ui::green(a).to_string())
-                .unwrap_or_else(|| "(not deployed)".to_string()),
+            ui::green(upgrade_config.bridgehub_address),
             upgrade_config.gas_multiplier
         ),
     )?;
 
-    ui::note(
-        "Upgrade Target",
-        format!(
-            "Target: {:?}\nChain: {}\nSkip simulation: {}",
-            args.target,
-            args.chain.as_deref().unwrap_or("(all)"),
-            args.skip_simulation
-        ),
-    )?;
+    // Create alloy provider for on-chain queries
+    let provider = onchain::create_provider(&rpc_url);
 
-    // Create toolkit runner and orchestrator
+    // Create toolkit runner
     let runner = adi_toolkit::ToolkitRunner::with_config_and_logger(
         context.toolkit_config(),
         Arc::clone(context.logger()),
@@ -154,55 +186,109 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
     .await
     .wrap_err("Failed to create toolkit runner")?;
     let wrapper = ToolkitRunnerWrapper(runner);
-    let state_dir = context.config().state_dir.join(&ecosystem_name);
 
+    // Create orchestrator
     let orchestrator = UpgradeOrchestrator::new(
         handler.as_ref(),
         &upgrade_config,
         &state_dir,
         &wrapper,
+        &provider,
         version.to_semver(),
     );
 
-    // Simulation phase
-    if !args.skip_simulation {
-        ui::info("Running upgrade simulation...")?;
-
-        let simulation_result = orchestrator.simulate().await?;
-
-        if !simulation_result.success {
-            return Err(eyre::eyre!(simulation_result.summary));
-        }
-
-        ui::note("Simulation Result", &simulation_result.summary)?;
-
-        let proceed: bool = ui::confirm("Proceed with broadcast?")
-            .initial_value(false)
-            .interact()
-            .wrap_err("Confirmation cancelled")?;
-
-        if !proceed {
-            ui::outro_cancel("Upgrade cancelled by user")?;
-            return Ok(());
-        }
-    }
-
-    // Broadcast phase
-    ui::info("Running upgrade broadcast...")?;
-    let broadcast_result = orchestrator.broadcast().await?;
-
-    if broadcast_result.success {
-        ui::success("Broadcast completed successfully")?;
-    }
-
-    // Validate bytecode (if output exists)
-    // TODO: Load manifest from toolkit image and validate
-    ui::info("Bytecode validation: skipped (manifest not yet available)")?;
-
-    // Chain upgrades (if target includes chains)
+    // Determine upgrade targets
+    let upgrade_ecosystem = matches!(args.target, UpgradeTarget::Ecosystem | UpgradeTarget::Both);
     let upgrade_chains = matches!(args.target, UpgradeTarget::Chain | UpgradeTarget::Both);
 
+    if upgrade_ecosystem {
+        ui::section("L1 Ecosystem Upgrade")?;
+
+        // Load previous upgrade values
+        let previous_values = load_previous_upgrade_values(
+            args.previous_upgrade_yaml.as_deref(),
+            &state_dir,
+            handler.upgrade_output_yaml(),
+        )?;
+
+        // Get chain ID for chain.toml generation (use first chain)
+        let chain_names = state_manager.list_chains().await?;
+        let chain_id = if let Some(first_chain) = chain_names.first() {
+            let chain_meta = state_manager
+                .chain(first_chain)
+                .metadata()
+                .await
+                .map_err(|e| eyre::eyre!("Failed to load chain metadata: {e}"))?;
+            chain_meta.chain_id
+        } else {
+            return Err(eyre::eyre!("No chains found in ecosystem state"));
+        };
+
+        // Phase 1: Prepare config
+        ui::info("Preparing upgrade configuration...")?;
+        orchestrator
+            .prepare_config(chain_id, &previous_values)
+            .await?;
+        ui::success("chain.toml generated")?;
+
+        // Phase 2: Simulation
+        if !args.skip_simulation {
+            ui::info("Running upgrade simulation...")?;
+            let simulation_result = orchestrator.simulate().await?;
+
+            if !simulation_result.success {
+                return Err(eyre::eyre!(simulation_result.summary));
+            }
+
+            ui::note("Simulation Result", &simulation_result.summary)?;
+
+            let proceed: bool = ui::confirm("Proceed with broadcast?")
+                .initial_value(false)
+                .interact()
+                .wrap_err("Confirmation cancelled")?;
+
+            if !proceed {
+                ui::outro_cancel("Upgrade cancelled by user")?;
+                return Ok(());
+            }
+        }
+
+        // Phase 3: Broadcast
+        ui::info("Running upgrade broadcast...")?;
+        let broadcast_result = orchestrator.broadcast().await?;
+
+        if broadcast_result.success {
+            ui::success("Broadcast completed successfully")?;
+        }
+
+        // Phase 4: Generate upgrade YAML
+        ui::info("Generating upgrade YAML...")?;
+        let l1_chain_id = provider
+            .get_chain_id()
+            .await
+            .map_err(|e| eyre::eyre!("Failed to get L1 chain ID: {e}"))?;
+        orchestrator.generate_upgrade_yaml(l1_chain_id).await?;
+        ui::success("Upgrade YAML generated")?;
+
+        // Phase 5: Governance execution
+        ui::info("Executing governance transactions...")?;
+        let gov_result = orchestrator.execute_governance().await?;
+        ui::success(format!(
+            "Governance executed: schedule={}, execute={}",
+            gov_result.schedule_tx_hash, gov_result.execute_tx_hash,
+        ))?;
+
+        // Save upgrade YAML for future use
+        match orchestrator.save_upgrade_yaml() {
+            Ok(path) => ui::success(format!("Upgrade YAML saved to {}", path.display()))?,
+            Err(e) => ui::warning(format!("Failed to save upgrade YAML: {e}"))?,
+        }
+    }
+
+    // Chain upgrades
     if upgrade_chains {
+        ui::section("L2 Chain Upgrades")?;
+
         let chain_names = state_manager.list_chains().await?;
 
         if chain_names.is_empty() {
@@ -212,7 +298,44 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
 
             for chain_name in &selected_chains {
                 ui::info(format!("Upgrading chain: {}", ui::green(chain_name)))?;
-                // TODO: Implement chain upgrade
+
+                let chain_meta = state_manager
+                    .chain(chain_name)
+                    .metadata()
+                    .await
+                    .map_err(|e| {
+                        eyre::eyre!("Failed to load chain metadata for {chain_name}: {e}")
+                    })?;
+
+                let upgrade_yaml_path = state_dir
+                    .join("l1-contracts")
+                    .join("script-out")
+                    .join(handler.upgrade_output_yaml());
+
+                let result = adi_upgrade::run_chain_upgrade(
+                    &wrapper,
+                    &provider,
+                    chain_name,
+                    chain_meta.chain_id,
+                    upgrade_config.bridgehub_address,
+                    &upgrade_config.governor_private_key,
+                    handler.upgrade_name(),
+                    &upgrade_yaml_path,
+                    rpc_url.as_str(),
+                    "http://127.0.0.1:3050",
+                    &state_dir,
+                    &version.to_semver(),
+                )
+                .await?;
+
+                if result.versions_match {
+                    ui::success(format!("Chain '{}' upgraded successfully", chain_name))?;
+                } else {
+                    ui::warning(format!(
+                        "Chain '{}' upgrade completed but protocol versions don't match",
+                        chain_name
+                    ))?;
+                }
             }
         }
     }

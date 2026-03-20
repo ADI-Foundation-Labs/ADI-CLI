@@ -1,10 +1,10 @@
 //! Upgrade configuration generation.
 
-use std::io::Write;
-use std::path::Path;
+use std::path::PathBuf;
 
 use adi_state::StateManager;
-use alloy_primitives::Address;
+use alloy_primitives::{Address, B256};
+use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -25,14 +25,25 @@ pub struct UpgradeConfig {
     /// Deployer address (from wallets.yaml).
     pub deployer_address: Address,
 
-    /// Bridgehub address.
-    pub bridgehub_address: Option<Address>,
+    /// Governor private key (from wallets.yaml).
+    #[serde(skip)]
+    pub governor_private_key: SecretString,
 
-    /// CTM address (queried on-chain).
-    pub ctm_address: Option<Address>,
+    /// Deployer private key (from wallets.yaml).
+    #[serde(skip)]
+    pub deployer_private_key: SecretString,
 
-    /// Governance address (queried on-chain).
-    pub governance_address: Option<Address>,
+    /// Bridgehub proxy address (required).
+    pub bridgehub_address: Address,
+
+    /// Create2 factory address.
+    pub create2_factory_addr: Option<Address>,
+
+    /// Create2 factory salt.
+    pub create2_factory_salt: Option<B256>,
+
+    /// Ecosystem state directory path.
+    pub state_dir: PathBuf,
 
     /// Gas price multiplier.
     pub gas_multiplier: f64,
@@ -47,6 +58,7 @@ impl UpgradeConfig {
     /// * `ecosystem_name` - Name of the ecosystem
     /// * `l1_rpc_url` - Settlement layer RPC URL
     /// * `gas_multiplier` - Gas price multiplier
+    /// * `state_dir` - Ecosystem state directory path
     ///
     /// # Errors
     ///
@@ -57,6 +69,7 @@ impl UpgradeConfig {
         ecosystem_name: &str,
         l1_rpc_url: Url,
         gas_multiplier: f64,
+        state_dir: PathBuf,
     ) -> Result<Self> {
         log::debug!("Loading upgrade config from state");
 
@@ -66,21 +79,19 @@ impl UpgradeConfig {
             .await
             .map_err(|e| UpgradeError::Config(format!("Failed to load wallets: {e}")))?;
 
-        let governor_address = wallets
-            .governor
-            .as_ref()
-            .map(|w| w.address)
-            .ok_or_else(|| {
-                UpgradeError::Config("Governor wallet not found in state".to_string())
-            })?;
+        let governor = wallets.governor.as_ref().ok_or_else(|| {
+            UpgradeError::Config("Governor wallet not found in state".to_string())
+        })?;
 
-        let deployer_address = wallets
-            .deployer
-            .as_ref()
-            .map(|w| w.address)
-            .ok_or_else(|| {
-                UpgradeError::Config("Deployer wallet not found in state".to_string())
-            })?;
+        let governor_address = governor.address;
+        let governor_private_key = SecretString::from(governor.expose_private_key().to_string());
+
+        let deployer = wallets.deployer.as_ref().ok_or_else(|| {
+            UpgradeError::Config("Deployer wallet not found in state".to_string())
+        })?;
+
+        let deployer_address = deployer.address;
+        let deployer_private_key = SecretString::from(deployer.expose_private_key().to_string());
 
         let contracts = state_manager
             .ecosystem()
@@ -91,43 +102,24 @@ impl UpgradeConfig {
         let bridgehub_address = contracts
             .core_ecosystem_contracts
             .as_ref()
-            .and_then(|c| c.bridgehub_proxy_addr);
+            .and_then(|c| c.bridgehub_proxy_addr)
+            .ok_or_else(|| UpgradeError::Config("Bridgehub address not found in state".into()))?;
+
+        let create2_factory_addr = contracts.create2_factory_addr;
+        let create2_factory_salt = contracts.create2_factory_salt;
 
         Ok(Self {
             l1_rpc_url,
             ecosystem_name: ecosystem_name.to_string(),
             governor_address,
             deployer_address,
+            governor_private_key,
+            deployer_private_key,
             bridgehub_address,
-            ctm_address: None,
-            governance_address: None,
+            create2_factory_addr,
+            create2_factory_salt,
+            state_dir,
             gas_multiplier,
         })
-    }
-
-    /// Write config to chain.toml format for forge script.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`UpgradeError::Config`] if the file cannot be created or written.
-    pub fn write_chain_toml(&self, path: &Path) -> Result<()> {
-        log::debug!("Writing chain.toml to {}", path.display());
-
-        let content = format!(
-            r#"[profile.default]
-l1_rpc_url = "{}"
-governor = "{}"
-deployer = "{}"
-"#,
-            self.l1_rpc_url, self.governor_address, self.deployer_address,
-        );
-
-        let mut file = std::fs::File::create(path)
-            .map_err(|e| UpgradeError::Config(format!("Failed to create chain.toml: {e}")))?;
-
-        file.write_all(content.as_bytes())
-            .map_err(|e| UpgradeError::Config(format!("Failed to write chain.toml: {e}")))?;
-
-        Ok(())
     }
 }

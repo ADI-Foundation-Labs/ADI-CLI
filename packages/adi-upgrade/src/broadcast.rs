@@ -17,9 +17,6 @@ pub struct BroadcastResult {
 
     /// Exit code from forge
     pub exit_code: i64,
-
-    /// Path to output YAML file
-    pub output_path: Option<std::path::PathBuf>,
 }
 
 /// Run upgrade broadcast (forge script with --broadcast).
@@ -41,24 +38,42 @@ pub async fn run_broadcast<R>(
 where
     R: ToolkitRunnerTrait,
 {
+    use secrecy::ExposeSecret;
+
     log::info!("Running upgrade broadcast");
-    log::debug!("Upgrade script: {}", handler.upgrade_script());
 
-    let script_path = handler.upgrade_script();
-
-    // Build forge command args with --broadcast
+    let script_path = format!("deploy-scripts/upgrade/{}", handler.upgrade_script());
     let rpc_url = config.l1_rpc_url.to_string();
-    let args = vec![
-        "script",
-        script_path,
-        "--rpc-url",
-        &rpc_url,
-        "--broadcast",
-        "-vvv",
+    let deployer_pk = config.deployer_private_key.expose_secret().to_string();
+    let gas_price = format!("{}", compute_gas_price(config.gas_multiplier));
+
+    let env_input = format!("/{}/chain.toml", handler.upgrade_env_dir());
+    let env_output = format!("/script-out/{}", handler.upgrade_output_toml());
+
+    let env_vars: Vec<(&str, &str)> = vec![
+        ("UPGRADE_ECOSYSTEM_INPUT", &env_input),
+        ("UPGRADE_ECOSYSTEM_OUTPUT", &env_output),
     ];
 
+    let mut args = vec![
+        "forge",
+        "script",
+        &script_path,
+        "--ffi",
+        "--rpc-url",
+        &rpc_url,
+        "--private-key",
+        &deployer_pk,
+        "--broadcast",
+    ];
+
+    if config.gas_multiplier > 0.0 {
+        args.push("--with-gas-price");
+        args.push(&gas_price);
+    }
+
     let exit_code = runner
-        .run_forge(&args, state_dir, protocol_version)
+        .run_command(&args, state_dir, protocol_version, &env_vars)
         .await
         .map_err(|e| UpgradeError::BroadcastFailed(e.to_string()))?;
 
@@ -71,9 +86,18 @@ where
         )));
     }
 
-    Ok(BroadcastResult {
-        success,
-        exit_code,
-        output_path: None, // TODO: parse output path
-    })
+    Ok(BroadcastResult { success, exit_code })
+}
+
+/// Compute gas price in wei from multiplier.
+///
+/// Uses a base gas price and applies the multiplier.
+/// For example, multiplier 1.2 with base 20 gwei = 24 gwei.
+fn compute_gas_price(multiplier: f64) -> u128 {
+    const BASE_GAS_PRICE_GWEI: u128 = 20;
+    const GWEI_TO_WEI: u128 = 1_000_000_000;
+
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let price = (BASE_GAS_PRICE_GWEI as f64 * multiplier * GWEI_TO_WEI as f64) as u128;
+    price
 }

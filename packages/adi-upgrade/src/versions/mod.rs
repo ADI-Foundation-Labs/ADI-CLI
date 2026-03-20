@@ -18,8 +18,26 @@ pub trait VersionHandler: Send + Sync {
     /// Forge script path for this version's upgrade.
     fn upgrade_script(&self) -> &str;
 
+    /// Directory for upgrade environment config (e.g., "upgrade-envs/v0.30.1-airbender-fix").
+    fn upgrade_env_dir(&self) -> &str;
+
+    /// Output TOML filename from forge script.
+    fn upgrade_output_toml(&self) -> &str;
+
+    /// Output YAML filename (the ecosystem upgrade output).
+    fn upgrade_output_yaml(&self) -> &str;
+
+    /// Upgrade name for zkstack (e.g., "v30-zk-sync-os-blobs").
+    fn upgrade_name(&self) -> &str;
+
+    /// Old protocol version hex for chain.toml (e.g., "0x1e00000000").
+    fn old_protocol_version_hex(&self) -> &str;
+
     /// Post-upgrade hooks to run after governance execution.
     fn post_upgrade_hooks(&self) -> Vec<PostUpgradeHook>;
+
+    /// Return version-specific chain.toml defaults as a typed config.
+    fn chain_toml_defaults(&self) -> crate::chain_toml::ChainTomlConfig;
 }
 
 /// Get the appropriate handler for a protocol version.
@@ -32,10 +50,4 @@ pub fn get_handler(version: &ProtocolVersion) -> Option<Box<dyn VersionHandler>>
     match version {
         ProtocolVersion::V0_30_1 => Some(Box::new(v0_30::V0_30_1Handler)),
     }
-}
-
-/// Check if a protocol version is supported for upgrades.
-#[must_use]
-pub fn is_supported(version: &ProtocolVersion) -> bool {
-    get_handler(version).is_some()
 }
