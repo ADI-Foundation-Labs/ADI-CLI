@@ -60,5 +60,6 @@ target "toolkit-v0-30-1" {
     CONTRACTS_COMMIT = "9ddc915c85d1f44c79b5d55e160d384138ed5105"
     FOUNDRY_ZKSYNC_VERSION = "latest"
     GENESIS_COMMIT = "a8e6de4f4f260ab33bb2ac57c441c0bec4a8fb2c"
+    ERA_CONTRACTS_TAG = "vb-v30.1-upgrade"
   }
 }

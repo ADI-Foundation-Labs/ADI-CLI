@@ -1,7 +1,8 @@
 version: "3.8"
 services:
   server:
-    image: ghcr.io/matter-labs/zksync-os-server:v0.13.0
+    # image: ghcr.io/matter-labs/zksync-os-server:v0.13.0
+    image: harbor.sre.ideasoft.io/adi-chain/server:v0.10.1-b6
     container_name: server
     platform: linux/amd64
     restart: unless-stopped
@@ -10,13 +11,14 @@ services:
     ports:
       - "3050:3050"
     environment:
-      sequencer_base_fee_override: "0x3e8"
+      # sequencer_base_fee_override: "0x3e8"
+      sequencer_base_fee_override: 1000
       sequencer_pubdata_price_override: "0x1"
       sequencer_native_price_override: "0x1"
       sequencer_block_dump_path: "/chain/db/block_dumps"
-
       general_rocks_db_path: "/chain/db/node1"
-      general_l1_rpc_url: "https://rpc.ab.testnet.adifoundation.ai"
+      # general_l1_rpc_url: "https://rpc.ab.testnet.adifoundation.ai"
+      general_l1_rpc_url: "http://host.docker.internal:8545/"
 
       # To get server params such as:
       #  - `genesis_bridgehub_address`
@@ -27,11 +29,11 @@ services:
       #
       # run command: `adi server-params`
 
-      genesis_bytecode_supplier_address: "0x0ABCe1cb5b50AAbE10Cf57972a4fdF13B491990e"
+      genesis_bytecode_supplier_address: "0x22896cC7869BB770a5fdE73e59d9500773E8E54F"
       genesis_genesis_input_path: "/genesis/genesis.json"
       l1_sender_max_fee_per_blob_gas_gwei: 15
 
-      genesis_bridgehub_address: "0xc3FAe584D9e28Ab87Ffc276f20f807353a9FEACC"
+      genesis_bridgehub_address: "0x9500A46983b78C68065e0d7Ba099a9A5846c065D"
       genesis_chain_id: 222
 
       prover_api_object_store_file_backed_base_path: "/shared"
@@ -45,18 +47,20 @@ services:
       batcher_batch_timeout: "10s"
       batcher_blocks_per_batch_limit: 10
 
-      l1_sender_operator_commit_pk: "0x5a80a87e88e45ddc107f63bd184f37f0f43cbe0db6f9cd323d118b82e2604c22"
-      l1_sender_operator_prove_pk: "0xb2dc5172cc4e74aee012a80dcacbef1ae90744cb9296af5d89bc96a9723f6711"
-      l1_sender_operator_execute_pk: "0xc02c52feaa7faea6b310c5689ebdaab4fe5205553a363a6debc1dd744323bafd"
-      l1_sender_max_fee_per_gas_gwei: 1500
-      l1_sender_max_priority_fee_per_gas_gwei: 1500
+      l1_sender_operator_commit_pk: "0xe5499d7dff364a544aa045db977de8bb899c057aba1e3ec9cf3598046139b8ac"
+      l1_sender_operator_prove_pk: "0x310cd8acdbe47b380d4f2030eb03cbd277d697a44292a33c6b2bacb64391ffc2"
+      l1_sender_operator_execute_pk: "0xf556cb0ecd63a8c572ca0eab69fd7e0a45a95d3b94fb0812f3d222600829abe8"
+      # l1_sender_max_fee_per_gas_gwei: 1500
+      # l1_sender_max_priority_fee_per_gas_gwei: 1500
+      l1_sender_max_fee_per_gas_gwei: 2
+      l1_sender_max_priority_fee_per_gas_gwei: 1
 
-      l1_sender_fusaka_upgrade_timestamp: 1771883505
-      l1_sender_pubdata_mode: "Calldata"
+      # l1_sender_fusaka_upgrade_timestamp: 1771883505
+      # l1_sender_pubdata_mode: "Calldata"
 
       RUST_LOG: "info,zksync_os_server=debug,zksync_os_sequencer=info,zksync_os_merkle_tree=info,zksync_os_priority_tree=info"
     volumes:
       - ./.state/volumes/chain:/chain
       - ./.state/volumes/shared:/shared
       # Change path to the genesis.json
-      - ./.state/l3eco/chains/adi/configs/genesis.json:/genesis/genesis.json:ro
+      - ./.state/adi_ecosystem/chains/adi/configs/genesis.json:/genesis/genesis.json:ro
