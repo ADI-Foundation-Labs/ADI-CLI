@@ -111,19 +111,42 @@ pub struct ChainCalldatas {
     pub chain_admin: Bytes,
 }
 
+/// Strip ANSI escape sequences (e.g. `\x1b[36m`) from a string.
+fn strip_ansi_codes(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    let mut chars = input.chars();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            // Skip until 'm' (end of SGR sequence)
+            for c2 in chars.by_ref() {
+                if c2 == 'm' {
+                    break;
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
 /// Extract chain upgrade calldatas from zkstack output file.
 ///
 /// Parses the `chain-upgrade.txt` output to find:
 /// - Schedule calldata from "Calldata to schedule upgrade" section
 /// - ChainAdmin calldata from "Full calldata to call `ChainAdmin` with" section
 pub fn extract_chain_calldatas(output: &str) -> Result<ChainCalldatas> {
+    // Strip ANSI escape codes — zkstack logs contain color codes whose digits
+    // would corrupt hex extraction (e.g. \x1b[36m contains '3','6').
+    let output = strip_ansi_codes(output);
+
     // Extract schedule calldata: find "data": "0x..." in the schedule section
-    let schedule_hex = extract_schedule_calldata(output)?;
+    let schedule_hex = extract_schedule_calldata(&output)?;
     let schedule = hex::decode(schedule_hex.trim_start_matches("0x"))
         .map_err(|e| UpgradeError::Config(format!("Invalid schedule calldata hex: {e}")))?;
 
     // Extract chainadmin calldata: hex line after "Full calldata to call `ChainAdmin` with"
-    let chain_admin_hex = extract_chainadmin_calldata(output)?;
+    let chain_admin_hex = extract_chainadmin_calldata(&output)?;
     let chain_admin = hex::decode(chain_admin_hex.trim_start_matches("0x"))
         .map_err(|e| UpgradeError::Config(format!("Invalid chainadmin calldata hex: {e}")))?;
 
@@ -319,10 +342,6 @@ where
         .and_then(|n| n.to_str())
         .ok_or_else(|| UpgradeError::Config("Invalid upgrade YAML path".into()))?;
 
-    let log_dir = state_dir.join("logs");
-    std::fs::create_dir_all(&log_dir)
-        .map_err(|e| UpgradeError::Config(format!("Failed to create log dir: {e}")))?;
-
     let chain_id_str = chain_id.to_string();
     let zkstack_args = vec![
         "dev",
@@ -341,7 +360,7 @@ where
     ];
 
     let exit_code = runner
-        .run_zkstack(&zkstack_args, state_dir, &log_dir, protocol_version)
+        .run_zkstack(&zkstack_args, state_dir, state_dir, protocol_version)
         .await
         .map_err(|e| UpgradeError::Config(format!("zkstack generate-chain-upgrade failed: {e}")))?;
 
@@ -352,11 +371,30 @@ where
         )));
     }
 
-    // Step 2: Extract calldatas from zkstack output
-    let output_path = log_dir.join("chain-upgrade.txt");
+    // Step 2: Extract calldatas from zkstack output (find latest zkstack log)
+    let zkstack_log_dir = state_dir.join("logs");
+    let output_path = std::fs::read_dir(&zkstack_log_dir)
+        .map_err(|e| {
+            UpgradeError::Config(format!(
+                "Failed to read log dir {}: {e}",
+                zkstack_log_dir.display()
+            ))
+        })?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_name().to_string_lossy().starts_with("zkstack_"))
+        .max_by_key(|e| e.metadata().and_then(|m| m.modified()).ok())
+        .map(|e| e.path())
+        .ok_or_else(|| {
+            UpgradeError::Config(format!(
+                "No zkstack log found in {}",
+                zkstack_log_dir.display()
+            ))
+        })?;
+
+    log::info!("Reading zkstack output from {}", output_path.display());
     let output_content = std::fs::read_to_string(&output_path).map_err(|e| {
         UpgradeError::Config(format!(
-            "Failed to read chain-upgrade.txt at {}: {e}",
+            "Failed to read zkstack log at {}: {e}",
             output_path.display()
         ))
     })?;

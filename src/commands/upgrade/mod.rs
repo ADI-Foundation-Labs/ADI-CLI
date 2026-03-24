@@ -28,8 +28,8 @@ pub enum UpgradeTarget {
 #[derive(Clone, Args, Debug, Serialize, Deserialize)]
 pub struct UpgradeArgs {
     /// Target protocol version (e.g., v0.30.1)
-    #[arg(long, required = true)]
-    pub protocol_version: String,
+    #[arg(long)]
+    pub protocol_version: Option<String>,
 
     /// Upgrade target: ecosystem, chain, or both
     #[arg(long, default_value = "both")]
@@ -46,10 +46,6 @@ pub struct UpgradeArgs {
     /// Settlement layer RPC URL
     #[arg(long)]
     pub rpc_url: Option<url::Url>,
-
-    /// Gas price multiplier
-    #[arg(long, default_value = "1.2")]
-    pub gas_multiplier: f64,
 
     /// Ecosystem name
     #[arg(long)]
@@ -126,18 +122,55 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
 
     let ecosystem_name = resolve_ecosystem_name(args.ecosystem_name.as_ref(), context.config())?;
 
-    ui::intro(format!(
-        "Upgrading {} to {}",
-        ui::green(&ecosystem_name),
-        ui::green(&args.protocol_version)
-    ))?;
+    // Resolve protocol version from arg, config, or interactive picker
+    let protocol_version_str = match args.protocol_version.as_ref() {
+        Some(v) => v.clone(),
+        None => {
+            if let Some(v) = context
+                .config()
+                .protocol_version
+                .as_ref()
+                .filter(|s| !s.is_empty())
+            {
+                v.clone()
+            } else {
+                use strum::IntoEnumIterator;
+                let versions: Vec<_> = ProtocolVersion::iter().collect();
+                match versions.len() {
+                    0 => return Err(eyre::eyre!("No supported protocol versions available")),
+                    1 => {
+                        let v = versions.first().ok_or_else(|| eyre::eyre!("No versions"))?;
+                        ui::info(format!("Auto-selected version: {}", ui::green(v)))?;
+                        v.to_string()
+                    }
+                    _ => {
+                        let items: Vec<(String, String, String)> = versions
+                            .iter()
+                            .map(|v: &ProtocolVersion| {
+                                (v.to_string(), v.to_string(), String::new())
+                            })
+                            .collect();
+                        ui::select("Select protocol version")
+                            .items(&items)
+                            .interact()
+                            .wrap_err("Version selection cancelled")?
+                    }
+                }
+            }
+        }
+    };
 
-    // Parse and validate protocol version
     let version =
-        ProtocolVersion::parse(&args.protocol_version).wrap_err("Invalid protocol version")?;
+        ProtocolVersion::parse(&protocol_version_str).wrap_err("Invalid protocol version")?;
 
     let handler = get_handler(&version)
         .ok_or_else(|| eyre::eyre!("Protocol version {} is not supported for upgrades", version))?;
+
+    ui::intro(format!(
+        "Upgrading {} to {}",
+        ui::green(&ecosystem_name),
+        ui::green(version)
+    ))?;
 
     ui::info(format!(
         "Using upgrade script: {}",
@@ -146,19 +179,35 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
 
     // Resolve RPC URL
     let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
+    // Normalize for host-side on-chain queries (host.docker.internal → localhost)
+    let normalized_rpc = adi_types::normalize_rpc_url(rpc_url.as_str());
+    let normalized_url: url::Url = normalized_rpc
+        .parse()
+        .wrap_err("Failed to parse normalized RPC URL")?;
     ui::info(format!("RPC URL: {}", ui::green(&rpc_url)))?;
 
     // Load ecosystem state
     let (state_manager, _s3_control) =
         create_state_manager_with_s3(&ecosystem_name, context).await?;
 
-    // Build upgrade config
+    // Validate state paths
     let state_dir = context.config().state_dir.join(&ecosystem_name);
+    crate::commands::state_paths::validate_and_fix_state_paths(&state_manager, &state_dir).await?;
+
+    // Build upgrade config
+
+    // Skip gas price for localhost (anvil), use config multiplier otherwise
+    let gas_multiplier = if adi_types::is_localhost_rpc(rpc_url.as_str()) {
+        None
+    } else {
+        Some(context.config().gas_multiplier)
+    };
+
     let upgrade_config = UpgradeConfig::from_state(
         &state_manager,
         &ecosystem_name,
         rpc_url.clone(),
-        args.gas_multiplier,
+        gas_multiplier,
         state_dir.clone(),
     )
     .await
@@ -171,12 +220,14 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
             ui::green(upgrade_config.governor_address),
             ui::green(upgrade_config.deployer_address),
             ui::green(upgrade_config.bridgehub_address),
-            upgrade_config.gas_multiplier
+            upgrade_config
+                .gas_multiplier
+                .map_or("disabled (localhost)".to_string(), |m| format!("{}%", m))
         ),
     )?;
 
-    // Create alloy provider for on-chain queries
-    let provider = onchain::create_provider(&rpc_url);
+    // Create alloy provider for on-chain queries (using normalized URL for host)
+    let provider = onchain::create_provider(&normalized_url);
 
     // Create toolkit runner
     let runner = adi_toolkit::ToolkitRunner::with_config_and_logger(
@@ -208,7 +259,7 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
         let previous_values = load_previous_upgrade_values(
             args.previous_upgrade_yaml.as_deref(),
             &state_dir,
-            handler.upgrade_output_yaml(),
+            handler.previous_upgrade_yaml(),
         )?;
 
         // Get chain ID for chain.toml generation (use first chain)
@@ -267,7 +318,7 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
             .get_chain_id()
             .await
             .map_err(|e| eyre::eyre!("Failed to get L1 chain ID: {e}"))?;
-        orchestrator.generate_upgrade_yaml(l1_chain_id).await?;
+        orchestrator.generate_upgrade_yaml(l1_chain_id)?;
         ui::success("Upgrade YAML generated")?;
 
         // Phase 5: Governance execution
@@ -307,10 +358,31 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
                         eyre::eyre!("Failed to load chain metadata for {chain_name}: {e}")
                     })?;
 
-                let upgrade_yaml_path = state_dir
+                let upgrade_yaml_source = state_dir
                     .join("l1-contracts")
                     .join("script-out")
                     .join(handler.upgrade_output_yaml());
+
+                // Copy YAML to state_dir root so zkstack finds it at /workspace/<filename>
+                let upgrade_yaml_path = state_dir.join(handler.upgrade_output_yaml());
+                std::fs::copy(&upgrade_yaml_source, &upgrade_yaml_path).wrap_err(format!(
+                    "Failed to copy upgrade YAML from {} to {}",
+                    upgrade_yaml_source.display(),
+                    upgrade_yaml_path.display()
+                ))?;
+
+                // Load chain governor key (chain admin owner, different from ecosystem governor)
+                let chain_wallets =
+                    state_manager
+                        .chain(chain_name)
+                        .wallets()
+                        .await
+                        .map_err(|e| {
+                            eyre::eyre!("Failed to load chain wallets for {chain_name}: {e}")
+                        })?;
+                let chain_governor = chain_wallets
+                    .governor
+                    .ok_or_else(|| eyre::eyre!("Chain '{chain_name}' has no governor wallet"))?;
 
                 let result = adi_upgrade::run_chain_upgrade(
                     &wrapper,
@@ -318,7 +390,7 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
                     chain_name,
                     chain_meta.chain_id,
                     upgrade_config.bridgehub_address,
-                    &upgrade_config.governor_private_key,
+                    &chain_governor.private_key,
                     handler.upgrade_name(),
                     &upgrade_yaml_path,
                     rpc_url.as_str(),
@@ -342,7 +414,7 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
 
     ui::outro(format!(
         "Upgrade to {} completed successfully",
-        ui::green(&args.protocol_version)
+        ui::green(version)
     ))?;
 
     Ok(())

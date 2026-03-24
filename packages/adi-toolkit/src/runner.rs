@@ -160,13 +160,18 @@ impl ToolkitRunner {
 
         self.client.pull_image(&image_uri).await?;
 
+        // Always include CI=true to suppress interactive prompts (e.g., telemetry)
+        let mut all_env_vars: Vec<(String, String)> = vec![("CI".to_string(), "true".to_string())];
+        all_env_vars.extend(
+            env_vars
+                .iter()
+                .map(|(k, v)| ((*k).to_string(), (*v).to_string())),
+        );
+
         let container_config = ContainerConfig {
             state_dir: state_dir.to_path_buf(),
             command: command.iter().map(|s| (*s).to_string()).collect(),
-            env_vars: env_vars
-                .iter()
-                .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-                .collect(),
+            env_vars: all_env_vars,
             timeout_seconds: self.config.timeout_seconds,
             log_dir: log_dir.to_path_buf(),
             log_command: log_command.to_string(),
@@ -379,7 +384,7 @@ impl ToolkitRunner {
             &temp_dir,
             log_dir,
             protocol_version,
-            &[("CI", "true")], // Suppress interactive prompts like telemetry
+            &[],
             "forge-verify",
             &format!("Verifying {}...", address),
             true, // quiet mode
@@ -486,7 +491,7 @@ exit [lindex $result 3]'"#,
             &shell_command,
             ecosystem_dir,
             protocol_version,
-            &[("CI", "true")],
+            &[],
             "deploy",
             label,
         )

@@ -45,7 +45,7 @@ where
     let script_path = format!("deploy-scripts/upgrade/{}", handler.upgrade_script());
     let rpc_url = config.l1_rpc_url.to_string();
     let deployer_pk = config.deployer_private_key.expose_secret().to_string();
-    let gas_price = format!("{}", compute_gas_price(config.gas_multiplier));
+    let gas_price = config.gas_multiplier.map(compute_gas_price);
 
     let env_input = format!("/{}/chain.toml", handler.upgrade_env_dir());
     let env_output = format!("/script-out/{}", handler.upgrade_output_toml());
@@ -55,22 +55,28 @@ where
         ("UPGRADE_ECOSYSTEM_OUTPUT", &env_output),
     ];
 
-    let mut args = vec![
-        "forge",
-        "script",
-        &script_path,
-        "--ffi",
-        "--rpc-url",
-        &rpc_url,
-        "--private-key",
-        &deployer_pk,
-        "--broadcast",
-    ];
+    // Build shell command to cd into l1-contracts and run forge with --broadcast
+    let mut forge_cmd = format!(
+        "forge script {} --ffi --rpc-url {} --private-key {} --broadcast",
+        script_path, rpc_url, deployer_pk
+    );
 
-    if config.gas_multiplier > 0.0 {
-        args.push("--with-gas-price");
-        args.push(&gas_price);
+    if let Some(price) = gas_price {
+        forge_cmd.push_str(&format!(" --with-gas-price {price}"));
     }
+
+    let upgrade_env_dir = handler.upgrade_env_dir();
+    let shell_cmd = format!(
+        "mkdir -p /deps/era-contracts/l1-contracts/{upgrade_env_dir} && \
+         cp -r /workspace/l1-contracts/{upgrade_env_dir}/. /deps/era-contracts/l1-contracts/{upgrade_env_dir}/ && \
+         mkdir -p /deps/era-contracts/l1-contracts/script-out && \
+         cd /deps/era-contracts/l1-contracts && {forge_cmd} && \
+         mkdir -p /workspace/l1-contracts/script-out && \
+         cp -r /deps/era-contracts/l1-contracts/script-out/. /workspace/l1-contracts/script-out/ && \
+         mkdir -p /workspace/l1-contracts/broadcast && \
+         cp -r /deps/era-contracts/l1-contracts/broadcast/. /workspace/l1-contracts/broadcast/"
+    );
+    let args = vec!["sh", "-c", &shell_cmd];
 
     let exit_code = runner
         .run_command(&args, state_dir, protocol_version, &env_vars)
@@ -93,11 +99,9 @@ where
 ///
 /// Uses a base gas price and applies the multiplier.
 /// For example, multiplier 1.2 with base 20 gwei = 24 gwei.
-fn compute_gas_price(multiplier: f64) -> u128 {
+fn compute_gas_price(multiplier: u64) -> u128 {
     const BASE_GAS_PRICE_GWEI: u128 = 20;
     const GWEI_TO_WEI: u128 = 1_000_000_000;
 
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    let price = (BASE_GAS_PRICE_GWEI as f64 * multiplier * GWEI_TO_WEI as f64) as u128;
-    price
+    BASE_GAS_PRICE_GWEI * GWEI_TO_WEI * u128::from(multiplier) / 100
 }

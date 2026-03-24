@@ -33,6 +33,9 @@ pub trait VersionHandler: Send + Sync {
     /// Old protocol version hex for chain.toml (e.g., "0x1e00000000").
     fn old_protocol_version_hex(&self) -> &str;
 
+    /// Previous version's upgrade YAML filename to load state_transition values from.
+    fn previous_upgrade_yaml(&self) -> &str;
+
     /// Post-upgrade hooks to run after governance execution.
     fn post_upgrade_hooks(&self) -> Vec<PostUpgradeHook>;
 

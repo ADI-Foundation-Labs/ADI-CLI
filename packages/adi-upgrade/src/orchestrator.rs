@@ -108,42 +108,28 @@ where
 
     /// Phase 4: Generate upgrade YAML from broadcast output.
     ///
-    /// Runs `yarn upgrade-yaml-output-generator` inside the toolkit container.
-    /// This reads the TOML output and broadcast JSON to produce the ecosystem YAML
-    /// needed for governance encoding and chain upgrades.
-    pub async fn generate_upgrade_yaml(&self, l1_chain_id: u64) -> Result<()> {
-        log::info!("Generating upgrade YAML output");
+    /// Reads the forge TOML output and broadcast JSON, extracts transaction
+    /// hashes, and produces the ecosystem YAML needed for governance encoding.
+    pub fn generate_upgrade_yaml(&self, l1_chain_id: u64) -> Result<()> {
+        let l1_contracts = self.state_dir.join("l1-contracts");
 
-        let toml_output = format!("script-out/{}", self.handler.upgrade_output_toml());
-        let broadcast_json = format!(
-            "./broadcast/deploy-scripts/upgrade/{}/{}/run-latest.json",
+        let toml_path = l1_contracts
+            .join("script-out")
+            .join(self.handler.upgrade_output_toml());
+        let broadcast_path = l1_contracts.join(format!(
+            "broadcast/{}/{}/run-latest.json",
             self.handler.upgrade_script(),
             l1_chain_id
-        );
-        let yaml_output = format!("script-out/{}", self.handler.upgrade_output_yaml());
+        ));
+        let yaml_path = l1_contracts
+            .join("script-out")
+            .join(self.handler.upgrade_output_yaml());
 
-        let env_vars: Vec<(&str, &str)> = vec![
-            ("UPGRADE_ECOSYSTEM_OUTPUT", &toml_output),
-            ("UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS", &broadcast_json),
-            ("YAML_OUTPUT_FILE", &yaml_output),
-        ];
-
-        let args = vec!["yarn", "upgrade-yaml-output-generator"];
-
-        let exit_code = self
-            .runner
-            .run_command(&args, self.state_dir, &self.protocol_version, &env_vars)
-            .await
-            .map_err(|e| UpgradeError::BroadcastFailed(format!("YAML generation failed: {e}")))?;
-
-        if exit_code != 0 {
-            return Err(UpgradeError::BroadcastFailed(format!(
-                "yarn upgrade-yaml-output-generator failed with exit code {exit_code}"
-            )));
-        }
-
-        log::info!("Upgrade YAML generated successfully");
-        Ok(())
+        crate::yaml_generator::generate_upgrade_yaml_from_files(
+            &toml_path,
+            &broadcast_path,
+            &yaml_path,
+        )
     }
 
     /// Phase 5: Extract stage1 calls and encode governance calldata.

@@ -45,8 +45,8 @@ pub struct UpgradeConfig {
     /// Ecosystem state directory path.
     pub state_dir: PathBuf,
 
-    /// Gas price multiplier.
-    pub gas_multiplier: f64,
+    /// Gas price multiplier percentage (None = skip gas price, e.g. localhost).
+    pub gas_multiplier: Option<u64>,
 }
 
 impl UpgradeConfig {
@@ -57,7 +57,7 @@ impl UpgradeConfig {
     /// * `state_manager` - State manager for the ecosystem
     /// * `ecosystem_name` - Name of the ecosystem
     /// * `l1_rpc_url` - Settlement layer RPC URL
-    /// * `gas_multiplier` - Gas price multiplier
+    /// * `gas_multiplier` - Gas price multiplier percentage (None for localhost)
     /// * `state_dir` - Ecosystem state directory path
     ///
     /// # Errors
@@ -68,7 +68,7 @@ impl UpgradeConfig {
         state_manager: &StateManager,
         ecosystem_name: &str,
         l1_rpc_url: Url,
-        gas_multiplier: f64,
+        gas_multiplier: Option<u64>,
         state_dir: PathBuf,
     ) -> Result<Self> {
         log::debug!("Loading upgrade config from state");

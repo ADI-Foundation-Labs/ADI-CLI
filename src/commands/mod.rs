@@ -18,6 +18,7 @@ mod init;
 mod owners;
 mod server_params;
 mod state;
+pub mod state_paths;
 mod transfer;
 mod upgrade;
 mod verify;

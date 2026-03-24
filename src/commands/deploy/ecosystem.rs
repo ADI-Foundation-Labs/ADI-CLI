@@ -1118,6 +1118,8 @@ fn resolve_ecosystem_name(args: &DeployArgs, context: &Context) -> Result<String
 /// Create state manager for the ecosystem with optional S3 sync.
 async fn create_state_manager(ecosystem_name: &str, context: &Context) -> Result<StateManager> {
     let (state_manager, _control) = create_state_manager_with_s3(ecosystem_name, context).await?;
+    let state_dir = context.config().state_dir.join(ecosystem_name);
+    crate::commands::state_paths::validate_and_fix_state_paths(&state_manager, &state_dir).await?;
     Ok(state_manager)
 }
 

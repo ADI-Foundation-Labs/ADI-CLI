@@ -46,6 +46,8 @@ pub mod upgrade_yaml;
 
 pub use upgrade_yaml::{load_previous_upgrade_values, save_upgrade_yaml};
 
+pub mod yaml_generator;
+
 pub mod governance;
 
 pub use governance::{

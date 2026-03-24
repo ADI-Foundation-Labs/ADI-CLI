@@ -87,7 +87,7 @@ thiserror = { version = "2", default-features = false }
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_json = { version = "1", default-features = false, features = ["std"] }
 serde_yaml = { version = "0.9", default-features = false }
-toml = { version = "0.8", default-features = false, features = ["display"] }
+toml = { version = "0.8", default-features = false, features = ["display", "parse"] }
 
 # Logging
 log = { version = "0.4", default-features = false }
@@ -209,6 +209,7 @@ reqwest = { workspace = true }
 futures-util = { workspace = true }
 
 semver = { workspace = true }
+strum = { workspace = true }
 
 # Utils
 tempfile = { workspace = true }

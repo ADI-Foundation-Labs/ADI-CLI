@@ -36,6 +36,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "strum 0.26.3",
  "tempfile",
  "tokio",
  "url",
@@ -177,6 +178,8 @@ dependencies = [
  "secrecy",
  "semver 1.0.27",
  "serde",
+ "serde_json",
+ "serde_yaml",
  "thiserror",
  "toml",
  "url",
@@ -4532,6 +4535,7 @@ dependencies = [
  "serde_spanned",
  "toml_datetime 0.6.11",
  "toml_write",
+ "winnow",
 ]
 
 [[package]]

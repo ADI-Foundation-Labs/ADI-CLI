@@ -34,6 +34,10 @@ impl VersionHandler for V0_30_1Handler {
         "0x1e00000000"
     }
 
+    fn previous_upgrade_yaml(&self) -> &str {
+        "v0.30.0-ecosystem.yaml"
+    }
+
     fn post_upgrade_hooks(&self) -> Vec<PostUpgradeHook> {
         // v0.30.1 has no post-upgrade hooks
         vec![]
