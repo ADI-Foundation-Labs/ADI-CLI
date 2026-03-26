@@ -59,3 +59,23 @@ impl Default for ContainerConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_config() {
+        let config = ContainerConfig::default();
+        assert_eq!(config.working_dir, "/workspace");
+        assert_eq!(config.state_dir, PathBuf::new());
+        assert!(config.command.is_empty());
+        assert!(config.env_vars.is_empty());
+        assert!(config.host_network);
+        assert_eq!(config.timeout_seconds, DEFAULT_TIMEOUT_SECONDS);
+        assert_eq!(config.log_command, "container");
+        assert_eq!(config.log_label, "Running...");
+        assert!(!config.quiet);
+        assert!(config.user.is_none());
+    }
+}

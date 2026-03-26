@@ -22,29 +22,9 @@ const LINE_MAX_WIDTH: usize = 76;
 const BAR_PREFIX: &str = "│  ";
 
 /// Strip ANSI escape sequences from a string.
-/// This prevents cursor manipulation codes in container output from breaking our display.
+/// Uses `console::strip_ansi_codes` for comprehensive escape handling.
 fn strip_ansi(s: &str) -> String {
-    let mut result = String::with_capacity(s.len());
-    let mut chars = s.chars().peekable();
-
-    while let Some(c) = chars.next() {
-        if c == '\x1b' {
-            // Skip ESC and the following sequence
-            if chars.peek() == Some(&'[') {
-                chars.next(); // consume '['
-                              // Skip until we hit a letter (end of sequence)
-                while let Some(&next) = chars.peek() {
-                    chars.next();
-                    if next.is_ascii_alphabetic() {
-                        break;
-                    }
-                }
-            }
-        } else {
-            result.push(c);
-        }
-    }
-    result
+    console::strip_ansi_codes(s).into_owned()
 }
 
 /// Manages rolling buffer of log lines and terminal rendering.
@@ -154,11 +134,13 @@ impl OutputStreamer {
 
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-        let log_path = log_dir
-            .join("logs")
-            .join(format!("{}_{}.log", command, timestamp));
+            .map_or(0, |d| d.as_secs());
+        let log_path = log_dir.join("logs").join(format!(
+            "{}_{}_{}.log",
+            command,
+            std::process::id(),
+            timestamp
+        ));
 
         // Print header immediately (static, never redrawn)
         if !quiet {
@@ -174,7 +156,7 @@ impl OutputStreamer {
                     if !quiet {
                         display.clear().ok();
                     }
-                    Self::save_log(&buffer, &log_path, quiet)?;
+                    Self::save_log(&buffer, &log_path, quiet).await?;
                     break Err(DockerError::StreamError("Interrupted by CTRL+C".to_string()));
                 }
 
@@ -215,19 +197,20 @@ impl OutputStreamer {
                         DockerError::StreamError(format!("Failed to log success: {}", e))
                     })?;
             }
-            Self::save_log(&buffer, &log_path, quiet)?;
+            Self::save_log(&buffer, &log_path, quiet).await?;
         }
 
         stream_result
     }
 
-    fn save_log(buffer: &[u8], log_path: &Path, quiet: bool) -> Result<()> {
+    async fn save_log(buffer: &[u8], log_path: &Path, quiet: bool) -> Result<()> {
         if let Some(parent) = log_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| {
+            tokio::fs::create_dir_all(parent).await.map_err(|e| {
                 DockerError::StreamError(format!("Failed to create log dir: {}", e))
             })?;
         }
-        std::fs::write(log_path, buffer)
+        tokio::fs::write(log_path, buffer)
+            .await
             .map_err(|e| DockerError::StreamError(format!("Failed to write log: {}", e)))?;
         if !quiet {
             let path_styled = Style::new().green().apply_to(log_path.display());
@@ -235,5 +218,54 @@ impl OutputStreamer {
                 .map_err(|e| DockerError::StreamError(format!("Failed to log: {}", e)))?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_strip_ansi_removes_csi_sequences() {
+        let input = "\x1b[31mred text\x1b[0m";
+        let result = strip_ansi(input);
+        assert_eq!(result, "red text");
+    }
+
+    #[test]
+    fn test_strip_ansi_handles_plain_text() {
+        let input = "plain text";
+        assert_eq!(strip_ansi(input), input);
+    }
+
+    #[test]
+    fn test_strip_ansi_handles_complex_sequences() {
+        // Multiple CSI sequences with parameters
+        let input = "\x1b[1;31mbold red\x1b[0m \x1b[38;5;200mpink\x1b[0m";
+        let result = strip_ansi(input);
+        assert_eq!(result, "bold red pink");
+    }
+
+    #[test]
+    fn test_log_display_push_and_truncate() {
+        let mut display = LogDisplay::new();
+        let long_line = "a".repeat(LINE_MAX_WIDTH + 20);
+        display.push_line(&long_line);
+
+        let line = display.lines.front().expect("should have one line");
+        assert!(line.chars().count() <= LINE_MAX_WIDTH);
+        assert!(line.ends_with("..."));
+    }
+
+    #[test]
+    fn test_log_display_rolling_buffer() {
+        let mut display = LogDisplay::new();
+        for i in 0..MAX_DISPLAY_LINES + 5 {
+            display.push_line(&format!("line {}", i));
+        }
+        assert_eq!(display.lines.len(), MAX_DISPLAY_LINES);
+        // First line should be the 6th pushed (index 5)
+        assert_eq!(display.lines.front().expect("should have lines"), "line 5");
     }
 }

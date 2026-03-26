@@ -19,8 +19,7 @@ use std::sync::Arc;
 /// let client = DockerClient::new().await?;
 ///
 /// // Check if Docker daemon is running
-/// let is_running = client.is_daemon_running().await?;
-/// assert!(is_running);
+/// client.is_daemon_running().await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -67,19 +66,19 @@ impl DockerClient {
         Ok(client)
     }
 
-    /// Check if Docker daemon is running and accessible.
+    /// Verify Docker daemon is running and accessible.
     ///
     /// # Errors
     ///
     /// Returns an error if daemon is not accessible.
-    pub async fn is_daemon_running(&self) -> Result<bool> {
+    pub async fn is_daemon_running(&self) -> Result<()> {
         self.logger.debug("Pinging Docker daemon...");
         self.inner
             .ping()
             .await
             .map_err(|e| DockerError::DaemonNotRunning(e.to_string()))?;
         self.logger.debug("Docker daemon ping successful");
-        Ok(true)
+        Ok(())
     }
 
     /// Check if an image exists locally by full URI.

@@ -9,7 +9,6 @@ use bollard::container::{
 };
 use bollard::models::{HostConfig, Mount, MountTypeEnum};
 use bollard::Docker;
-use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
@@ -41,16 +40,7 @@ impl ContainerManager {
         ));
         let container_id = self.create(image_uri, config).await?;
 
-        let result = self
-            .run_and_wait(
-                &container_id,
-                config.timeout_seconds,
-                &config.log_dir,
-                &config.log_command,
-                &config.log_label,
-                config.quiet,
-            )
-            .await;
+        let result = self.run_and_wait(&container_id, config).await;
 
         self.logger.debug("Cleaning up container...");
         if let Err(e) = self.remove(&container_id).await {
@@ -64,13 +54,15 @@ impl ContainerManager {
     }
 
     async fn create(&self, image_uri: &str, config: &ContainerConfig) -> Result<String> {
-        let state_dir_absolute = config.state_dir.canonicalize().map_err(|e| {
-            DockerError::ContainerCreateFailed(format!(
-                "Failed to resolve state directory '{}' to absolute path: {}",
-                config.state_dir.display(),
-                e
-            ))
-        })?;
+        let state_dir_absolute = tokio::fs::canonicalize(&config.state_dir)
+            .await
+            .map_err(|e| {
+                DockerError::ContainerCreateFailed(format!(
+                    "Failed to resolve state directory '{}' to absolute path: {}",
+                    config.state_dir.display(),
+                    e
+                ))
+            })?;
 
         self.logger.debug(&format!(
             "Creating container: image={}, working_dir={}, mount={}:/workspace",
@@ -79,9 +71,19 @@ impl ContainerManager {
             state_dir_absolute.display()
         ));
 
+        let state_dir_str = state_dir_absolute
+            .to_str()
+            .ok_or_else(|| {
+                DockerError::ContainerCreateFailed(format!(
+                    "State directory path is not valid UTF-8: {}",
+                    state_dir_absolute.display()
+                ))
+            })?
+            .to_string();
+
         let workspace_mount = Mount {
             target: Some("/workspace".to_string()),
-            source: Some(state_dir_absolute.to_string_lossy().to_string()),
+            source: Some(state_dir_str),
             typ: Some(MountTypeEnum::BIND),
             read_only: Some(false),
             ..Default::default()
@@ -96,7 +98,7 @@ impl ContainerManager {
         };
 
         let tmp_dir = state_dir_absolute.join(".tmp");
-        std::fs::create_dir_all(&tmp_dir).map_err(|e| {
+        tokio::fs::create_dir_all(&tmp_dir).await.map_err(|e| {
             DockerError::ContainerCreateFailed(format!(
                 "Failed to create tmp directory '{}': {}",
                 tmp_dir.display(),
@@ -104,9 +106,19 @@ impl ContainerManager {
             ))
         })?;
 
+        let tmp_dir_str = tmp_dir
+            .to_str()
+            .ok_or_else(|| {
+                DockerError::ContainerCreateFailed(format!(
+                    "Tmp directory path is not valid UTF-8: {}",
+                    tmp_dir.display()
+                ))
+            })?
+            .to_string();
+
         let tmp_mount = Mount {
             target: Some("/tmp".to_string()),
-            source: Some(tmp_dir.to_string_lossy().to_string()),
+            source: Some(tmp_dir_str),
             typ: Some(MountTypeEnum::BIND),
             read_only: Some(false),
             ..Default::default()
@@ -161,18 +173,10 @@ impl ContainerManager {
         Ok(response.id)
     }
 
-    async fn run_and_wait(
-        &self,
-        container_id: &str,
-        timeout_seconds: u64,
-        log_dir: &Path,
-        log_command: &str,
-        log_label: &str,
-        quiet: bool,
-    ) -> Result<i64> {
+    async fn run_and_wait(&self, container_id: &str, config: &ContainerConfig) -> Result<i64> {
         self.logger.debug(&format!(
             "Starting container: {} (timeout: {}s)",
-            container_id, timeout_seconds
+            container_id, config.timeout_seconds
         ));
 
         self.docker
@@ -183,12 +187,18 @@ impl ContainerManager {
         self.logger.debug("Container started, streaming output...");
 
         let streamer = OutputStreamer::new(self.docker.clone(), Arc::clone(&self.logger));
-        let duration = Duration::from_secs(timeout_seconds);
+        let duration = Duration::from_secs(config.timeout_seconds);
 
         // Stream logs with static header and updating log lines
         let stream_result = timeout(
             duration,
-            streamer.stream_logs(container_id, log_dir, log_command, log_label, quiet),
+            streamer.stream_logs(
+                container_id,
+                &config.log_dir,
+                &config.log_command,
+                &config.log_label,
+                config.quiet,
+            ),
         )
         .await;
 
@@ -211,7 +221,7 @@ impl ContainerManager {
                 // Timeout
                 let _ = self.docker.stop_container(container_id, None).await;
                 Err(DockerError::Timeout {
-                    seconds: timeout_seconds,
+                    seconds: config.timeout_seconds,
                 })
             }
         }
@@ -230,7 +240,12 @@ impl ContainerManager {
             })?;
 
         // Get exit code from container state
-        let exit_code = inspect.state.and_then(|s| s.exit_code).unwrap_or(0);
+        let exit_code = inspect.state.and_then(|s| s.exit_code).ok_or_else(|| {
+            DockerError::ContainerFailed {
+                exit_code: -1,
+                message: format!("Container {} has no exit code in state", container_id),
+            }
+        })?;
 
         Ok(exit_code)
     }
@@ -257,8 +272,42 @@ fn generate_container_name() -> String {
 
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
+        .map_or(0, |d| d.as_nanos());
 
-    format!("adi-docker-{:x}", timestamp & 0xFFFF_FFFF)
+    format!(
+        "adi-docker-{}-{:x}",
+        std::process::id(),
+        timestamp & 0xFFFF_FFFF
+    )
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_container_name_format() {
+        let name = generate_container_name();
+        assert!(name.starts_with("adi-docker-"));
+        // Should contain pid and hex timestamp separated by '-'
+        let parts: Vec<&str> = name
+            .strip_prefix("adi-docker-")
+            .unwrap()
+            .splitn(2, '-')
+            .collect();
+        assert_eq!(parts.len(), 2);
+        // First part is pid (decimal)
+        parts.first().unwrap().parse::<u32>().unwrap();
+        // Second part is hex timestamp
+        u64::from_str_radix(parts.get(1).unwrap(), 16).unwrap();
+    }
+
+    #[test]
+    fn test_generate_container_name_uniqueness() {
+        let name1 = generate_container_name();
+        std::thread::sleep(std::time::Duration::from_millis(1));
+        let name2 = generate_container_name();
+        assert_ne!(name1, name2);
+    }
 }
