@@ -87,6 +87,7 @@ thiserror = { version = "2", default-features = false }
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_json = { version = "1", default-features = false, features = ["std"] }
 serde_yaml = { version = "0.9", default-features = false }
+toml = { version = "0.8", default-features = false, features = ["display", "parse"] }
 
 # Logging
 log = { version = "0.4", default-features = false }
@@ -166,6 +167,7 @@ adi-ecosystem = { path = "packages/adi-ecosystem" }
 adi-types = { path = "packages/adi-types" }
 adi-state = { path = "packages/adi-state" }
 adi-funding = { path = "packages/adi-funding" }
+adi-upgrade = { path = "packages/adi-upgrade" }
 
 [lints]
 workspace = true
@@ -192,6 +194,7 @@ adi-ecosystem = { workspace = true }
 adi-state = { workspace = true }
 adi-funding = { workspace = true }
 adi-types = { workspace = true }
+adi-upgrade = { workspace = true }
 
 # EVM types
 alloy-primitives = { workspace = true }
@@ -204,6 +207,9 @@ secrecy = { workspace = true }
 url = { workspace = true }
 reqwest = { workspace = true }
 futures-util = { workspace = true }
+
+semver = { workspace = true }
+strum = { workspace = true }
 
 # Utils
 tempfile = { workspace = true }

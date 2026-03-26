@@ -50,6 +50,13 @@ pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
         control.disable_auto_sync();
     }
 
+    let ecosystem_state_dir = state_dir.join(&ecosystem_name);
+    crate::commands::state_paths::validate_and_fix_state_paths(
+        &state_manager,
+        &ecosystem_state_dir,
+    )
+    .await?;
+
     if !state_manager.exists().await? {
         return Err(eyre::eyre!(
             "Ecosystem '{}' does not exist. Run 'adi init' first.",

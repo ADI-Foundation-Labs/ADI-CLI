@@ -1,0 +1,36 @@
+[package]
+name = "adi-upgrade"
+version.workspace = true
+edition.workspace = true
+description = "SDK for upgrading ZkSync ecosystem contracts"
+
+[lints]
+workspace = true
+
+[lib]
+name = "adi_upgrade"
+path = "src/lib.rs"
+
+[dependencies]
+adi-state = { workspace = true }
+adi-toolkit = { workspace = true }
+alloy-contract = { workspace = true }
+alloy-network = { workspace = true }
+alloy-primitives = { workspace = true }
+alloy-provider = { workspace = true }
+alloy-rpc-types = { workspace = true }
+alloy-signer-local = { workspace = true }
+alloy-sol-types = { workspace = true }
+alloy-transport-http = { workspace = true }
+hex = { workspace = true }
+async-trait = { workspace = true }
+eyre = { workspace = true }
+log = { workspace = true }
+secrecy = { workspace = true }
+semver = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
+url = { workspace = true }
