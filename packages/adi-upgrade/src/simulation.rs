@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use crate::config::UpgradeConfig;
+use crate::config::{compute_gas_price, UpgradeConfig};
 use crate::error::{Result, UpgradeError};
 use crate::versions::VersionHandler;
 
@@ -99,18 +99,6 @@ where
         summary,
     })
 }
-
-/// Compute gas price in wei from percentage multiplier.
-///
-/// Uses a base gas price of 20 gwei and applies the percentage.
-/// For example, multiplier 200 (= 2x) with base 20 gwei = 40 gwei.
-fn compute_gas_price(multiplier: u64) -> u128 {
-    const BASE_GAS_PRICE_GWEI: u128 = 20;
-    const GWEI_TO_WEI: u128 = 1_000_000_000;
-
-    BASE_GAS_PRICE_GWEI * GWEI_TO_WEI * u128::from(multiplier) / 100
-}
-
 /// Trait for toolkit runner to enable testing.
 #[async_trait::async_trait]
 pub trait ToolkitRunnerTrait: Send + Sync {

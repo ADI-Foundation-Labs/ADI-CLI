@@ -6,10 +6,9 @@ use alloy_network::EthereumWallet;
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
-use alloy_signer_local::PrivateKeySigner;
-use secrecy::ExposeSecret;
 
 use crate::error::{Result, UpgradeError};
+use crate::signing::signer_from_secret;
 
 /// Result of governance execution.
 #[derive(Debug)]
@@ -37,16 +36,7 @@ pub async fn execute_governance<P: Provider + Clone>(
     );
 
     // Create signer from governor key
-    let key_str = governor_key.expose_secret();
-    let key_hex = key_str.strip_prefix("0x").unwrap_or(key_str);
-    let key_bytes: [u8; 32] = hex::decode(key_hex)
-        .map_err(|e| UpgradeError::GovernanceFailed(format!("Invalid governor key hex: {e}")))?
-        .try_into()
-        .map_err(|_| UpgradeError::GovernanceFailed("Governor key must be 32 bytes".into()))?;
-
-    let signer = PrivateKeySigner::from_bytes(&key_bytes.into())
-        .map_err(|e| UpgradeError::GovernanceFailed(format!("Invalid governor key: {e}")))?;
-
+    let signer = signer_from_secret(governor_key)?;
     let wallet = EthereumWallet::from(signer);
 
     // Create signing provider by wrapping the existing provider

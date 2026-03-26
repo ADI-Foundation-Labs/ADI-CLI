@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use crate::config::UpgradeConfig;
+use crate::config::{compute_gas_price, UpgradeConfig};
 use crate::error::{Result, UpgradeError};
 use crate::simulation::ToolkitRunnerTrait;
 use crate::versions::VersionHandler;
@@ -93,15 +93,4 @@ where
     }
 
     Ok(BroadcastResult { success, exit_code })
-}
-
-/// Compute gas price in wei from multiplier.
-///
-/// Uses a base gas price and applies the multiplier.
-/// For example, multiplier 1.2 with base 20 gwei = 24 gwei.
-fn compute_gas_price(multiplier: u64) -> u128 {
-    const BASE_GAS_PRICE_GWEI: u128 = 20;
-    const GWEI_TO_WEI: u128 = 1_000_000_000;
-
-    BASE_GAS_PRICE_GWEI * GWEI_TO_WEI * u128::from(multiplier) / 100
 }

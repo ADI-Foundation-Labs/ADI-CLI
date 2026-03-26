@@ -7,6 +7,7 @@
 #![deny(unsafe_code)]
 
 mod error;
+mod signing;
 
 pub use error::{Result, UpgradeError};
 
@@ -59,5 +60,6 @@ pub mod chain_upgrade;
 
 pub use chain_upgrade::{
     extract_chain_calldatas, resolve_chain_contracts, run_chain_upgrade, verify_protocol_versions,
-    version_to_protocol_uint, ChainCalldatas, ChainContracts, ChainUpgradeResult,
+    version_to_protocol_uint, ChainCalldatas, ChainContracts, ChainUpgradeParams,
+    ChainUpgradeResult,
 };

@@ -49,6 +49,17 @@ pub struct UpgradeConfig {
     pub gas_multiplier: Option<u64>,
 }
 
+/// Compute gas price in wei from percentage multiplier.
+///
+/// Uses a base gas price of 20 gwei and applies the percentage.
+/// For example, multiplier 200 (= 2x) with base 20 gwei = 40 gwei.
+pub(crate) fn compute_gas_price(multiplier: u64) -> u128 {
+    const BASE_GAS_PRICE_GWEI: u128 = 20;
+    const GWEI_TO_WEI: u128 = 1_000_000_000;
+
+    BASE_GAS_PRICE_GWEI * GWEI_TO_WEI * u128::from(multiplier) / 100
+}
+
 impl UpgradeConfig {
     /// Load upgrade config from ecosystem state.
     ///
