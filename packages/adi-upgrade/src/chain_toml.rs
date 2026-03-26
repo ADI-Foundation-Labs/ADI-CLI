@@ -215,7 +215,10 @@ pub async fn generate_chain_toml<P: Provider + Clone>(
     let ctm = onchain::query_ctm(provider, config.bridgehub_address, chain_id).await?;
     let diamond = onchain::query_zk_chain(provider, config.bridgehub_address, chain_id).await?;
     let verifier = onchain::query_verifier(provider, diamond).await?;
+    let is_testnet = onchain::query_is_testnet_verifier(provider, verifier).await;
+    log::info!("Detected testnet_verifier = {is_testnet} for verifier {verifier}");
 
+    toml_config.testnet_verifier = is_testnet;
     toml_config.owner_address = format!("{governance}");
     toml_config.contracts.bridgehub_proxy_address = format!("{}", config.bridgehub_address);
     toml_config.zksync_os.optional_ctm_address = format!("{ctm}");

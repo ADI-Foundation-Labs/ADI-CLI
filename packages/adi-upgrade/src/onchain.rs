@@ -2,9 +2,10 @@
 //!
 //! Replaces all `cast call` usage with typed Rust implementations.
 
-use alloy_primitives::{Address, U256};
+use alloy_primitives::{Address, Bytes, U256};
 use alloy_provider::{Provider, ProviderBuilder};
-use alloy_sol_types::sol;
+use alloy_rpc_types::TransactionRequest;
+use alloy_sol_types::{sol, SolCall};
 use url::Url;
 
 use crate::error::{Result, UpgradeError};
@@ -43,6 +44,13 @@ sol! {
     interface IChainTypeManager {
         /// Returns the current protocol version.
         function protocolVersion() external view returns (uint256);
+    }
+
+    /// Verifier mockVerify interface for testnet detection.
+    /// Production verifier reverts with MockVerifierNotSupported.
+    /// Testnet verifier returns true for valid inputs.
+    interface IVerifierMock {
+        function mockVerify(uint256[] memory _publicInputs, uint256[] memory _proof) external view returns (bool);
     }
 }
 
@@ -164,4 +172,31 @@ pub async fn query_diamond_protocol_version(
         .call()
         .await
         .map_err(|e| UpgradeError::Config(format!("Failed to query diamond protocol version: {e}")))
+}
+
+/// Detect whether the verifier contract is a testnet verifier.
+///
+/// Calls `mockVerify` on the verifier contract. Testnet verifiers
+/// (`ZKsyncOSTestnetVerifier`) accept the call, while production verifiers
+/// (`ZKsyncOSDualVerifier`) revert with `MockVerifierNotSupported`.
+///
+/// Returns `true` for testnet, `false` for production.
+pub async fn query_is_testnet_verifier(
+    provider: &(impl Provider + Clone),
+    verifier: Address,
+) -> bool {
+    let public_inputs = vec![U256::from(1)];
+    let proof = vec![U256::from(13), U256::from(1)];
+
+    let call = IVerifierMock::mockVerifyCall {
+        _publicInputs: public_inputs,
+        _proof: proof,
+    };
+    let data = Bytes::from(call.abi_encode());
+
+    let tx = TransactionRequest::default()
+        .to(verifier)
+        .input(data.into());
+
+    provider.call(tx).await.is_ok()
 }
