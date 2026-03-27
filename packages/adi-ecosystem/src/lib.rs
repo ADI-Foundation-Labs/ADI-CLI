@@ -49,6 +49,7 @@ mod defaults;
 mod deploy;
 mod error;
 mod ownership;
+mod signer;
 mod types;
 mod validator;
 mod verify;

@@ -92,6 +92,7 @@ pub struct VerificationResult {
 
 impl VerificationResult {
     /// Create a new verification result.
+    #[must_use]
     pub fn new(name: &str, address: Address, outcome: VerificationOutcome) -> Self {
         Self {
             name: name.to_string(),
@@ -101,26 +102,31 @@ impl VerificationResult {
     }
 
     /// Create an already verified result.
+    #[must_use]
     pub fn already_verified(name: &str, address: Address) -> Self {
         Self::new(name, address, VerificationOutcome::AlreadyVerified)
     }
 
     /// Create a submitted result.
+    #[must_use]
     pub fn submitted(name: &str, address: Address, guid: String) -> Self {
         Self::new(name, address, VerificationOutcome::Submitted { guid })
     }
 
     /// Create a confirmed result.
+    #[must_use]
     pub fn confirmed(name: &str, address: Address) -> Self {
         Self::new(name, address, VerificationOutcome::Confirmed)
     }
 
     /// Create a failed result.
+    #[must_use]
     pub fn failed(name: &str, address: Address, reason: String) -> Self {
         Self::new(name, address, VerificationOutcome::Failed { reason })
     }
 
     /// Create a skipped result.
+    #[must_use]
     pub fn skipped(name: &str, address: Address, reason: String) -> Self {
         Self::new(name, address, VerificationOutcome::Skipped { reason })
     }
@@ -181,6 +187,7 @@ pub struct VerificationSummary {
 
 impl VerificationSummary {
     /// Create a new summary from results.
+    #[must_use]
     pub fn new(results: Vec<VerificationResult>) -> Self {
         Self { results }
     }
@@ -257,6 +264,7 @@ pub struct ContractVerificationStatus {
 
 impl ContractVerificationStatus {
     /// Create a new status entry.
+    #[must_use]
     pub fn new(name: &str, address: Address, status: VerificationStatus) -> Self {
         Self {
             name: name.to_string(),
@@ -280,6 +288,7 @@ pub struct VerificationStatusSummary {
 
 impl VerificationStatusSummary {
     /// Create a new summary.
+    #[must_use]
     pub fn new(statuses: Vec<ContractVerificationStatus>) -> Self {
         Self { statuses }
     }

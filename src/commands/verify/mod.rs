@@ -301,7 +301,8 @@ pub async fn run(args: VerifyArgs, context: &Context) -> Result<()> {
         api_key.clone(),
         chain_id,
     );
-    let explorer_client = ExplorerClient::new(explorer_config, Arc::clone(context.logger()));
+    let explorer_client = ExplorerClient::new(explorer_config, Arc::clone(context.logger()))
+        .map_err(|e| eyre::eyre!("Failed to create explorer client: {}", e))?;
 
     // Check current verification status
     ui::section("Checking Verification Status")?;

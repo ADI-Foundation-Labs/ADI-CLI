@@ -27,7 +27,7 @@
 //!     Some("YOUR_API_KEY".to_string()),
 //!     1, // mainnet
 //! );
-//! let client = ExplorerClient::new(config, Arc::new(NoopLogger));
+//! let client = ExplorerClient::new(config, Arc::new(NoopLogger)).unwrap();
 //! ```
 
 mod diamond;

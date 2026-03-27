@@ -69,17 +69,23 @@ pub struct ExplorerClient {
 
 impl ExplorerClient {
     /// Create a new explorer client.
-    pub fn new(config: ExplorerConfig, logger: Arc<dyn Logger>) -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the HTTP client cannot be built.
+    pub fn new(config: ExplorerConfig, logger: Arc<dyn Logger>) -> Result<Self, VerificationError> {
         let http_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
-            .unwrap_or_default();
+            .map_err(|e| {
+                VerificationError::ExplorerApi(format!("Failed to build HTTP client: {}", e))
+            })?;
 
-        Self {
+        Ok(Self {
             config,
             http_client,
             logger,
-        }
+        })
     }
 
     /// Get the explorer config.
@@ -317,7 +323,7 @@ mod tests {
             api_key: None,
             chain_id: 1,
         };
-        let client = ExplorerClient::new(config, Arc::new(NoopLogger));
+        let client = ExplorerClient::new(config, Arc::new(NoopLogger)).unwrap();
 
         let response = r#"{"status":"1","message":"OK","result":"[{\"inputs\":[]}]"}"#;
         let status = client.parse_verification_response(response).unwrap();
@@ -337,7 +343,7 @@ mod tests {
             api_key: None,
             chain_id: 99999,
         };
-        let client = ExplorerClient::new(config, Arc::new(NoopLogger));
+        let client = ExplorerClient::new(config, Arc::new(NoopLogger)).unwrap();
 
         // Blockscout returns null for result field when contract is not verified
         let response =

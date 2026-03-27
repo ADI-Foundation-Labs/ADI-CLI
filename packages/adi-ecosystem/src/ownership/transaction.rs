@@ -1,15 +1,12 @@
 //! Transaction helpers for ownership acceptance.
 //!
-//! This module provides utilities for sending transactions and
-//! creating signers from private keys.
+//! This module provides utilities for sending transactions.
 
 use crate::error::{EcosystemError, Result};
 use alloy_network::TransactionBuilder;
 use alloy_primitives::{Address, Bytes, B256};
 use alloy_provider::Provider;
 use alloy_rpc_types::TransactionRequest;
-use alloy_signer_local::PrivateKeySigner;
-use secrecy::{ExposeSecret, SecretString};
 
 /// Transaction result with hash and block number.
 pub struct TxResult {
@@ -68,20 +65,4 @@ where
         tx_hash,
         block_number: receipt.block_number.unwrap_or_default(),
     })
-}
-
-/// Create a signer from a private key.
-pub fn create_signer(key: &SecretString) -> Result<PrivateKeySigner> {
-    let key_str = key.expose_secret();
-
-    // Strip 0x prefix if present
-    let key_hex = key_str.strip_prefix("0x").unwrap_or(key_str);
-
-    let key_bytes: [u8; 32] = hex::decode(key_hex)
-        .map_err(|e| EcosystemError::InvalidConfig(format!("Invalid private key hex: {}", e)))?
-        .try_into()
-        .map_err(|_| EcosystemError::InvalidConfig("Private key must be 32 bytes".to_string()))?;
-
-    PrivateKeySigner::from_bytes(&key_bytes.into())
-        .map_err(|e| EcosystemError::InvalidConfig(format!("Invalid private key: {}", e)))
 }

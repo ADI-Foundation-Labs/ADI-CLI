@@ -5,15 +5,15 @@
 //! instead of EIP-4844 blobs.
 
 use crate::error::{EcosystemError, Result};
+use crate::signer::create_signer;
 use adi_types::{normalize_rpc_url, Logger};
 use alloy_network::{EthereumWallet, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
-use alloy_signer_local::PrivateKeySigner;
 use alloy_sol_types::{sol, SolCall};
 use console::Style;
-use secrecy::{ExposeSecret, SecretString};
+use secrecy::SecretString;
 
 // Define the contract interfaces using alloy's sol! macro
 sol! {
@@ -212,22 +212,6 @@ pub async fn configure_l3_da(
     ));
 
     Ok(tx_hash)
-}
-
-/// Create a signer from a private key.
-fn create_signer(key: &SecretString) -> Result<PrivateKeySigner> {
-    let key_str = key.expose_secret();
-
-    // Strip 0x prefix if present
-    let key_hex = key_str.strip_prefix("0x").unwrap_or(key_str);
-
-    let key_bytes: [u8; 32] = hex::decode(key_hex)
-        .map_err(|e| EcosystemError::InvalidConfig(format!("Invalid private key hex: {}", e)))?
-        .try_into()
-        .map_err(|_| EcosystemError::InvalidConfig("Private key must be 32 bytes".to_string()))?;
-
-    PrivateKeySigner::from_bytes(&key_bytes.into())
-        .map_err(|e| EcosystemError::InvalidConfig(format!("Invalid private key: {}", e)))
 }
 
 #[cfg(test)]

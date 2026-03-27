@@ -102,6 +102,7 @@ pub struct OwnershipResult {
 
 impl OwnershipResult {
     /// Create a successful result.
+    #[must_use]
     pub fn success(name: &str, tx_hash: B256) -> Self {
         Self {
             name: name.to_string(),
@@ -112,6 +113,7 @@ impl OwnershipResult {
     }
 
     /// Create a failed result.
+    #[must_use]
     pub fn failure(name: &str, error: String) -> Self {
         Self {
             name: name.to_string(),
@@ -122,6 +124,7 @@ impl OwnershipResult {
     }
 
     /// Create a skipped result (contract address not configured).
+    #[must_use]
     pub fn skipped(name: &str, reason: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -141,6 +144,7 @@ pub struct OwnershipSummary {
 
 impl OwnershipSummary {
     /// Create a new summary from results.
+    #[must_use]
     pub fn new(results: Vec<OwnershipResult>) -> Self {
         Self { results }
     }
@@ -255,6 +259,7 @@ pub struct CalldataEntry {
 
 impl CalldataEntry {
     /// Create a new calldata entry.
+    #[must_use]
     pub fn new(name: &'static str, to: Address, calldata: Bytes, description: String) -> Self {
         Self {
             name,
@@ -274,6 +279,7 @@ pub struct CalldataOutput {
 
 impl CalldataOutput {
     /// Create a new empty calldata output.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             entries: Vec::new(),
