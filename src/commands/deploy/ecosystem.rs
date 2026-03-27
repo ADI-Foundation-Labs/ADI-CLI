@@ -11,7 +11,7 @@ use adi_ecosystem::verification::{
 };
 use adi_ecosystem::{
     add_validator_roles, configure_l3_da, remove_validator_roles, validate_chain_id,
-    DeployedContracts,
+    ChainFundingDefaults, DeployedContracts,
 };
 use adi_funding::{
     build_funding_target_statuses, is_localhost_rpc, normalize_rpc_url, AnvilFunder,
@@ -439,9 +439,14 @@ async fn run_anvil_funding(
         ui::green(count_wallets(&chain_wallets))
     ))?;
 
-    // Build funding amounts from config
+    // Build funding amounts from config (args > chain config > ecosystem config > defaults)
     let funding_defaults = &context.config().funding;
-    let amounts = build_default_amounts(args, funding_defaults);
+    let chain_funding = context
+        .config()
+        .ecosystem
+        .get_chain(chain_name)
+        .map(|c| &c.funding);
+    let amounts = build_default_amounts(args, funding_defaults, chain_funding);
 
     // Create funder to check balances (normalize URL for host-side connection)
     let funder = AnvilFunder::with_rpc(&normalize_rpc_url(rpc_url.as_str()))?
@@ -1258,8 +1263,13 @@ async fn build_funding_config(
         .logger()
         .debug(&format!("Gas multiplier: {}%", multiplier));
 
-    // Build custom amounts (args > config > library defaults)
-    let amounts = build_default_amounts(args, funding_defaults);
+    // Build custom amounts (args > chain config > ecosystem config > library defaults)
+    let chain_funding = context
+        .config()
+        .ecosystem
+        .get_chain(chain_name)
+        .map(|c| &c.funding);
+    let amounts = build_default_amounts(args, funding_defaults, chain_funding);
     config = config.with_amounts(amounts);
 
     // Get base token from chain metadata
@@ -1315,12 +1325,13 @@ async fn build_funding_config(
     Ok(config)
 }
 
-/// Build DefaultAmounts from CLI args and config, falling back to library defaults.
+/// Build DefaultAmounts from CLI args, chain config, ecosystem config, falling back to library defaults.
 ///
-/// Priority: CLI args > config file > library defaults
+/// Priority: CLI args > chain funding config > ecosystem funding config > library defaults
 fn build_default_amounts(
     args: &DeployArgs,
     config: &crate::config::FundingDefaults,
+    chain_funding: Option<&ChainFundingDefaults>,
 ) -> DefaultAmounts {
     let defaults = DefaultAmounts::default();
 
@@ -1342,16 +1353,27 @@ fn build_default_amounts(
         operator_eth: args
             .operator_eth
             .map(eth_to_wei)
+            .or_else(|| chain_funding.and_then(|cf| cf.operator_eth).map(eth_to_wei))
             .unwrap_or(defaults.operator_eth),
         // Not configurable - use library defaults
         blob_operator_eth: defaults.blob_operator_eth,
         prove_operator_eth: args
             .prove_operator_eth
             .map(eth_to_wei)
+            .or_else(|| {
+                chain_funding
+                    .and_then(|cf| cf.prove_operator_eth)
+                    .map(eth_to_wei)
+            })
             .unwrap_or(defaults.prove_operator_eth),
         execute_operator_eth: args
             .execute_operator_eth
             .map(eth_to_wei)
+            .or_else(|| {
+                chain_funding
+                    .and_then(|cf| cf.execute_operator_eth)
+                    .map(eth_to_wei)
+            })
             .unwrap_or(defaults.execute_operator_eth),
         // Not configurable - use library defaults
         fee_account_eth: defaults.fee_account_eth,

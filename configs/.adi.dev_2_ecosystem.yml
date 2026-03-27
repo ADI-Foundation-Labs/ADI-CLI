@@ -1,0 +1,20 @@
+ecosystem:
+  name: adi_dev_2_ecosystem
+  rpc_url: https://eth-sepolia.g.alchemy.com/v2/CHANGE_ME
+
+  chains:
+    - name: adi_devnet_2
+      chain_id: 99981
+      base_token_address: 0x2a98B46fe31BA8Be05ef1cE3D36e1f80Db04190D
+      prover_mode: gpu
+      blobs: true
+      funding:
+        operator_eth: 2
+        prove_operator_eth: 2
+        execute_operator_eth: 2
+
+funding:
+  funder_key: CHANGE_ME
+  deployer_eth: 1
+  governor_eth: 1
+  governor_cgt_units: 5
