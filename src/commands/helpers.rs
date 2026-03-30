@@ -196,7 +196,7 @@ pub fn derive_address_from_key(key: &secrecy::SecretString) -> Result<Address> {
 pub fn create_state_manager_with_context(ecosystem_name: &str, context: &Context) -> StateManager {
     let ecosystem_path = context.config().state_dir.join(ecosystem_name);
     StateManager::with_backend_type_and_logger(
-        context.config().state_backend.clone(),
+        context.config().state_backend,
         &ecosystem_path,
         Arc::clone(context.logger()),
     )
@@ -297,7 +297,7 @@ pub async fn create_state_manager_with_s3(
 
     // Fallback to filesystem backend
     let manager = StateManager::with_backend_type_and_logger(
-        context.config().state_backend.clone(),
+        context.config().state_backend,
         &ecosystem_path,
         Arc::clone(context.logger()),
     );

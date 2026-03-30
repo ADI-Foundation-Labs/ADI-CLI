@@ -53,6 +53,7 @@ dependencies = [
  "docker_credential",
  "eyre",
  "futures-util",
+ "log",
  "thiserror",
  "tokio",
  "url",

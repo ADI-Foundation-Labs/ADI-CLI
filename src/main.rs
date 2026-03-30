@@ -1,3 +1,5 @@
+//! ADI CLI - SDK-first Rust CLI for managing ZkSync ecosystem smart contracts.
+
 use std::path::PathBuf;
 
 use clap::{
@@ -23,6 +25,7 @@ const STYLES: Styles = Styles::styled()
     .error(Ansi::Red.on_default().bold());
 
 #[derive(Clone, Parser, Debug, Serialize, Deserialize)]
+/// CLI options parsed by Clap.
 #[clap(about)]
 #[command(styles = STYLES)]
 pub struct Opts {

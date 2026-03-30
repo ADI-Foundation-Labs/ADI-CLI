@@ -17,7 +17,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 /// Backend type for state storage.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum BackendType {
     /// Filesystem-based storage (default).

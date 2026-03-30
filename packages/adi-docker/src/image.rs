@@ -13,8 +13,9 @@ use std::sync::Arc;
 ///
 /// `harbor.example.com/namespace/image:tag` -> `image:tag`
 fn short_image_name(image_uri: &str) -> &str {
-    // Get the last path segment (image:tag)
-    image_uri.rsplit('/').next().unwrap_or(image_uri)
+    image_uri
+        .rsplit_once('/')
+        .map_or(image_uri, |(_, name)| name)
 }
 
 /// Manages Docker images (pull, check existence).

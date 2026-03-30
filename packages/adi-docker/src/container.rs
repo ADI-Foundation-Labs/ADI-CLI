@@ -202,29 +202,33 @@ impl ContainerManager {
         )
         .await;
 
-        match stream_result {
-            Ok(Ok(())) => {
-                // Streaming completed normally, get exit code
-                match timeout(Duration::from_secs(10), self.wait_for_exit(container_id)).await {
-                    Ok(result) => result,
-                    Err(_) => Ok(0), // Container already exited, assume success
-                }
-            }
-            Ok(Err(e)) => {
-                // Stream was interrupted (CTRL+C)
-                self.logger.warning(&format!("Stream interrupted: {}", e));
-                self.logger.info("Stopping container...");
-                let _ = self.docker.stop_container(container_id, None).await;
-                Err(DockerError::StreamError("Interrupted by user".to_string()))
-            }
+        // Handle timeout
+        let stream_inner = match stream_result {
+            Ok(inner) => inner,
             Err(_) => {
-                // Timeout
                 let _ = self.docker.stop_container(container_id, None).await;
-                Err(DockerError::Timeout {
+                return Err(DockerError::Timeout {
                     seconds: config.timeout_seconds,
-                })
+                });
             }
+        };
+
+        // Handle stream interruption (CTRL+C)
+        if let Err(e) = stream_inner {
+            self.logger.warning(&format!("Stream interrupted: {}", e));
+            self.logger.info("Stopping container...");
+            let _ = self.docker.stop_container(container_id, None).await;
+            return Err(DockerError::StreamError("Interrupted by user".to_string()));
         }
+
+        // Streaming completed normally, get exit code
+        timeout(Duration::from_secs(10), self.wait_for_exit(container_id))
+            .await
+            .map_err(|_| {
+                self.logger
+                    .warning("Timed out waiting for container exit code");
+                DockerError::Timeout { seconds: 10 }
+            })?
     }
 
     async fn wait_for_exit(&self, container_id: &str) -> Result<i64> {

@@ -28,7 +28,9 @@ overflow-checks = false
 strip = true
 
 [workspace.lints.rust]
+unsafe_code = "deny"
 unused_must_use = "deny"
+missing_docs = "warn"
 
 [workspace.lints.clippy]
 panic = "deny"
@@ -53,6 +55,12 @@ iter_nth_zero = "deny"
 bind_instead_of_map = "deny"
 manual_filter_map = "deny"
 double_ended_iterator_last = "allow"
+needless_pass_by_value = "warn"
+cognitive_complexity = "warn"
+clone_on_ref_ptr = "warn"
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "deny"
 
 [workspace.dependencies]
 # CLI
@@ -96,7 +104,7 @@ env_logger = { version = "0.11", default-features = false, features = [
 ] }
 
 # Docker
-bollard = { version = "0.18" }
+bollard = { version = "0.18", default-features = false, features = ["http", "pipe"] }
 docker_credential = { version = "1.3", default-features = false }
 futures-util = { version = "0.3", default-features = false, features = [
   "std",

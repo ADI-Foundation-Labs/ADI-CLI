@@ -687,6 +687,7 @@ fn display_funding_summary(plan: &adi_funding::FundingPlan, config: &FundingConf
 /// Run ecosystem contract deployment and validator role configuration.
 ///
 /// This is the shared deployment logic used by both Anvil and production funding paths.
+#[allow(clippy::cognitive_complexity)] // TODO: refactor into smaller functions
 async fn run_ecosystem_deployment(
     args: &DeployArgs,
     context: &Context,
