@@ -49,7 +49,7 @@
 //! # Configuration
 //!
 //! The [`ToolkitConfig`] struct controls:
-//! - Registry URL (default: `harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli`)
+//! - Registry URL (default: `harbor.sde.adifoundation.ai/adi-public/cli`)
 //! - Image name (default: `adi-toolkit`)
 //! - Operation timeout (default: 1 hour)
 //!
