@@ -5,7 +5,6 @@ spec:
       type: "string"
       options: [default, toolkit-v0-30-1]
       description: "Select the build target (default, toolkit-v0-30-1)"
-
 ---
 stages:
   - check
@@ -40,7 +39,7 @@ variables:
     - wget -qO- https://taskfile.dev/install.sh | sh -s -- -d -b /usr/local/bin
 
     # Login to Harbor
-    - echo "$HARBOR_PASSWORD" | docker login harbor-v2.dev.internal.adifoundation.ai -u "$HARBOR_USERNAME" --password-stdin
+    - echo "$HARBOR_PASSWORD" | docker login adi-chain -u "$HARBOR_USERNAME" --password-stdin
 
     # Wait for Docker daemon
     - |

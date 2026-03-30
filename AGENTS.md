@@ -153,7 +153,7 @@ Host Machine
 **Toolkit Images:**
 - Pre-built images containing all dependencies
 - Tagged by protocol version (e.g., `v30.0.2`)
-- Default registry: `harbor.sde.adifoundation.ai/adi-chain/cli`
+- Default registry: `adi-chain/cli`
 - Image name: `adi-toolkit`
 - Auto-pulled when missing
 

@@ -3,7 +3,7 @@
 version: "3"
 
 vars:
-  REGISTRY: harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli
+  REGISTRY: adi-chain/cli
   CACHE_REF_SLUG: '{{default "main" .CI_COMMIT_REF_SLUG}}'
   # Default platform to linux/arm64 for local dev (Apple Silicon friendly)
   PLATFORM: '{{default "linux/arm64" .PLATFORM}}'
