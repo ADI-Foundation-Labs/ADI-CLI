@@ -11,6 +11,9 @@ use s3::bucket::Bucket;
 use s3::creds::Credentials;
 use s3::region::Region;
 
+/// HTTP 404 Not Found status code.
+const HTTP_NOT_FOUND: u16 = 404;
+
 /// Configuration for S3 synchronization.
 #[derive(Clone, Debug)]
 pub struct S3Config {
@@ -164,20 +167,15 @@ impl S3Client {
     pub async fn exists(&self, key: &str) -> Result<bool> {
         let full_key = self.full_key(key);
 
-        match self.bucket.head_object(&full_key).await {
-            Ok(_) => Ok(true),
-            Err(e) => {
-                // Check if it's a "not found" error (HTTP 404)
-                let error_str = e.to_string();
-                if error_str.contains("404") || error_str.contains("NoSuchKey") {
-                    Ok(false)
-                } else {
-                    Err(StateError::S3DownloadFailed {
-                        key: full_key,
-                        reason: error_str,
-                    })
-                }
-            }
-        }
+        let (_, status) =
+            self.bucket
+                .head_object(&full_key)
+                .await
+                .map_err(|e| StateError::S3DownloadFailed {
+                    key: full_key,
+                    reason: e.to_string(),
+                })?;
+
+        Ok(status != HTTP_NOT_FOUND)
     }
 }
