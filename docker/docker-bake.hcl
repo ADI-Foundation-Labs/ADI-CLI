@@ -51,6 +51,17 @@ group "default" {
   targets = ["toolkit-v0-30-1"]
 }
 
+target "toolkit-v0-30-0" {
+  inherits = ["common"]
+  tags = ["${REGISTRY}/adi-toolkit:v0.30.0${TAG_SUFFIX}"]
+  args = {
+    ZKSYNC_ERA_COMMIT = "79769b7a2c3d5e5e5975e01e499d0e2e8f3fa279"
+    CONTRACTS_COMMIT = "a233f74066aed7a9f750fd4ed1efd67b5f5fe9a3"
+    FOUNDRY_ZKSYNC_VERSION = "latest"
+    GENESIS_COMMIT = "a8e6de4f4f260ab33bb2ac57c441c0bec4a8fb2c"
+  }
+}
+
 target "toolkit-v0-30-1" {
   inherits = ["common"]
   tags = ["${REGISTRY}/adi-toolkit:v0.30.1${TAG_SUFFIX}"]

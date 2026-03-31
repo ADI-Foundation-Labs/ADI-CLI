@@ -37,6 +37,9 @@ pub enum ParseError {
     Clone, Copy, Debug, Default, EnumString, EnumIter, Serialize, Deserialize, PartialEq, Eq,
 )]
 pub enum ProtocolVersion {
+    /// Protocol version 0.30.0
+    #[strum(serialize = "v0.30.0", serialize = "0.30.0")]
+    V0_30_0,
     /// Protocol version 0.30.1
     #[default]
     #[strum(serialize = "v0.30.1", serialize = "0.30.1")]
@@ -99,6 +102,7 @@ impl ProtocolVersion {
     #[must_use]
     pub fn to_semver(self) -> semver::Version {
         match self {
+            ProtocolVersion::V0_30_0 => semver::Version::new(0, 30, 0),
             ProtocolVersion::V0_30_1 => semver::Version::new(0, 30, 1),
         }
     }
