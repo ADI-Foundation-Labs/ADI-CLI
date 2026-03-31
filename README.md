@@ -12,36 +12,16 @@ SDK-first Rust CLI for managing ZkSync ecosystem smart contracts. Runs on the ho
 
 ## Installation
 
-### Quick Install (recommended)
-
-The installer requires a GitLab personal access token with `**api`** scope.
-[Create a token here](https://gitlab.sre.ideasoft.io/-/user_settings/personal_access_tokens?name=adi-cli-install&scopes=api).
-
-```bash
-export GITLAB_TOKEN="glpat-..."
-curl -fsSL --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
-  "https://gitlab.sre.ideasoft.io/api/v4/projects/348/repository/files/install.sh/raw?ref=main" | bash
-```
-
-To install a specific version:
-
-```bash
-curl -fsSL --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
-  "https://gitlab.sre.ideasoft.io/api/v4/projects/348/repository/files/install.sh/raw?ref=main" | bash -s -- v0.1.0
-```
-
-The installer detects your OS and architecture, downloads the correct binary, and places it in `~/.cargo/bin/`.
-
 ### Install via Cargo
 
 ```bash
-CARGO_NET_GIT_FETCH_WITH_CLI=true cargo install --git ssh://git@gitlab.sre.ideasoft.io/adi-foundation/adi-chain/cli.git
+cargo install --git https://github.com/ADI-Foundation-Labs/ADI-CLI.git
 ```
 
 ### Building from Source
 
 ```bash
-git clone ssh://git@gitlab.sre.ideasoft.io/adi-foundation/adi-chain/cli.git adi-cli
+git clone https://github.com/ADI-Foundation-Labs/ADI-CLI.git adi-cli
 cd adi-cli
 cargo build --release
 cp ./target/release/adi ~/.local/bin/

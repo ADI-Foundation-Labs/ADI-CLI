@@ -109,14 +109,14 @@ See `commands/version.rs` (simple) or `commands/init/` (with args) for patterns.
 
 The CLI is built from 6 workspace packages with clear separation of concerns:
 
-| Package         | Description                                           |
-| --------------- | ----------------------------------------------------- |
-| `adi-docker`    | Pure Docker management SDK (bollard wrapper)          |
-| `adi-toolkit`   | High-level toolkit container orchestration            |
-| `adi-ecosystem` | Domain logic for ZkSync ecosystem management          |
-| `adi-state`     | Abstract state management with filesystem backend     |
-| `adi-funding`   | Wallet funding SDK with plan-execute pattern          |
-| `adi-types`     | Shared domain types (wallets, contracts, metadata)    |
+| Package         | Description                                        |
+| --------------- | -------------------------------------------------- |
+| `adi-docker`    | Pure Docker management SDK (bollard wrapper)       |
+| `adi-toolkit`   | High-level toolkit container orchestration         |
+| `adi-ecosystem` | Domain logic for ZkSync ecosystem management       |
+| `adi-state`     | Abstract state management with filesystem backend  |
+| `adi-funding`   | Wallet funding SDK with plan-execute pattern       |
+| `adi-types`     | Shared domain types (wallets, contracts, metadata) |
 
 Package dependency graph:
 ```
@@ -153,7 +153,7 @@ Host Machine
 **Toolkit Images:**
 - Pre-built images containing all dependencies
 - Tagged by protocol version (e.g., `v30.0.2`)
-- Default registry: `harbor-v2.dev.internal.adifoundation.ai/adi-chain/cli`
+- Default registry: `harbor.sde.adifoundation.ai/adi-public/cli`
 - Image name: `adi-toolkit`
 - Auto-pulled when missing
 
