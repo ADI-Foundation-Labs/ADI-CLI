@@ -3,11 +3,49 @@
 use crate::error::{DockerError, Result};
 use adi_types::Logger;
 use bollard::image::CreateImageOptions;
+use bollard::models::CreateImageInfo;
 use bollard::Docker;
+use cliclack::ProgressBar;
 use console::style;
 use futures_util::StreamExt;
 use std::collections::HashMap;
 use std::sync::Arc;
+
+/// Extract a human-readable error reason from a bollard error.
+fn pull_error_reason(e: &bollard::errors::Error) -> String {
+    match e {
+        bollard::errors::Error::DockerStreamError { error } => error.clone(),
+        other => other.to_string(),
+    }
+}
+
+/// Update aggregate layer progress from a single stream event.
+fn update_layer_progress(
+    info: &CreateImageInfo,
+    layer_progress: &mut HashMap<String, (u64, u64)>,
+    progress: &ProgressBar,
+) {
+    let Some(id) = info.id.as_ref() else { return };
+    let Some(detail) = info.progress_detail.as_ref() else {
+        return;
+    };
+    let (Some(current), Some(total)) = (detail.current, detail.total) else {
+        return;
+    };
+
+    let current_bytes = u64::try_from(current).unwrap_or(0);
+    let total_bytes = u64::try_from(total).unwrap_or(0);
+    layer_progress.insert(id.clone(), (current_bytes, total_bytes));
+
+    let (total_current, total_size): (u64, u64) = layer_progress
+        .values()
+        .fold((0, 0), |(c, t), (lc, lt)| (c + lc, t + lt));
+
+    if total_size > 0 {
+        progress.set_length(total_size);
+        progress.set_position(total_current);
+    }
+}
 
 /// Extract short image name from full URI.
 ///
@@ -71,49 +109,24 @@ impl ImageManager {
         progress.start(format!("Pulling {}", style(short_name).green()));
 
         while let Some(result) = stream.next().await {
-            match result {
-                Ok(info) => {
-                    if let Some(error) = info.error {
-                        progress.error(&error);
-                        return Err(DockerError::PullFailed {
-                            image: image_uri.to_string(),
-                            reason: error,
-                        });
-                    }
-
-                    // Update layer progress if we have progress detail
-                    if let (Some(id), Some(detail)) = (info.id, info.progress_detail) {
-                        if let (Some(current), Some(total)) = (detail.current, detail.total) {
-                            // Only track positive values (negative shouldn't happen but be safe)
-                            let current_bytes = u64::try_from(current).unwrap_or(0);
-                            let total_bytes = u64::try_from(total).unwrap_or(0);
-                            layer_progress.insert(id, (current_bytes, total_bytes));
-
-                            // Sum all layers to get total progress
-                            let (total_current, total_size): (u64, u64) = layer_progress
-                                .values()
-                                .fold((0, 0), |(c, t), (lc, lt)| (c + lc, t + lt));
-
-                            if total_size > 0 {
-                                progress.set_length(total_size);
-                                progress.set_position(total_current);
-                            }
-                        }
-                    }
+            let info = result.map_err(|e| {
+                let reason = pull_error_reason(&e);
+                progress.error(&reason);
+                DockerError::PullFailed {
+                    image: image_uri.to_string(),
+                    reason,
                 }
-                Err(e) => {
-                    // Extract the actual error message from DockerStreamError
-                    let reason = match &e {
-                        bollard::errors::Error::DockerStreamError { error } => error.clone(),
-                        other => other.to_string(),
-                    };
-                    progress.error(&reason);
-                    return Err(DockerError::PullFailed {
-                        image: image_uri.to_string(),
-                        reason,
-                    });
-                }
+            })?;
+
+            if let Some(error) = info.error {
+                progress.error(&error);
+                return Err(DockerError::PullFailed {
+                    image: image_uri.to_string(),
+                    reason: error,
+                });
             }
+
+            update_layer_progress(&info, &mut layer_progress, &progress);
         }
 
         progress.stop(format!("Pulled {}", style(short_name).green()));
