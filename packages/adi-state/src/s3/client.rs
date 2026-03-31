@@ -7,11 +7,9 @@
 //! enabling multi-tenant bucket usage with clear folder separation.
 
 use crate::error::{Result, StateError};
-use adi_types::Logger;
 use s3::bucket::Bucket;
 use s3::creds::Credentials;
 use s3::region::Region;
-use std::sync::Arc;
 
 /// Configuration for S3 synchronization.
 #[derive(Clone, Debug)]
@@ -34,8 +32,6 @@ pub struct S3Config {
 pub struct S3Client {
     bucket: Box<Bucket>,
     key_prefix: String,
-    #[allow(dead_code)]
-    logger: Arc<dyn Logger>,
 }
 
 impl S3Client {
@@ -47,12 +43,11 @@ impl S3Client {
     /// # Arguments
     ///
     /// * `config` - S3 configuration with bucket, region, credentials, and tenant_id
-    /// * `logger` - Logger instance for debug output
     ///
     /// # Errors
     ///
     /// Returns error if client initialization fails.
-    pub async fn new(config: S3Config, logger: Arc<dyn Logger>) -> Result<Self> {
+    pub async fn new(config: S3Config) -> Result<Self> {
         let credentials = Credentials::new(
             Some(&config.access_key_id),
             Some(&config.secret_access_key),
@@ -67,7 +62,6 @@ impl S3Client {
 
         // Use tenant_id as key prefix for multi-tenant bucket usage
         let key_prefix = format!("{}/", config.tenant_id);
-        logger.debug(&format!("S3 key prefix: {}", key_prefix));
 
         // Determine region: custom endpoint or standard AWS region
         let region = if let Some(endpoint) = &config.endpoint_url {
@@ -92,11 +86,7 @@ impl S3Client {
             bucket = bucket.with_path_style();
         }
 
-        Ok(Self {
-            bucket,
-            key_prefix,
-            logger,
-        })
+        Ok(Self { bucket, key_prefix })
     }
 
     /// Get the full S3 key with prefix.

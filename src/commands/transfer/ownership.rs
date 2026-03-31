@@ -137,7 +137,7 @@ async fn resolve_config<'a>(
     let include_ecosystem = matches!(args.scope, OwnershipScope::Ecosystem | OwnershipScope::All);
     let include_chain = matches!(args.scope, OwnershipScope::Chain | OwnershipScope::All);
 
-    let state_manager = create_state_manager_with_context(&ecosystem_name, context);
+    let state_manager = create_state_manager_with_context(&ecosystem_name, context)?;
 
     let chain_name = if include_chain {
         Some(select_chain_from_state(args.chain.as_ref(), &state_manager, &ecosystem_name).await?)

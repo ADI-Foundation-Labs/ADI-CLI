@@ -843,7 +843,7 @@ pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
     ui::intro("ADI CLI")?;
 
     let ecosystem_name = resolve_ecosystem_name(args.ecosystem_name.as_ref(), context.config())?;
-    let state_manager = create_state_manager_with_context(&ecosystem_name, context);
+    let state_manager = create_state_manager_with_context(&ecosystem_name, context)?;
 
     // Check if ecosystem exists
     if !ecosystem_exists(&state_manager).await? {

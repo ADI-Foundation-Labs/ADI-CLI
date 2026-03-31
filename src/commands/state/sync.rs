@@ -6,7 +6,6 @@ use adi_state::s3::{create_tar_gz, S3Client, S3Config};
 use clap::Args;
 use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 use crate::commands::helpers::resolve_ecosystem_name;
 use crate::context::Context;
@@ -70,7 +69,7 @@ pub async fn run(args: &SyncArgs, context: &Context) -> Result<()> {
     };
 
     ui::info("Connecting to S3...")?;
-    let s3_client = S3Client::new(client_config, Arc::clone(context.logger()))
+    let s3_client = S3Client::new(client_config)
         .await
         .wrap_err("Failed to create S3 client")?;
 

@@ -205,7 +205,7 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
             }
             ExistingEcosystemAction::Reinitialize => {
                 // Show files that will be deleted
-                let files = state_manager.list_state_files();
+                let files = state_manager.list_state_files().await;
                 let file_list: String = files
                     .iter()
                     .map(|f| format!("  - {}", f))

@@ -46,7 +46,7 @@ pub(super) async fn resolve_config<'a>(
     let include_ecosystem = matches!(args.scope, OwnershipScope::Ecosystem | OwnershipScope::All);
     let include_chain = matches!(args.scope, OwnershipScope::Chain | OwnershipScope::All);
 
-    let state_manager = create_state_manager_with_context(&ecosystem_name, context);
+    let state_manager = create_state_manager_with_context(&ecosystem_name, context)?;
 
     let ecosystem_contracts = load_ecosystem_contracts(include_ecosystem, &state_manager).await?;
     let chain_name = resolve_chain_name(

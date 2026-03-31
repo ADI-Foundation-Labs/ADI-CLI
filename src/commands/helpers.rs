@@ -193,13 +193,21 @@ pub fn derive_address_from_key(key: &secrecy::SecretString) -> Result<Address> {
 }
 
 /// Create state manager for the ecosystem with context's logger.
-pub fn create_state_manager_with_context(ecosystem_name: &str, context: &Context) -> StateManager {
+///
+/// # Errors
+///
+/// Returns error if the backend type requires async initialization.
+pub fn create_state_manager_with_context(
+    ecosystem_name: &str,
+    context: &Context,
+) -> Result<StateManager> {
     let ecosystem_path = context.config().state_dir.join(ecosystem_name);
     StateManager::with_backend_type_and_logger(
         context.config().state_backend,
         &ecosystem_path,
         Arc::clone(context.logger()),
     )
+    .map_err(|e| eyre::eyre!("Failed to create state manager: {e}"))
 }
 
 /// Convert CLI S3Config to adi-state S3Config.
@@ -300,7 +308,8 @@ pub async fn create_state_manager_with_s3(
         context.config().state_backend,
         &ecosystem_path,
         Arc::clone(context.logger()),
-    );
+    )
+    .map_err(|e| eyre::eyre!("Failed to create state manager: {e}"))?;
 
     Ok((manager, None))
 }
