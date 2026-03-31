@@ -10,7 +10,7 @@ use crate::error::{FundingError, Result};
 use crate::events::{FundingEvent, FundingEventHandler, NoOpEventHandler};
 use crate::provider::FundingProvider;
 use crate::signer::create_signer;
-use adi_types::Wallets;
+use adi_types::{Wallet, Wallets};
 use alloy_network::{EthereumWallet, TransactionBuilder};
 use alloy_primitives::{Address, B256, U256};
 use alloy_provider::{Provider, ProviderBuilder};
@@ -148,97 +148,60 @@ impl AnvilFunder {
         ecosystem: &Wallets,
         chain: &Wallets,
     ) -> Result<Vec<AnvilFundingTarget>> {
-        let mut targets = Vec::new();
+        // (wallet, role, source, amount) — declarative funding table
+        // Note: fee_account, token_multiplier_setter are NOT funded
+        // during ecosystem deployment (same as production funding logic)
+        let wallet_configs: [(Option<&Wallet>, WalletRole, WalletSource, U256); 6] = [
+            (
+                ecosystem.deployer.as_ref(),
+                WalletRole::Deployer,
+                WalletSource::Ecosystem,
+                self.amounts.deployer_eth,
+            ),
+            (
+                ecosystem.governor.as_ref(),
+                WalletRole::Governor,
+                WalletSource::Ecosystem,
+                self.amounts.governor_eth,
+            ),
+            (
+                chain.governor.as_ref(),
+                WalletRole::Governor,
+                WalletSource::Chain,
+                self.amounts.governor_eth,
+            ),
+            (
+                chain.operator.as_ref(),
+                WalletRole::Operator,
+                WalletSource::Chain,
+                self.amounts.operator_eth,
+            ),
+            (
+                chain.prove_operator.as_ref(),
+                WalletRole::ProveOperator,
+                WalletSource::Chain,
+                self.amounts.prove_operator_eth,
+            ),
+            (
+                chain.execute_operator.as_ref(),
+                WalletRole::ExecuteOperator,
+                WalletSource::Chain,
+                self.amounts.execute_operator_eth,
+            ),
+        ];
 
-        // Helper to create target with balance check
-        let check_and_add = |targets: &mut Vec<AnvilFundingTarget>,
-                             role: WalletRole,
-                             source: WalletSource,
-                             address: Address,
-                             amount: U256,
-                             balance: U256| {
+        let mut targets = Vec::new();
+        for (wallet, role, source, amount) in wallet_configs {
+            let Some(w) = wallet else { continue };
+            let balance = get_eth_balance(&self.provider, w.address).await?;
             targets.push(AnvilFundingTarget {
                 role,
                 source,
-                address,
+                address: w.address,
                 amount,
                 current_balance: balance,
                 needs_funding: balance < amount,
             });
-        };
-
-        // Ecosystem wallets: deployer, governor
-        if let Some(w) = &ecosystem.deployer {
-            let balance = get_eth_balance(&self.provider, w.address).await?;
-            check_and_add(
-                &mut targets,
-                WalletRole::Deployer,
-                WalletSource::Ecosystem,
-                w.address,
-                self.amounts.deployer_eth,
-                balance,
-            );
-        }
-        if let Some(w) = &ecosystem.governor {
-            let balance = get_eth_balance(&self.provider, w.address).await?;
-            check_and_add(
-                &mut targets,
-                WalletRole::Governor,
-                WalletSource::Ecosystem,
-                w.address,
-                self.amounts.governor_eth,
-                balance,
-            );
-        }
-
-        // Chain wallets: governor only
-        // Note: fee_account, token_multiplier_setter are NOT funded
-        // during ecosystem deployment (same as production funding logic)
-        if let Some(w) = &chain.governor {
-            let balance = get_eth_balance(&self.provider, w.address).await?;
-            check_and_add(
-                &mut targets,
-                WalletRole::Governor,
-                WalletSource::Chain,
-                w.address,
-                self.amounts.governor_eth,
-                balance,
-            );
-        }
-
-        // Chain operators (from chain wallets)
-        if let Some(w) = &chain.operator {
-            let balance = get_eth_balance(&self.provider, w.address).await?;
-            check_and_add(
-                &mut targets,
-                WalletRole::Operator,
-                WalletSource::Chain,
-                w.address,
-                self.amounts.operator_eth,
-                balance,
-            );
-        }
-        if let Some(w) = &chain.prove_operator {
-            let balance = get_eth_balance(&self.provider, w.address).await?;
-            check_and_add(
-                &mut targets,
-                WalletRole::ProveOperator,
-                WalletSource::Chain,
-                w.address,
-                self.amounts.prove_operator_eth,
-                balance,
-            );
-        }
-        if let Some(w) = &chain.execute_operator {
-            let balance = get_eth_balance(&self.provider, w.address).await?;
-            check_and_add(
-                &mut targets,
-                WalletRole::ExecuteOperator,
-                WalletSource::Chain,
-                w.address,
-                self.amounts.execute_operator_eth,
-                balance,
-            );
         }
 
         Ok(targets)
