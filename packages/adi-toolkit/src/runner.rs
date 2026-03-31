@@ -34,6 +34,66 @@ fn get_current_user() -> Option<String> {
     None
 }
 
+/// Parameters for running a command in a toolkit container.
+struct RunCommandParams<'a> {
+    /// Command and arguments to execute.
+    command: &'a [&'a str],
+    /// Working directory mounted into the container.
+    state_dir: &'a Path,
+    /// Directory for saving log files.
+    log_dir: &'a Path,
+    /// Protocol version for toolkit image selection.
+    protocol_version: &'a Version,
+    /// Environment variables to pass to the container.
+    env_vars: &'a [(&'a str, &'a str)],
+    /// Command name for log file naming.
+    log_command: &'a str,
+    /// Label for progress display.
+    log_label: &'a str,
+    /// Whether to suppress output.
+    quiet: bool,
+}
+
+/// Parameters for `forge verify-contract`.
+pub struct ForgeVerifyParams<'a> {
+    /// Contract address to verify.
+    pub address: &'a str,
+    /// Path to contract in format "path/to/Contract.sol:ContractName".
+    pub contract_path: &'a str,
+    /// Chain ID for the network.
+    pub chain_id: u64,
+    /// Block explorer API URL.
+    pub verifier_url: &'a str,
+    /// Verifier type ("blockscout", "etherscan", "sourcify", etc.).
+    pub verifier: &'a str,
+    /// Block explorer API key (optional for public explorers like Blockscout).
+    pub api_key: Option<&'a str>,
+    /// Optional constructor arguments (hex-encoded).
+    pub constructor_args: Option<&'a str>,
+    /// Protocol version for toolkit image selection.
+    pub protocol_version: &'a Version,
+    /// Directory for saving log files.
+    pub log_dir: &'a Path,
+    /// Root path for contract sources (e.g., /deps/era-contracts/l1-contracts).
+    pub root_path: &'a str,
+}
+
+/// Parameters for `zkstack ecosystem init`.
+pub struct EcosystemInitParams<'a> {
+    /// Path to the ecosystem directory.
+    pub ecosystem_dir: &'a Path,
+    /// Settlement layer RPC URL.
+    pub l1_rpc_url: &'a str,
+    /// Optional gas price in wei (uses default if None).
+    pub gas_price_wei: Option<u128>,
+    /// Protocol version for toolkit image selection.
+    pub protocol_version: &'a Version,
+    /// Whether to deploy ecosystem contracts.
+    pub deploy_ecosystem: bool,
+    /// Name of the chain to initialize/deploy.
+    pub chain_name: &'a str,
+}
+
 /// Executes commands inside Docker toolkit containers.
 ///
 /// Container lifecycle: create -> start -> stream output -> wait -> remove
@@ -88,64 +148,27 @@ impl ToolkitRunner {
         log_command: &str,
         log_label: &str,
     ) -> Result<i64> {
-        self.run_command_internal(
+        self.run_command_internal(RunCommandParams {
             command,
             state_dir,
-            state_dir,
+            log_dir: state_dir,
             protocol_version,
             env_vars,
             log_command,
             log_label,
-            false,
-        )
-        .await
-    }
-
-    /// Execute a command with separate working directory and log directory.
-    /// Use this when state_dir is a temp directory but logs should go elsewhere.
-    #[allow(clippy::too_many_arguments)]
-    pub async fn run_command_with_log_dir(
-        &self,
-        command: &[&str],
-        state_dir: &Path,
-        log_dir: &Path,
-        protocol_version: &Version,
-        env_vars: &[(&str, &str)],
-        log_command: &str,
-        log_label: &str,
-    ) -> Result<i64> {
-        self.run_command_internal(
-            command,
-            state_dir,
-            log_dir,
-            protocol_version,
-            env_vars,
-            log_command,
-            log_label,
-            false,
-        )
+            quiet: false,
+        })
         .await
     }
 
     /// Internal command runner with quiet mode support.
-    #[allow(clippy::too_many_arguments)]
-    async fn run_command_internal(
-        &self,
-        command: &[&str],
-        state_dir: &Path,
-        log_dir: &Path,
-        protocol_version: &Version,
-        env_vars: &[(&str, &str)],
-        log_command: &str,
-        log_label: &str,
-        quiet: bool,
-    ) -> Result<i64> {
+    async fn run_command_internal(&self, params: RunCommandParams<'_>) -> Result<i64> {
         let image_ref = self
             .config
-            .image_reference(protocol_version, self.logger.as_ref());
+            .image_reference(params.protocol_version, self.logger.as_ref());
         let image_uri = image_ref.full_uri();
 
-        if !quiet {
+        if !params.quiet {
             self.logger.info(&format!(
                 "Using toolkit image: {}",
                 style(&image_uri).green()
@@ -153,9 +176,9 @@ impl ToolkitRunner {
         }
         self.logger.debug(&format!(
             "Running command: {:?} (state_dir: {}, log_dir: {})",
-            command,
-            state_dir.display(),
-            log_dir.display()
+            params.command,
+            params.state_dir.display(),
+            params.log_dir.display()
         ));
 
         self.client.pull_image(&image_uri).await?;
@@ -163,20 +186,21 @@ impl ToolkitRunner {
         // Always include CI=true to suppress interactive prompts (e.g., telemetry)
         let mut all_env_vars: Vec<(String, String)> = vec![("CI".to_string(), "true".to_string())];
         all_env_vars.extend(
-            env_vars
+            params
+                .env_vars
                 .iter()
                 .map(|(k, v)| ((*k).to_string(), (*v).to_string())),
         );
 
         let container_config = ContainerConfig {
-            state_dir: state_dir.to_path_buf(),
-            command: command.iter().map(|s| (*s).to_string()).collect(),
+            state_dir: params.state_dir.to_path_buf(),
+            command: params.command.iter().map(|s| (*s).to_string()).collect(),
             env_vars: all_env_vars,
             timeout_seconds: self.config.timeout_seconds,
-            log_dir: log_dir.to_path_buf(),
-            log_command: log_command.to_string(),
-            log_label: log_label.to_string(),
-            quiet,
+            log_dir: params.log_dir.to_path_buf(),
+            log_command: params.log_command.to_string(),
+            log_label: params.log_label.to_string(),
+            quiet: params.quiet,
             user: get_current_user(),
             ..Default::default()
         };
@@ -191,26 +215,11 @@ impl ToolkitRunner {
         let result = manager.run(&image_uri, &container_config).await;
 
         // Always clean up tmp directory (keep only *.md files), even on error/interrupt
-        let tmp_dir = state_dir.join(".tmp");
+        let tmp_dir = params.state_dir.join(".tmp");
         if tmp_dir.exists() {
             // Check for crash reports before cleanup (only on failure)
-            if let Ok(ref exit_code) = result {
-                if *exit_code != 0 {
-                    if let Ok(entries) = std::fs::read_dir(&tmp_dir) {
-                        for entry in entries.flatten() {
-                            let filename = entry.file_name();
-                            let filename_str = filename.to_string_lossy();
-                            if filename_str.starts_with("report-")
-                                && filename_str.ends_with(".toml")
-                            {
-                                self.logger.error(&format!(
-                                    "Crash report available at: {}",
-                                    entry.path().display()
-                                ));
-                            }
-                        }
-                    }
-                }
+            if matches!(&result, Ok(code) if *code != 0) {
+                self.log_crash_reports(&tmp_dir);
             }
             cleanup_tmp_dir(&tmp_dir, self.logger.as_ref());
         }
@@ -243,15 +252,16 @@ impl ToolkitRunner {
         command.extend(args);
         let label = format!("Running zkstack {}...", args.first().unwrap_or(&""));
 
-        self.run_command_with_log_dir(
-            &command,
+        self.run_command_internal(RunCommandParams {
+            command: &command,
             state_dir,
             log_dir,
             protocol_version,
-            &[],
-            "zkstack",
-            &label,
-        )
+            env_vars: &[],
+            log_command: "zkstack",
+            log_label: &label,
+            quiet: false,
+        })
         .await
     }
 
@@ -303,59 +313,34 @@ impl ToolkitRunner {
     }
 
     /// Execute `forge verify-contract` in toolkit container.
-    ///
-    /// # Arguments
-    /// * `address` - Contract address to verify
-    /// * `contract_path` - Path to contract in format "path/to/Contract.sol:ContractName"
-    /// * `chain_id` - Chain ID for the network
-    /// * `verifier_url` - Block explorer API URL
-    /// * `verifier` - Verifier type ("blockscout", "etherscan", "sourcify", etc.)
-    /// * `api_key` - Block explorer API key (optional for public explorers like Blockscout)
-    /// * `constructor_args` - Optional constructor arguments (hex-encoded)
-    /// * `protocol_version` - Protocol version for toolkit image selection
-    /// * `log_dir` - Directory for saving log files
-    /// * `root_path` - Root path for contract sources (e.g., /deps/era-contracts/l1-contracts)
-    #[allow(clippy::too_many_arguments)]
-    pub async fn run_forge_verify(
-        &self,
-        address: &str,
-        contract_path: &str,
-        chain_id: u64,
-        verifier_url: &str,
-        verifier: &str,
-        api_key: Option<&str>,
-        constructor_args: Option<&str>,
-        protocol_version: &Version,
-        log_dir: &Path,
-        root_path: &str,
-    ) -> Result<i64> {
+    pub async fn run_forge_verify(&self, params: &ForgeVerifyParams<'_>) -> Result<i64> {
         self.logger.debug(&format!(
             "Running forge verify-contract for {} (contract: {}, root: {})",
-            address, contract_path, root_path
+            params.address, params.contract_path, params.root_path
         ));
 
         // Build the forge verify-contract command
         // Forge verify doesn't use src setting, so we prepend contracts/ to the path
         // Exception: lib/ paths (e.g., OpenZeppelin contracts) are at project root level
-        let full_contract_path = if contract_path.starts_with("lib/") {
-            contract_path.to_string()
+        let full_contract_path = if params.contract_path.starts_with("lib/") {
+            params.contract_path.to_string()
         } else {
-            format!("contracts/{}", contract_path)
+            format!("contracts/{}", params.contract_path)
         };
-        let chain_id_str = chain_id.to_string();
+        let chain_id_str = params.chain_id.to_string();
         let mut args: Vec<&str> = vec![
             "forge",
             "verify-contract",
-            address,
+            params.address,
             &full_contract_path,
             "--chain-id",
             &chain_id_str,
             "--verifier",
-            verifier,
+            params.verifier,
             "--verifier-url",
-            verifier_url,
+            params.verifier_url,
             "--root",
-            root_path,
+            params.root_path,
             "--compiler-version",
             "0.8.28",
             "--evm-version",
@@ -365,12 +350,12 @@ impl ToolkitRunner {
             "--watch", // Wait for verification to complete (not just submission accepted)
         ];
 
-        if let Some(key) = api_key {
+        if let Some(key) = params.api_key {
             args.push("--etherscan-api-key");
             args.push(key);
         }
 
-        if let Some(ctor_args) = constructor_args {
+        if let Some(ctor_args) = params.constructor_args {
             args.push("--constructor-args");
             args.push(ctor_args);
         }
@@ -379,47 +364,29 @@ impl ToolkitRunner {
 
         // Run in quiet mode - output is suppressed during batch verification
         // (progress bar shows status, logs are saved to file)
-        self.run_command_internal(
-            &args,
-            &temp_dir,
-            log_dir,
-            protocol_version,
-            &[],
-            "forge-verify",
-            &format!("Verifying {}...", address),
-            true, // quiet mode
-        )
+        self.run_command_internal(RunCommandParams {
+            command: &args,
+            state_dir: &temp_dir,
+            log_dir: params.log_dir,
+            protocol_version: params.protocol_version,
+            env_vars: &[],
+            log_command: "forge-verify",
+            log_label: &format!("Verifying {}...", params.address),
+            quiet: true,
+        })
         .await
     }
 
     /// Execute `zkstack ecosystem init` with foundry.toml permission fix.
-    ///
-    /// # Arguments
-    ///
-    /// * `ecosystem_dir` - Path to the ecosystem directory
-    /// * `l1_rpc_url` - Settlement layer RPC URL
-    /// * `gas_price_wei` - Optional gas price in wei (uses default if None)
-    /// * `protocol_version` - Protocol version for toolkit image selection
-    /// * `deploy_ecosystem` - Whether to deploy ecosystem contracts:
-    ///   - `true` for first-time deployment (creates Bridgehub, Governance, etc.)
-    ///   - `false` when adding a chain to an existing ecosystem
-    /// * `chain_name` - Name of the chain to initialize/deploy
-    /// * `verification` - Contract verification options
-    #[allow(clippy::too_many_arguments)]
     pub async fn run_zkstack_ecosystem_init(
         &self,
-        ecosystem_dir: &Path,
-        l1_rpc_url: &str,
-        gas_price_wei: Option<u128>,
-        protocol_version: &Version,
-        deploy_ecosystem: bool,
-        chain_name: &str,
+        params: &EcosystemInitParams<'_>,
     ) -> Result<i64> {
         self.logger.debug(&format!(
             "Running zkstack ecosystem init (ecosystem_dir: {}, rpc: {}, deploy_ecosystem: {})",
-            ecosystem_dir.display(),
-            l1_rpc_url,
-            deploy_ecosystem
+            params.ecosystem_dir.display(),
+            params.l1_rpc_url,
+            params.deploy_ecosystem
         ));
 
         let foundry_fix = r#"sed -i.bak 's/{ access = "read", path = "\.\.\/l1-contracts\/script-out\/" }/{ access = "read-write", path = "..\/l1-contracts\/script-out\/" }/' /deps/zksync-era/contracts/l1-contracts/foundry.toml"#;
@@ -434,21 +401,22 @@ impl ToolkitRunner {
              --deploy-erc20 false \
              --deploy-paymaster false \
              --chain {}",
-            deploy_ecosystem, chain_name
+            params.deploy_ecosystem, params.chain_name
         );
 
         // When not deploying ecosystem, point to existing contracts config
-        if !deploy_ecosystem {
+        if !params.deploy_ecosystem {
             // In container, ecosystem_dir is mounted as /workspace
             // zkstack expects path to ecosystem root where configs/contracts.yaml exists
             zkstack_args.push_str(" --ecosystem-contracts-path /workspace/configs/contracts.yaml");
         }
 
-        if let Some(gas_price) = gas_price_wei {
+        if let Some(gas_price) = params.gas_price_wei {
             zkstack_args.push_str(&format!(" -a --with-gas-price -a {}", gas_price));
         }
 
-        let container_rpc_url = transform_url_for_container(l1_rpc_url, self.logger.as_ref());
+        let container_rpc_url =
+            transform_url_for_container(params.l1_rpc_url, self.logger.as_ref());
         zkstack_args.push_str(&format!(" --l1-rpc-url {}", container_rpc_url));
 
         let shell_cmd = format!(
@@ -469,7 +437,7 @@ exit [lindex $result 3]'"#,
             zkstack = zkstack_args
         );
 
-        let deploy_msg = if deploy_ecosystem {
+        let deploy_msg = if params.deploy_ecosystem {
             "deploying ecosystem + chain contracts"
         } else {
             "deploying chain contracts only"
@@ -481,7 +449,7 @@ exit [lindex $result 3]'"#,
 
         let shell_command = vec!["sh", "-c", &shell_cmd];
 
-        let label = if deploy_ecosystem {
+        let label = if params.deploy_ecosystem {
             "Deploying ecosystem contracts..."
         } else {
             "Deploying chain contracts..."
@@ -489,12 +457,29 @@ exit [lindex $result 3]'"#,
 
         self.run_command(
             &shell_command,
-            ecosystem_dir,
-            protocol_version,
+            params.ecosystem_dir,
+            params.protocol_version,
             &[],
             "deploy",
             label,
         )
         .await
+    }
+
+    /// Log any crash reports found in the given directory.
+    fn log_crash_reports(&self, dir: &Path) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let filename = entry.file_name();
+            let filename_str = filename.to_string_lossy();
+            if filename_str.starts_with("report-") && filename_str.ends_with(".toml") {
+                self.logger.error(&format!(
+                    "Crash report available at: {}",
+                    entry.path().display()
+                ));
+            }
+        }
     }
 }

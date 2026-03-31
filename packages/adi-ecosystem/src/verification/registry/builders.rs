@@ -33,15 +33,14 @@ impl ContractRegistry {
             init_data: alloy_primitives::Bytes::new(),
         };
 
-        Some(VerificationTarget::new_with_proxy(
+        Some(VerificationTarget::new(
             contract_type,
             proxy_addr,
             ContractsRoot::L1Contracts.path(),
             "lib/openzeppelin-contracts-v4/contracts/proxy/transparent/TransparentUpgradeableProxy.sol",
             "TransparentUpgradeableProxy",
             true,
-            Some(proxy_info),
-        ))
+        ).with_proxy_info(proxy_info))
     }
 
     /// Build verification target for ZKsyncOSDualVerifier contract.
@@ -87,15 +86,17 @@ impl ContractRegistry {
             ),
         };
 
-        Some(VerificationTarget::new_with_verifier(
-            ContractType::Verifier,
-            verifier_addr,
-            ContractsRoot::L1Contracts.path(),
-            source_path,
-            contract_name,
-            false,
-            Some(verifier_info),
-        ))
+        Some(
+            VerificationTarget::new(
+                ContractType::Verifier,
+                verifier_addr,
+                ContractsRoot::L1Contracts.path(),
+                source_path,
+                contract_name,
+                false,
+            )
+            .with_verifier_info(verifier_info),
+        )
     }
 
     /// Build verification target for ChainAdmin contract.
@@ -116,15 +117,17 @@ impl ContractRegistry {
             token_multiplier_setter: Address::ZERO,
         };
 
-        Some(VerificationTarget::new_with_chain_admin(
-            contract_type,
-            addr,
-            ContractsRoot::L1Contracts.path(),
-            Self::source_path(contract_type),
-            Self::contract_name(contract_type),
-            false,
-            Some(chain_admin_info),
-        ))
+        Some(
+            VerificationTarget::new(
+                contract_type,
+                addr,
+                ContractsRoot::L1Contracts.path(),
+                Self::source_path(contract_type),
+                Self::contract_name(contract_type),
+                false,
+            )
+            .with_chain_admin_info(chain_admin_info),
+        )
     }
 
     /// Build all verification targets from ecosystem contracts.

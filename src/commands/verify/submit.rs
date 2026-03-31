@@ -5,7 +5,7 @@ use adi_ecosystem::verification::{
     encode_proxy_constructor_args, encode_verifier_constructor_args, VerificationOutcome,
     VerificationResult, VerificationSummary, VerificationTarget,
 };
-use adi_toolkit::{ProtocolVersion, ToolkitRunner};
+use adi_toolkit::{ForgeVerifyParams, ProtocolVersion, ToolkitRunner};
 use std::sync::Arc;
 
 use crate::commands::helpers::resolve_protocol_version;
@@ -80,23 +80,26 @@ pub(super) async fn submit_verifications(
 
         let constructor_args = compute_constructor_args(target);
 
+        let address_str = format!("{:?}", address);
+        let contract_path = target.forge_contract_path();
+        let semver = protocol_version.to_semver();
         let exit_code = runner
-            .run_forge_verify(
-                &format!("{:?}", address),
-                &target.forge_contract_path(),
-                config.explorer_client.config().chain_id,
-                config.explorer_client.config().api_url.as_str(),
-                config
+            .run_forge_verify(&ForgeVerifyParams {
+                address: &address_str,
+                contract_path: &contract_path,
+                chain_id: config.explorer_client.config().chain_id,
+                verifier_url: config.explorer_client.config().api_url.as_str(),
+                verifier: config
                     .explorer_client
                     .config()
                     .explorer_type
                     .forge_verifier_name(),
-                config.explorer_client.config().api_key.as_deref(),
-                constructor_args.as_deref(),
-                &protocol_version.to_semver(),
-                &log_dir,
-                target.root_path,
-            )
+                api_key: config.explorer_client.config().api_key.as_deref(),
+                constructor_args: constructor_args.as_deref(),
+                protocol_version: &semver,
+                log_dir: &log_dir,
+                root_path: target.root_path,
+            })
             .await;
 
         let result = match exit_code {

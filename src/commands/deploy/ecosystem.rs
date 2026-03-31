@@ -19,7 +19,7 @@ use adi_funding::{
     FundingPlanBuilder, FundingTargetStatus, LoggingEventHandler, SpinnerEventHandler,
 };
 use adi_state::StateManager;
-use adi_toolkit::{ProtocolVersion, ToolkitRunner};
+use adi_toolkit::{EcosystemInitParams, ProtocolVersion, ToolkitRunner};
 use adi_types::{Operators, Wallets};
 use alloy_primitives::{Address, U256};
 use clap::Args;
@@ -846,14 +846,14 @@ async fn run_zkstack_init(
     ui::info(init_msg)?;
 
     let exit_code = runner
-        .run_zkstack_ecosystem_init(
-            &ecosystem_path,
-            rpc_url.as_str(),
+        .run_zkstack_ecosystem_init(&EcosystemInitParams {
+            ecosystem_dir: &ecosystem_path,
+            l1_rpc_url: rpc_url.as_str(),
             gas_price_wei,
-            &protocol_version.to_semver(),
+            protocol_version: &protocol_version.to_semver(),
             deploy_ecosystem,
             chain_name,
-        )
+        })
         .await
         .wrap_err("Failed to run zkstack ecosystem init")?;
 
