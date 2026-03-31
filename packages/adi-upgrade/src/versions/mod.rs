@@ -51,6 +51,7 @@ pub trait VersionHandler: Send + Sync {
 #[must_use]
 pub fn get_handler(version: &ProtocolVersion) -> Option<Box<dyn VersionHandler>> {
     match version {
+        ProtocolVersion::V0_30_0 => None,
         ProtocolVersion::V0_30_1 => Some(Box::new(v0_30::V0_30_1Handler)),
     }
 }
