@@ -44,24 +44,28 @@ impl FundingEventHandler for SpinnerEventHandler {
                     style(transfer.to).green(),
                     style(transfer.role).cyan()
                 ));
-                if let Ok(mut guard) = self.spinner.lock() {
-                    *guard = Some(spinner);
-                }
+                let mut guard = match self.spinner.lock() {
+                    Ok(g) => g,
+                    Err(poisoned) => poisoned.into_inner(),
+                };
+                *guard = Some(spinner);
             }
             FundingEvent::TransferConfirmed {
                 index,
                 tx_hash,
                 gas_used,
             } => {
-                if let Ok(mut guard) = self.spinner.lock() {
-                    if let Some(spinner) = guard.take() {
-                        spinner.stop(format!(
-                            "{} Confirmed: {} (gas: {})",
-                            style(format!("[{}]", index + 1)).magenta(),
-                            style(tx_hash).green(),
-                            style(gas_used).green()
-                        ));
-                    }
+                let mut guard = match self.spinner.lock() {
+                    Ok(g) => g,
+                    Err(poisoned) => poisoned.into_inner(),
+                };
+                if let Some(spinner) = guard.take() {
+                    spinner.stop(format!(
+                        "{} Confirmed: {} (gas: {})",
+                        style(format!("[{}]", index + 1)).magenta(),
+                        style(tx_hash).green(),
+                        style(gas_used).green()
+                    ));
                 }
             }
             // Ignore other events - they're handled by the UI layer
