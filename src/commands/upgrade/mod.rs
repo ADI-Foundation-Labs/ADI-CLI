@@ -164,18 +164,17 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
     }
 
     if upgrade_chains {
-        run_chain_upgrades(
-            &args,
-            &state_manager,
-            &state_dir,
-            handler.as_ref(),
-            &upgrade_config,
-            &wrapper,
-            &provider,
-            &rpc_url,
-            &version,
-        )
-        .await?;
+        let chain_ctx = ChainUpgradeContext {
+            state_manager: &state_manager,
+            state_dir: &state_dir,
+            handler: handler.as_ref(),
+            upgrade_config: &upgrade_config,
+            wrapper: &wrapper,
+            provider: &provider,
+            rpc_url: &rpc_url,
+            version: &version,
+        };
+        run_chain_upgrades(&args, &chain_ctx).await?;
     }
 
     ui::outro(format!(
@@ -288,18 +287,22 @@ where
     Ok(())
 }
 
+/// Context for chain-level upgrade operations.
+struct ChainUpgradeContext<'a, R, P> {
+    state_manager: &'a adi_state::StateManager,
+    state_dir: &'a std::path::Path,
+    handler: &'a dyn adi_upgrade::VersionHandler,
+    upgrade_config: &'a adi_upgrade::UpgradeConfig,
+    wrapper: &'a R,
+    provider: &'a P,
+    rpc_url: &'a url::Url,
+    version: &'a adi_toolkit::ProtocolVersion,
+}
+
 /// Run chain-level upgrades.
-#[allow(clippy::too_many_arguments)]
 async fn run_chain_upgrades<R, P>(
     args: &UpgradeArgs,
-    state_manager: &adi_state::StateManager,
-    state_dir: &std::path::Path,
-    handler: &dyn adi_upgrade::VersionHandler,
-    upgrade_config: &adi_upgrade::UpgradeConfig,
-    wrapper: &R,
-    provider: &P,
-    rpc_url: &url::Url,
-    version: &adi_toolkit::ProtocolVersion,
+    ctx: &ChainUpgradeContext<'_, R, P>,
 ) -> Result<()>
 where
     R: adi_upgrade::ToolkitRunnerTrait,
@@ -310,7 +313,7 @@ where
 
     ui::section("L2 Chain Upgrades")?;
 
-    let chain_names = state_manager.list_chains().await?;
+    let chain_names = ctx.state_manager.list_chains().await?;
 
     if chain_names.is_empty() {
         ui::warning("No chains found in ecosystem, skipping chain upgrade")?;
@@ -322,27 +325,32 @@ where
     for chain_name in &selected_chains {
         ui::info(format!("Upgrading chain: {}", ui::green(chain_name)))?;
 
-        let chain_meta = state_manager
+        let chain_meta = ctx
+            .state_manager
             .chain(chain_name)
             .metadata()
             .await
             .map_err(|e| eyre::eyre!("Failed to load chain metadata for {chain_name}: {e}"))?;
 
-        let upgrade_yaml_source = state_dir
+        let upgrade_yaml_source = ctx
+            .state_dir
             .join("l1-contracts")
             .join("script-out")
-            .join(handler.upgrade_output_yaml());
+            .join(ctx.handler.upgrade_output_yaml());
 
         // Copy YAML to state_dir root so zkstack finds it at /workspace/<filename>
-        let upgrade_yaml_path = state_dir.join(handler.upgrade_output_yaml());
-        std::fs::copy(&upgrade_yaml_source, &upgrade_yaml_path).wrap_err(format!(
-            "Failed to copy upgrade YAML from {} to {}",
-            upgrade_yaml_source.display(),
-            upgrade_yaml_path.display()
-        ))?;
+        let upgrade_yaml_path = ctx.state_dir.join(ctx.handler.upgrade_output_yaml());
+        tokio::fs::copy(&upgrade_yaml_source, &upgrade_yaml_path)
+            .await
+            .wrap_err(format!(
+                "Failed to copy upgrade YAML from {} to {}",
+                upgrade_yaml_source.display(),
+                upgrade_yaml_path.display(),
+            ))?;
 
         // Load chain governor key (chain admin owner, different from ecosystem governor)
-        let chain_wallets = state_manager
+        let chain_wallets = ctx
+            .state_manager
             .chain(chain_name)
             .wallets()
             .await
@@ -351,7 +359,7 @@ where
             .governor
             .ok_or_else(|| eyre::eyre!("Chain '{chain_name}' has no governor wallet"))?;
 
-        let semver = version.to_semver();
+        let semver = ctx.version.to_semver();
         let l2_rpc = args
             .l2_rpc_url
             .as_ref()
@@ -361,17 +369,17 @@ where
         let params = adi_upgrade::ChainUpgradeParams {
             chain_name,
             chain_id: chain_meta.chain_id,
-            bridgehub: upgrade_config.bridgehub_address,
+            bridgehub: ctx.upgrade_config.bridgehub_address,
             governor_key: &chain_governor.private_key,
-            upgrade_name: handler.upgrade_name(),
+            upgrade_name: ctx.handler.upgrade_name(),
             upgrade_yaml_path: &upgrade_yaml_path,
-            l1_rpc_url: rpc_url.as_str(),
+            l1_rpc_url: ctx.rpc_url.as_str(),
             l2_rpc_url: &l2_rpc,
-            state_dir,
+            state_dir: ctx.state_dir,
             protocol_version: &semver,
         };
 
-        let result = adi_upgrade::run_chain_upgrade(wrapper, provider, &params).await?;
+        let result = adi_upgrade::run_chain_upgrade(ctx.wrapper, ctx.provider, &params).await?;
 
         if result.versions_match {
             ui::success(format!("Chain '{}' upgraded successfully", chain_name))?;

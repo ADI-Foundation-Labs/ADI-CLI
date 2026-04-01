@@ -240,3 +240,49 @@ impl Default for Config {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn indent_as_array_item_single_line() {
+        let result = indent_as_array_item("name: my_chain", 4);
+        assert_eq!(result, "    - name: my_chain\n");
+    }
+
+    #[test]
+    fn indent_as_array_item_multi_line() {
+        let result = indent_as_array_item("name: my_chain\nchain_id: 222", 4);
+        assert_eq!(result, "    - name: my_chain\n      chain_id: 222\n");
+    }
+
+    #[test]
+    fn indent_as_array_item_skips_empty_lines() {
+        let result = indent_as_array_item("name: my_chain\n\nchain_id: 222", 4);
+        assert_eq!(result, "    - name: my_chain\n      chain_id: 222\n");
+    }
+
+    #[test]
+    fn find_chains_insertion_point_with_entries() {
+        let content = "ecosystem:\n  chains:\n    - name: chain_a\n      chain_id: 100\n";
+        let pos = find_chains_insertion_point(content);
+        assert!(pos.is_some());
+        // Position should be at the end of the last chain entry
+        let pos = pos.unwrap_or(0);
+        assert!(pos > 0);
+        assert!(pos <= content.len());
+    }
+
+    #[test]
+    fn find_chains_insertion_point_no_chains_section() {
+        let content = "ecosystem:\n  name: test\n";
+        assert!(find_chains_insertion_point(content).is_none());
+    }
+
+    #[test]
+    fn find_chains_insertion_point_empty_chains() {
+        let content = "ecosystem:\n  chains:\nother_key: value\n";
+        assert!(find_chains_insertion_point(content).is_none());
+    }
+}

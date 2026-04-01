@@ -4,7 +4,6 @@
 
 use adi_state::s3::{extract_tar_gz, S3Client, S3Config};
 use clap::Args;
-use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::helpers::resolve_ecosystem_name;
@@ -64,9 +63,9 @@ pub async fn run(args: &RestoreArgs, context: &Context) -> Result<()> {
         .ok_or_else(|| eyre::eyre!("S3 bucket not configured. Set s3.bucket in config"))?;
 
     // Get credentials
-    let tenant_id = get_tenant_id(s3_config)?;
-    let access_key_id = get_access_key_id(s3_config)?;
-    let secret_access_key = get_secret_access_key(s3_config)?;
+    let tenant_id = super::helpers::get_tenant_id(s3_config)?;
+    let access_key_id = super::helpers::get_access_key_id(s3_config)?;
+    let secret_access_key = super::helpers::get_secret_access_key(s3_config)?;
 
     // Create S3 client
     let client_config = S3Config {
@@ -139,46 +138,4 @@ pub async fn run(args: &RestoreArgs, context: &Context) -> Result<()> {
     ui::outro(format!("{}", ecosystem_path.display()))?;
 
     Ok(())
-}
-
-/// Get tenant ID from config.
-fn get_tenant_id(config: &crate::config::S3Config) -> Result<String> {
-    config
-        .tenant_id
-        .clone()
-        .ok_or_else(|| eyre::eyre!("S3 tenant_id not configured. Set s3.tenant_id in config"))
-}
-
-/// Get access key ID from config or environment.
-fn get_access_key_id(config: &crate::config::S3Config) -> Result<String> {
-    // Check config first (highest priority after env)
-    if let Some(ref key) = config.access_key_id {
-        return Ok(key.expose_secret().to_string());
-    }
-
-    // Check AWS_ACCESS_KEY_ID environment variable
-    if let Ok(key) = std::env::var("AWS_ACCESS_KEY_ID") {
-        return Ok(key);
-    }
-
-    Err(eyre::eyre!(
-        "S3 access key not configured. Set s3.access_key_id in config or AWS_ACCESS_KEY_ID env var"
-    ))
-}
-
-/// Get secret access key from config or environment.
-fn get_secret_access_key(config: &crate::config::S3Config) -> Result<String> {
-    // Check config first (highest priority after env)
-    if let Some(ref key) = config.secret_access_key {
-        return Ok(key.expose_secret().to_string());
-    }
-
-    // Check AWS_SECRET_ACCESS_KEY environment variable
-    if let Ok(key) = std::env::var("AWS_SECRET_ACCESS_KEY") {
-        return Ok(key);
-    }
-
-    Err(eyre::eyre!(
-        "S3 secret key not configured. Set s3.secret_access_key in config or AWS_SECRET_ACCESS_KEY env var"
-    ))
 }

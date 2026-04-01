@@ -7,7 +7,7 @@ use adi_state::{S3SyncEvent, S3SyncEventHandler};
 use async_trait::async_trait;
 use cliclack::ProgressBar;
 use console::style;
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 
 /// Event handler that shows S3 sync progress with cliclack spinners.
 ///
@@ -42,33 +42,29 @@ impl S3SyncEventHandler for SpinnerS3EventHandler {
                     "Syncing {} to S3...",
                     style(&ecosystem_name).cyan()
                 ));
-                if let Ok(mut guard) = self.spinner.lock() {
-                    *guard = Some(spinner);
-                }
+                let mut guard = self.spinner.lock().await;
+                *guard = Some(spinner);
             }
             S3SyncEvent::ArchiveCreated { size_bytes } => {
                 let size_mb = crate::ui::bytes_to_mb(size_bytes);
-                if let Ok(guard) = self.spinner.lock() {
-                    if let Some(ref spinner) = *guard {
-                        spinner.set_message(format!("Uploading to S3 ({size_mb:.2} MB)..."));
-                    }
+                let guard = self.spinner.lock().await;
+                if let Some(ref spinner) = *guard {
+                    spinner.set_message(format!("Uploading to S3 ({size_mb:.2} MB)..."));
                 }
             }
             S3SyncEvent::UploadComplete { key: _ } => {
                 // Will be followed by SyncComplete
             }
             S3SyncEvent::SyncComplete => {
-                if let Ok(mut guard) = self.spinner.lock() {
-                    if let Some(spinner) = guard.take() {
-                        spinner.stop(format!("{}", style("State synced to S3").green()));
-                    }
+                let mut guard = self.spinner.lock().await;
+                if let Some(spinner) = guard.take() {
+                    spinner.stop(format!("{}", style("State synced to S3").green()));
                 }
             }
             S3SyncEvent::SyncFailed { error } => {
-                if let Ok(mut guard) = self.spinner.lock() {
-                    if let Some(spinner) = guard.take() {
-                        spinner.stop(format!("{}: {}", style("S3 sync failed").red(), error));
-                    }
+                let mut guard = self.spinner.lock().await;
+                if let Some(spinner) = guard.take() {
+                    spinner.stop(format!("{}: {}", style("S3 sync failed").red(), error));
                 }
             }
         }

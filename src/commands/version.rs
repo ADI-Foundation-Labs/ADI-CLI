@@ -141,3 +141,56 @@ pub async fn run() -> Result<()> {
     print_logo();
     Ok(())
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lerp_at_zero_returns_start() {
+        assert_eq!(lerp(0, 255, 0.0), 0);
+    }
+
+    #[test]
+    fn lerp_at_one_returns_end() {
+        assert_eq!(lerp(0, 255, 1.0), 255);
+    }
+
+    #[test]
+    fn lerp_at_half_returns_midpoint() {
+        assert_eq!(lerp(0, 255, 0.5), 128);
+    }
+
+    #[test]
+    fn lerp_same_start_end() {
+        assert_eq!(lerp(100, 100, 0.5), 100);
+    }
+
+    #[test]
+    fn center_shorter_than_width() {
+        let result = center("hi", 10);
+        // center pads left only via format width
+        assert!(result.contains("hi"));
+        assert!(result.starts_with(' '));
+    }
+
+    #[test]
+    fn center_equal_to_width() {
+        let result = center("hello", 5);
+        assert_eq!(result, "hello");
+    }
+
+    #[test]
+    fn center_longer_than_width() {
+        let result = center("hello world", 5);
+        assert_eq!(result, "hello world");
+    }
+
+    #[test]
+    fn build_subtitle_contains_version() {
+        let subtitle = build_subtitle();
+        assert!(subtitle.starts_with('v'));
+        assert!(subtitle.contains('•'));
+    }
+}

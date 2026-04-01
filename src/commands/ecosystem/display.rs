@@ -1,38 +1,20 @@
-//! Display ecosystem and chain information with deployed contracts.
+//! Formatting functions for ecosystem and chain contract display.
 
-use adi_state::StateManager;
 use adi_types::{
     BaseToken, BatchCommitDataMode, BridgesConfig, ChainContracts, ChainEcosystemContracts,
     ChainL1Contracts, ChainL2Contracts, ChainMetadata, CoreEcosystemContracts, EcosystemContracts,
     EcosystemMetadata, InitialDeployments, L1Contracts, ProverMode, VmOption, ZkSyncOsCtm,
 };
 use alloy_primitives::{Address, B256};
-use clap::Args;
-use serde::{Deserialize, Serialize};
 
-use crate::commands::helpers::{create_state_manager_with_context, resolve_ecosystem_name};
-use crate::context::Context;
-use crate::error::{Result, WrapErr};
 use crate::ui;
-
-/// Arguments for `ecosystem` command.
-#[derive(Clone, Args, Debug, Serialize, Deserialize)]
-pub struct EcosystemArgs {
-    /// Ecosystem name (falls back to config file if not provided).
-    #[arg(long, help = "Ecosystem name (falls back to config if not provided)")]
-    pub ecosystem_name: Option<String>,
-
-    /// Chain name to display chain-level information.
-    #[arg(long, help = "Chain name to display chain-level information")]
-    pub chain: Option<String>,
-}
 
 // ============================================================================
 // Value formatting helpers
 // ============================================================================
 
 /// Format an optional address field with green color.
-fn format_addr(name: &str, addr: Option<Address>) -> String {
+pub(super) fn format_addr(name: &str, addr: Option<Address>) -> String {
     match addr {
         Some(a) => format!("{}: {}", name, ui::green(a)),
         None => format!("{}: {}", name, ui::cyan("not set")),
@@ -40,7 +22,7 @@ fn format_addr(name: &str, addr: Option<Address>) -> String {
 }
 
 /// Format an optional hash field with green color.
-fn format_hash(name: &str, hash: Option<B256>) -> String {
+pub(super) fn format_hash(name: &str, hash: Option<B256>) -> String {
     match hash {
         Some(h) => format!("{}: {}", name, ui::green(h)),
         None => format!("{}: {}", name, ui::cyan("not set")),
@@ -48,7 +30,7 @@ fn format_hash(name: &str, hash: Option<B256>) -> String {
 }
 
 /// Format a value with green color.
-fn format_val<T: std::fmt::Display>(name: &str, val: T) -> String {
+pub(super) fn format_val<T: std::fmt::Display>(name: &str, val: T) -> String {
     format!("{}: {}", name, ui::green(val))
 }
 
@@ -57,7 +39,7 @@ fn format_val<T: std::fmt::Display>(name: &str, val: T) -> String {
 // ============================================================================
 
 /// Format ecosystem metadata for display.
-fn format_ecosystem_metadata(
+pub(super) fn format_ecosystem_metadata(
     meta: &EcosystemMetadata,
     deployments: Option<&InitialDeployments>,
 ) -> String {
@@ -79,7 +61,7 @@ fn format_ecosystem_metadata(
 }
 
 /// Format chain metadata for display.
-fn format_chain_metadata(meta: &ChainMetadata) -> String {
+pub(super) fn format_chain_metadata(meta: &ChainMetadata) -> String {
     let base_token_display = format_base_token(&meta.base_token);
 
     [
@@ -98,7 +80,7 @@ fn format_chain_metadata(meta: &ChainMetadata) -> String {
 }
 
 /// Format prover mode for display.
-fn format_prover_mode(mode: ProverMode) -> &'static str {
+pub(super) fn format_prover_mode(mode: ProverMode) -> &'static str {
     match mode {
         ProverMode::NoProofs => "NoProofs",
         ProverMode::Gpu => "GPU",
@@ -106,7 +88,7 @@ fn format_prover_mode(mode: ProverMode) -> &'static str {
 }
 
 /// Format batch commit data mode for display.
-fn format_batch_mode(mode: &BatchCommitDataMode) -> &'static str {
+pub(super) fn format_batch_mode(mode: &BatchCommitDataMode) -> &'static str {
     match mode {
         BatchCommitDataMode::Rollup => "Rollup",
         BatchCommitDataMode::Validium => "Validium",
@@ -114,7 +96,7 @@ fn format_batch_mode(mode: &BatchCommitDataMode) -> &'static str {
 }
 
 /// Format VM option for display.
-fn format_vm_option(opt: &VmOption) -> &'static str {
+pub(super) fn format_vm_option(opt: &VmOption) -> &'static str {
     match opt {
         VmOption::ZKSyncOsVM => "ZKSyncOsVM",
         VmOption::Evm => "EVM",
@@ -122,7 +104,7 @@ fn format_vm_option(opt: &VmOption) -> &'static str {
 }
 
 /// Format base token for display.
-fn format_base_token(token: &BaseToken) -> String {
+pub(super) fn format_base_token(token: &BaseToken) -> String {
     if token.is_eth() {
         "ETH".to_string()
     } else {
@@ -131,7 +113,7 @@ fn format_base_token(token: &BaseToken) -> String {
 }
 
 // ============================================================================
-// Contract formatting (existing logic)
+// Contract formatting
 // ============================================================================
 
 /// Format core ecosystem contracts section.
@@ -164,7 +146,7 @@ fn format_core(core: &CoreEcosystemContracts) -> Vec<String> {
 }
 
 /// Format bridges section.
-fn format_bridges(bridges: &BridgesConfig) -> Vec<String> {
+pub(super) fn format_bridges(bridges: &BridgesConfig) -> Vec<String> {
     let mut lines = Vec::new();
     if let Some(ref erc20) = bridges.erc20 {
         lines.push(format!("  {}", format_addr("ERC20 L1", erc20.l1_address)));
@@ -398,190 +380,8 @@ fn format_ctm(ctm: &ZkSyncOsCtm) -> Vec<String> {
     lines
 }
 
-/// Count non-None addresses in ecosystem contracts.
-fn count_ecosystem_contracts(contracts: &EcosystemContracts) -> usize {
-    let mut count = 0;
-
-    // Top-level addresses
-    if contracts.create2_factory_addr.is_some() {
-        count += 1;
-    }
-    if contracts.multicall3_addr.is_some() {
-        count += 1;
-    }
-
-    // Core ecosystem contracts
-    if let Some(ref core) = contracts.core_ecosystem_contracts {
-        if core.bridgehub_proxy_addr.is_some() {
-            count += 1;
-        }
-        if core.message_root_proxy_addr.is_some() {
-            count += 1;
-        }
-        if core.transparent_proxy_admin_addr.is_some() {
-            count += 1;
-        }
-        if core.stm_deployment_tracker_proxy_addr.is_some() {
-            count += 1;
-        }
-        if core.native_token_vault_addr.is_some() {
-            count += 1;
-        }
-    }
-
-    // Bridges
-    if let Some(ref bridges) = contracts.bridges {
-        if let Some(ref erc20) = bridges.erc20 {
-            if erc20.l1_address.is_some() {
-                count += 1;
-            }
-            if erc20.l2_address.is_some() {
-                count += 1;
-            }
-        }
-        if let Some(ref shared) = bridges.shared {
-            if shared.l1_address.is_some() {
-                count += 1;
-            }
-            if shared.l2_address.is_some() {
-                count += 1;
-            }
-        }
-        if bridges.l1_nullifier_addr.is_some() {
-            count += 1;
-        }
-    }
-
-    // L1 contracts
-    if let Some(ref l1) = contracts.l1 {
-        if l1.governance_addr.is_some() {
-            count += 1;
-        }
-        if l1.chain_admin_addr.is_some() {
-            count += 1;
-        }
-        if l1.transaction_filterer_addr.is_some() {
-            count += 1;
-        }
-    }
-
-    // ZkSync OS CTM
-    if let Some(ref ctm) = contracts.zksync_os_ctm {
-        count += count_ctm_contracts(ctm);
-    }
-
-    count
-}
-
-/// Count non-None addresses in a slice of optional addresses.
-fn count_some(addrs: &[Option<Address>]) -> usize {
-    addrs.iter().filter(|a| a.is_some()).count()
-}
-
-/// Count non-None addresses in ZkSyncOsCtm.
-fn count_ctm_contracts(ctm: &ZkSyncOsCtm) -> usize {
-    let core = count_some(&[
-        ctm.governance,
-        ctm.chain_admin,
-        ctm.proxy_admin,
-        ctm.state_transition_proxy_addr,
-        ctm.validator_timelock_addr,
-        ctm.server_notifier_proxy_addr,
-        ctm.verifier_addr,
-        ctm.l1_rollup_da_manager,
-        ctm.l1_bytecodes_supplier_addr,
-        ctm.l1_wrapped_base_token_store,
-        ctm.default_upgrade_addr,
-        ctm.genesis_upgrade_addr,
-        ctm.rollup_l1_da_validator_addr,
-        ctm.no_da_validium_l1_validator_addr,
-        ctm.blobs_zksync_os_l1_da_validator_addr,
-        ctm.avail_l1_da_validator_addr,
-    ]);
-
-    let facets = count_some(&[
-        ctm.admin_facet_addr,
-        ctm.executor_facet_addr,
-        ctm.mailbox_facet_addr,
-        ctm.getters_facet_addr,
-        ctm.diamond_init_addr,
-    ]);
-
-    let impls = count_some(&[
-        ctm.bridgehub_impl_addr,
-        ctm.message_root_impl_addr,
-        ctm.native_token_vault_impl_addr,
-        ctm.stm_deployment_tracker_impl_addr,
-        ctm.chain_type_manager_impl_addr,
-        ctm.server_notifier_impl_addr,
-        ctm.erc20_bridge_impl_addr,
-        ctm.shared_bridge_impl_addr,
-        ctm.l1_nullifier_impl_addr,
-        ctm.validator_timelock_impl_addr,
-    ]);
-
-    let other = count_some(&[
-        ctm.verifier_fflonk_addr,
-        ctm.verifier_plonk_addr,
-        ctm.bridged_standard_erc20_addr,
-        ctm.bridged_token_beacon_addr,
-        ctm.dummy_avail_bridge_addr,
-        ctm.dummy_vector_x_addr,
-        ctm.server_notifier_proxy_admin_addr,
-    ]);
-
-    core + facets + impls + other
-}
-
-/// Count unique chain-specific contract addresses.
-///
-/// Only counts addresses that are unique to the chain (not ecosystem references).
-fn count_chain_contracts(contracts: &ChainContracts) -> usize {
-    let mut count = 0;
-
-    // L1 contracts (chain-specific)
-    if let Some(ref l1) = contracts.l1 {
-        if l1.diamond_proxy_addr.is_some() {
-            count += 1;
-        }
-        if l1.governance_addr.is_some() {
-            count += 1;
-        }
-        if l1.chain_admin_addr.is_some() {
-            count += 1;
-        }
-        if l1.chain_proxy_admin_addr.is_some() {
-            count += 1;
-        }
-    }
-
-    // L2 contracts
-    if let Some(ref l2) = contracts.l2 {
-        if l2.testnet_paymaster_addr.is_some() {
-            count += 1;
-        }
-        if l2.default_l2_upgrader.is_some() {
-            count += 1;
-        }
-        if l2.l2_native_token_vault_proxy_addr.is_some() {
-            count += 1;
-        }
-        if l2.consensus_registry.is_some() {
-            count += 1;
-        }
-        if l2.multicall3.is_some() {
-            count += 1;
-        }
-        if l2.timestamp_asserter_addr.is_some() {
-            count += 1;
-        }
-    }
-
-    count
-}
-
 /// Format ecosystem contracts for display.
-fn format_ecosystem_contracts(contracts: &EcosystemContracts) -> String {
+pub(super) fn format_ecosystem_contracts(contracts: &EcosystemContracts) -> String {
     let mut lines = Vec::new();
 
     lines.push(format_addr(
@@ -798,7 +598,7 @@ fn format_chain_l2(l2: &ChainL2Contracts) -> Vec<String> {
 }
 
 /// Format chain contracts for display.
-fn format_chain_contracts(contracts: &ChainContracts) -> String {
+pub(super) fn format_chain_contracts(contracts: &ChainContracts) -> String {
     let mut lines = Vec::new();
 
     lines.push(format_addr(
@@ -832,143 +632,4 @@ fn format_chain_contracts(contracts: &ChainContracts) -> String {
     }
 
     lines.join("\n")
-}
-
-// ============================================================================
-// Main command execution
-// ============================================================================
-
-/// Execute the ecosystem command.
-pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
-    ui::intro("ADI CLI")?;
-
-    let ecosystem_name = resolve_ecosystem_name(args.ecosystem_name.as_ref(), context.config())?;
-    let state_manager = create_state_manager_with_context(&ecosystem_name, context)?;
-
-    // Check if ecosystem exists
-    if !ecosystem_exists(&state_manager).await? {
-        ui::warning(format!(
-            "Ecosystem '{}' not found.\nRun 'adi init' first to initialize the ecosystem.",
-            ecosystem_name
-        ))?;
-        ui::outro("")?;
-        return Ok(());
-    }
-
-    // Load and display ecosystem metadata
-    let eco_metadata = state_manager
-        .ecosystem()
-        .metadata()
-        .await
-        .wrap_err("Failed to load ecosystem metadata")?;
-
-    let initial_deployments = state_manager.ecosystem().initial_deployments().await.ok();
-
-    let meta_display = format_ecosystem_metadata(&eco_metadata, initial_deployments.as_ref());
-    ui::note(
-        format!("Ecosystem '{}'", ui::green(&ecosystem_name)),
-        meta_display,
-    )?;
-
-    // Load and display ecosystem contracts if they exist
-    let contract_count = if contracts_exist(&state_manager).await? {
-        let ecosystem_contracts = state_manager
-            .ecosystem()
-            .contracts()
-            .await
-            .wrap_err("Failed to load ecosystem contracts")?;
-
-        let count = count_ecosystem_contracts(&ecosystem_contracts);
-        let contracts_display = format_ecosystem_contracts(&ecosystem_contracts);
-        ui::note("Contracts", contracts_display)?;
-        Some(count)
-    } else {
-        ui::info("No contracts deployed yet. Run 'adi deploy' to deploy.")?;
-        None
-    };
-
-    // Load and display chain information
-    // Use --chain if provided, otherwise use default_chain from ecosystem metadata
-    let chain_to_display = args.chain.as_ref().unwrap_or(&eco_metadata.default_chain);
-    let chain_contract_count = display_chain_info(&state_manager, chain_to_display).await?;
-
-    // Display summary (ecosystem + chain contracts)
-    let summary = match (contract_count, chain_contract_count) {
-        (Some(eco), Some(chain)) => {
-            format!(
-                "Total contracts: {} (ecosystem: {}, chain: {})",
-                eco + chain,
-                eco,
-                chain
-            )
-        }
-        (Some(eco), None) => format!("Total contracts: {}", eco),
-        _ => "No contracts deployed".to_string(),
-    };
-    ui::outro(summary)?;
-    Ok(())
-}
-
-/// Display chain information including metadata and contracts.
-///
-/// Returns the count of unique chain contracts if they exist.
-async fn display_chain_info(
-    state_manager: &StateManager,
-    chain_name: &str,
-) -> Result<Option<usize>> {
-    let chain_ops = state_manager.chain(chain_name);
-
-    // Check if chain exists
-    if !chain_ops.exists().await? {
-        ui::warning(format!("Chain '{}' not found.", chain_name))?;
-        return Ok(None);
-    }
-
-    // Load and display chain metadata
-    let chain_metadata = chain_ops
-        .metadata()
-        .await
-        .wrap_err("Failed to load chain metadata")?;
-
-    let meta_display = format_chain_metadata(&chain_metadata);
-    ui::note(format!("Chain '{}'", ui::green(chain_name)), meta_display)?;
-
-    // Load and display chain contracts if they exist
-    if chain_ops.contracts_exist().await? {
-        let chain_contracts = chain_ops
-            .contracts()
-            .await
-            .wrap_err("Failed to load chain contracts")?;
-
-        let count = count_chain_contracts(&chain_contracts);
-        let contracts_display = format_chain_contracts(&chain_contracts);
-        ui::note(
-            format!("Chain '{}' Contracts", chain_name),
-            contracts_display,
-        )?;
-        Ok(Some(count))
-    } else {
-        ui::info(format!(
-            "No contracts deployed for chain '{}' yet.",
-            chain_name
-        ))?;
-        Ok(None)
-    }
-}
-
-/// Check if ecosystem metadata exists.
-async fn ecosystem_exists(state_manager: &StateManager) -> Result<bool> {
-    state_manager
-        .exists()
-        .await
-        .wrap_err("Failed to check if ecosystem exists")
-}
-
-/// Check if ecosystem contracts exist.
-async fn contracts_exist(state_manager: &StateManager) -> Result<bool> {
-    state_manager
-        .ecosystem()
-        .contracts_exist()
-        .await
-        .wrap_err("Failed to check if contracts exist")
 }

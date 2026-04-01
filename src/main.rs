@@ -49,7 +49,7 @@ pub struct Opts {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> eyre::Result<()> {
     cliclack::set_theme(theme::AdiTheme);
     let opts: Opts = Opts::parse();
 

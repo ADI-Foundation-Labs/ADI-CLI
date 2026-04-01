@@ -94,7 +94,6 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     // 3. Check if ecosystem state already exists
     let state_dir = &context.config().state_dir;
     let ecosystem_path = state_dir.join(&config.name);
-    #[allow(unused_variables)]
     let (state_manager, s3_control) = create_state_manager_with_s3(&config.name, context)
         .await
         .wrap_err("Failed to create state manager")?;
@@ -266,7 +265,9 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
         .debug(&format!("Using temp directory: {}", temp_path.display()));
 
     // 6. Create state directory
-    std::fs::create_dir_all(state_dir).wrap_err("Failed to create state directory")?;
+    tokio::fs::create_dir_all(state_dir)
+        .await
+        .wrap_err("Failed to create state directory")?;
 
     // 7. Create toolkit runner and execute pointing to temp dir
     ui::info("Connecting to Docker...")?;

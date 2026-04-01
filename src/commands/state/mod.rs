@@ -2,6 +2,7 @@
 //!
 //! Provides commands for syncing ecosystem state to S3 and restoring from S3.
 
+pub(crate) mod helpers;
 mod restore;
 mod sync;
 

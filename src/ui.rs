@@ -29,7 +29,6 @@ pub fn yellow<D: std::fmt::Display>(val: D) -> console::StyledObject<D> {
 }
 
 /// Style text in red for errors.
-#[allow(dead_code)]
 pub fn red<D: std::fmt::Display>(val: D) -> console::StyledObject<D> {
     style(val).red()
 }
@@ -40,7 +39,6 @@ pub fn cyan<D: std::fmt::Display>(val: D) -> console::StyledObject<D> {
 }
 
 /// Style text dimmed (gray).
-#[allow(dead_code)]
 pub fn dim<D: std::fmt::Display>(val: D) -> console::StyledObject<D> {
     style(val).dim()
 }

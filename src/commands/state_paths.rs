@@ -271,3 +271,34 @@ async fn apply_fixes(
 fn normalize_path(path: &str) -> String {
     path.replace("/./", "/").trim_end_matches('/').to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_path_removes_trailing_slash() {
+        assert_eq!(normalize_path("/workspace/chains/"), "/workspace/chains");
+    }
+
+    #[test]
+    fn normalize_path_removes_dot_segments() {
+        assert_eq!(normalize_path("/workspace/./chains"), "/workspace/chains");
+    }
+
+    #[test]
+    fn normalize_path_clean_path_unchanged() {
+        assert_eq!(normalize_path("/workspace/chains"), "/workspace/chains");
+    }
+
+    #[test]
+    fn normalize_path_multiple_trailing_slashes() {
+        // trim_end_matches removes all trailing slashes
+        assert_eq!(normalize_path("/workspace///"), "/workspace");
+    }
+
+    #[test]
+    fn normalize_path_empty_string() {
+        assert_eq!(normalize_path(""), "");
+    }
+}

@@ -40,7 +40,6 @@ pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
 
     // 3. Create state manager and validate ecosystem exists (needed for uniqueness checks)
     let state_dir = &context.config().state_dir;
-    #[allow(unused_variables)]
     let (state_manager, s3_control) = create_state_manager_with_s3(&ecosystem_name, context)
         .await
         .wrap_err("Failed to create state manager")?;
