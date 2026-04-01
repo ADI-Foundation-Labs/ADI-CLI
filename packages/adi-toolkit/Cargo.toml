@@ -15,7 +15,6 @@ path = "src/lib.rs"
 adi-docker = { workspace = true }
 adi-types = { workspace = true }
 tokio = { workspace = true }
-eyre = { workspace = true }
 console = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }

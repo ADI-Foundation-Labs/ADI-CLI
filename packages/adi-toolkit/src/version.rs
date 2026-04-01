@@ -36,6 +36,7 @@ pub enum ParseError {
 #[derive(
     Clone, Copy, Debug, Default, EnumString, EnumIter, Serialize, Deserialize, PartialEq, Eq,
 )]
+#[serde(rename_all = "snake_case")]
 pub enum ProtocolVersion {
     /// Protocol version 0.30.1
     #[default]

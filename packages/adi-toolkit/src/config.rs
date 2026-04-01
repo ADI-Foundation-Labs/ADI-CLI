@@ -25,6 +25,7 @@ pub const DEFAULT_IMAGE_NAME: &str = "adi-toolkit";
 /// assert_eq!(config.registry, "harbor.sde.adifoundation.ai/adi-public/cli");
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct ToolkitConfig {
     /// Container registry URL.
     pub registry: String,
@@ -97,7 +98,8 @@ impl ToolkitConfig {
     pub fn image_reference(&self, version: &Version, logger: &dyn Logger) -> ImageReference {
         let tag = self
             .tag_override
-            .clone()
+            .as_deref()
+            .map(String::from)
             .unwrap_or_else(|| format!("v{}.{}.{}", version.major, version.minor, version.patch));
         logger.debug(&format!(
             "Building image reference: registry={}, image={}, tag={} (override={})",
