@@ -59,6 +59,7 @@ impl<'de> Deserialize<'de> for VmOption {
 /// wallet_creation: "Random"
 /// ```
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct EcosystemMetadata {
     /// Ecosystem name.
     pub name: String,
@@ -101,6 +102,7 @@ pub struct EcosystemMetadata {
 /// l1_network: "Sepolia"
 /// ```
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct ChainMetadata {
     /// Chain internal ID.
     pub id: u64,

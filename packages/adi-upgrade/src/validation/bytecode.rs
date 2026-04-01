@@ -11,6 +11,11 @@ const HASH_MARKER: &str = "00000060";
 /// Expected length of a bytecode hash in hex characters (32 bytes = 64 hex chars).
 const HASH_HEX_LEN: usize = 64;
 
+/// Prefix of the Solidity compiler metadata hash marker. Hashes starting with
+/// this prefix are compiler-generated version metadata, not contract bytecode
+/// hashes, and should be skipped during validation.
+const COMPILER_METADATA_HASH_PREFIX: &str = "c37bb1bc";
+
 /// Manifest of expected bytecode hashes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BytecodeManifest {
@@ -128,7 +133,7 @@ pub fn validate_upgrade_output(
 
     for hash in extract_hashes(upgrade_yaml) {
         // Skip noise patterns
-        if hash.starts_with("c37bb1bc") {
+        if hash.starts_with(COMPILER_METADATA_HASH_PREFIX) {
             continue;
         }
         if hash.chars().take(24).all(|c| c == '0') {

@@ -1,12 +1,17 @@
 //! Funding plan calculation and validation.
 
-use crate::balance::{get_token_balance, get_token_decimals, get_token_symbol, get_wallet_balance};
+use crate::balance::{
+    get_token_balance, get_token_decimals, get_token_symbol, get_wallet_balance, WalletBalance,
+};
 use crate::config::{FundingConfig, FundingTarget, FundingTargetStatus, WalletRole, WalletSource};
 use crate::error::{FundingError, Result};
 use crate::provider::FundingProvider;
-use crate::transfer::{estimate_eth_transfer_gas, estimate_token_transfer_gas, Transfer};
+use crate::transfer::{
+    estimate_eth_transfer_gas, estimate_token_transfer_gas, Transfer, TransferType,
+};
 use adi_types::{Operators, Wallets};
 use alloy_primitives::{Address, U256};
+use std::collections::HashMap;
 
 /// A complete funding plan ready for execution.
 #[derive(Clone, Debug)]
@@ -294,27 +299,6 @@ impl<'a> FundingPlanBuilder<'a> {
             None => None,
         };
 
-        // Pre-flight check: calculate minimum ETH needed (transfers only, no gas)
-        // This catches obvious "funder is way short" cases before expensive gas estimation
-        let mut min_eth_needed = U256::ZERO;
-        for target in &self.targets {
-            let current = get_wallet_balance(self.provider, target.address, None)
-                .await?
-                .eth_balance;
-            if current < target.eth_amount {
-                min_eth_needed += target.eth_amount - current;
-            }
-        }
-
-        // Early validation: funder must have at least the transfer amounts
-        if funder_eth < min_eth_needed {
-            return Err(FundingError::InsufficientEthBalance {
-                have: funder_eth,
-                need: min_eth_needed,
-                gas_estimate: U256::ZERO, // Gas not yet calculated
-            });
-        }
-
         // Get token symbol and decimals if token is configured
         let (token_symbol, token_decimals) = match self.config.token_address {
             Some(token) => {
@@ -341,16 +325,44 @@ impl<'a> FundingPlanBuilder<'a> {
             }
         }
 
+        // Query all target balances once (ETH + token) and cache for reuse
+        let mut cached_balances: HashMap<Address, WalletBalance> = HashMap::new();
+        let mut min_eth_needed = U256::ZERO;
+        for target in &self.targets {
+            let balance =
+                get_wallet_balance(self.provider, target.address, self.config.token_address)
+                    .await?;
+            if balance.eth_balance < target.eth_amount {
+                min_eth_needed += target.eth_amount - balance.eth_balance;
+            }
+            cached_balances.insert(target.address, balance);
+        }
+
+        // Early validation: funder must have at least the transfer amounts
+        if funder_eth < min_eth_needed {
+            return Err(FundingError::InsufficientEthBalance {
+                have: funder_eth,
+                need: min_eth_needed,
+                gas_estimate: U256::ZERO, // Gas not yet calculated
+            });
+        }
+
         let mut transfers = Vec::new();
         let mut total_eth_transfer = U256::ZERO;
         let mut total_token_transfer = U256::ZERO;
         let mut total_gas = U256::ZERO;
 
-        // Calculate required transfers for each target
+        // Calculate required transfers for each target using cached balances
         for target in &self.targets {
             let current_balance =
-                get_wallet_balance(self.provider, target.address, self.config.token_address)
-                    .await?;
+                cached_balances
+                    .get(&target.address)
+                    .cloned()
+                    .unwrap_or(WalletBalance {
+                        address: target.address,
+                        eth_balance: U256::ZERO,
+                        token_balance: None,
+                    });
 
             // ETH funding needed?
             if current_balance.eth_balance < target.eth_amount {
@@ -395,9 +407,12 @@ impl<'a> FundingPlanBuilder<'a> {
                         target.role,
                         self.funder,
                         target.address,
-                        token_addr,
-                        token_needed,
-                        token_symbol.clone(),
+                        TransferType::Token {
+                            token_address: token_addr,
+                            amount: token_needed,
+                            symbol: token_symbol.clone(),
+                            decimals: token_decimals.unwrap_or(18),
+                        },
                         gas_estimate,
                     ));
 

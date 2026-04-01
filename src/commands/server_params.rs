@@ -56,7 +56,7 @@ pub async fn run(args: &ServerParamsArgs, context: &Context) -> Result<()> {
     }
 
     // Create state manager
-    let state_manager = create_state_manager_with_context(&ecosystem_name, context);
+    let state_manager = create_state_manager_with_context(&ecosystem_name, context)?;
 
     // Check if ecosystem exists
     if !state_manager

@@ -8,7 +8,8 @@ pub use ecosystem::EcosystemStateOps;
 
 use crate::backend::{
     create_backend, create_s3_sync_backend, create_s3_sync_backend_with_control,
-    create_s3_sync_backend_with_handler, BackendType, S3SyncControl, StateBackend,
+    create_s3_sync_backend_with_handler, BackendType, FilesystemBackend, S3SyncControl,
+    StateBackend,
 };
 use crate::error::Result;
 use crate::paths;
@@ -71,9 +72,9 @@ impl StateManager {
             "Creating StateManager with filesystem backend at {}",
             ecosystem_path.display()
         ));
-        let backend = create_backend(BackendType::Filesystem, ecosystem_path, Arc::clone(&logger));
+        let backend = FilesystemBackend::new(ecosystem_path, Arc::clone(&logger));
         Self {
-            backend: Arc::from(backend),
+            backend: Arc::new(backend),
             base_path: ecosystem_path.to_path_buf(),
             logger,
         }
@@ -100,8 +101,11 @@ impl StateManager {
     ///
     /// * `backend_type` - The backend type to use.
     /// * `ecosystem_path` - Path to the ecosystem directory.
-    #[must_use]
-    pub fn with_backend_type(backend_type: BackendType, ecosystem_path: &Path) -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the backend type requires async initialization.
+    pub fn with_backend_type(backend_type: BackendType, ecosystem_path: &Path) -> Result<Self> {
         Self::with_backend_type_and_logger(backend_type, ecosystem_path, Arc::new(LogCrateLogger))
     }
 
@@ -112,23 +116,26 @@ impl StateManager {
     /// * `backend_type` - The backend type to use.
     /// * `ecosystem_path` - Path to the ecosystem directory.
     /// * `logger` - Custom logger implementation.
-    #[must_use]
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the backend type requires async initialization.
     pub fn with_backend_type_and_logger(
         backend_type: BackendType,
         ecosystem_path: &Path,
         logger: Arc<dyn Logger>,
-    ) -> Self {
+    ) -> Result<Self> {
         logger.debug(&format!(
             "Creating StateManager with {:?} backend at {}",
             backend_type,
             ecosystem_path.display()
         ));
-        let backend = create_backend(backend_type, ecosystem_path, Arc::clone(&logger));
-        Self {
+        let backend = create_backend(backend_type, ecosystem_path, Arc::clone(&logger))?;
+        Ok(Self {
             backend: Arc::from(backend),
             base_path: ecosystem_path.to_path_buf(),
             logger,
-        }
+        })
     }
 
     /// Create a state manager with S3 synchronization.
@@ -353,10 +360,13 @@ impl StateManager {
     ///
     /// Returns a list of relative file paths that exist in the state directory.
     /// Useful for showing the user what will be deleted.
-    pub fn list_state_files(&self) -> Vec<String> {
+    pub async fn list_state_files(&self) -> Vec<String> {
         let mut files = Vec::new();
-        if self.base_path.exists() {
-            collect_files_recursive(&self.base_path, &self.base_path, &mut files);
+        let exists = tokio::fs::try_exists(&self.base_path)
+            .await
+            .unwrap_or(false);
+        if exists {
+            collect_files_recursive(&self.base_path, &self.base_path, &mut files).await;
         }
         files.sort();
         files
@@ -364,15 +374,21 @@ impl StateManager {
 }
 
 /// Recursively collect file paths relative to base.
-fn collect_files_recursive(base: &Path, current: &Path, files: &mut Vec<String>) {
-    if let Ok(entries) = std::fs::read_dir(current) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                collect_files_recursive(base, &path, files);
-            } else if let Ok(relative) = path.strip_prefix(base) {
-                files.push(relative.display().to_string());
-            }
+async fn collect_files_recursive(base: &Path, current: &Path, files: &mut Vec<String>) {
+    let mut entries = match tokio::fs::read_dir(current).await {
+        Ok(entries) => entries,
+        Err(e) => {
+            log::warn!("Failed to read directory {}: {}", current.display(), e);
+            return;
+        }
+    };
+
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let path = entry.path();
+        if path.is_dir() {
+            Box::pin(collect_files_recursive(base, &path, files)).await;
+        } else if let Ok(relative) = path.strip_prefix(base) {
+            files.push(relative.display().to_string());
         }
     }
 }

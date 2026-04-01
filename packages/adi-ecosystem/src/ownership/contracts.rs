@@ -35,11 +35,8 @@ where
 {
     let green = Style::new().green();
 
-    let chain_admin = match contracts.chain_admin_addr() {
-        Some(addr) => addr,
-        None => {
-            return OwnershipResult::skipped("Chain Admin", "chain_admin_addr not configured");
-        }
+    let Some(chain_admin) = contracts.chain_admin_addr() else {
+        return OwnershipResult::skipped("Chain Admin", "chain_admin_addr not configured");
     };
 
     // Check if ownership acceptance is needed
@@ -101,11 +98,8 @@ where
 {
     let green = Style::new().green();
 
-    let governance = match contracts.governance_addr() {
-        Some(addr) => addr,
-        None => {
-            return OwnershipResult::skipped("Chain Governance", "governance_addr not configured");
-        }
+    let Some(governance) = contracts.governance_addr() else {
+        return OwnershipResult::skipped("Chain Governance", "governance_addr not configured");
     };
 
     // Check if ownership acceptance is needed
@@ -161,14 +155,11 @@ where
 {
     let green = Style::new().green();
 
-    let chain_admin = match contracts.chain_admin_addr() {
-        Some(addr) => addr,
-        None => {
-            return OwnershipResult::skipped(
-                "Ecosystem Chain Admin",
-                "chain_admin_addr not configured",
-            );
-        }
+    let Some(chain_admin) = contracts.chain_admin_addr() else {
+        return OwnershipResult::skipped(
+            "Ecosystem Chain Admin",
+            "chain_admin_addr not configured",
+        );
     };
 
     // Check if ownership acceptance is needed
@@ -224,11 +215,9 @@ where
 }
 
 /// Accept ownership for Server Notifier via multicall.
-#[allow(clippy::too_many_arguments)]
 pub(crate) async fn accept_server_notifier<P>(
     provider: &P,
     contracts: &EcosystemContracts,
-    chain_admin: Option<Address>,
     governor: Address,
     chain_id: u64,
     nonce: &mut u64,
@@ -240,21 +229,15 @@ where
 {
     let green = Style::new().green();
 
-    let server_notifier = match contracts.server_notifier_addr() {
-        Some(addr) => addr,
-        None => {
-            return OwnershipResult::skipped(
-                "Server Notifier",
-                "server_notifier_proxy_addr not configured",
-            );
-        }
+    let Some(server_notifier) = contracts.server_notifier_addr() else {
+        return OwnershipResult::skipped(
+            "Server Notifier",
+            "server_notifier_proxy_addr not configured",
+        );
     };
 
-    let chain_admin_addr = match chain_admin {
-        Some(addr) => addr,
-        None => {
-            return OwnershipResult::skipped("Server Notifier", "chain_admin_addr not configured");
-        }
+    let Some(chain_admin_addr) = contracts.chain_admin_addr() else {
+        return OwnershipResult::skipped("Server Notifier", "chain_admin_addr not configured");
     };
 
     // Check if ownership acceptance is needed
@@ -325,14 +308,11 @@ where
 {
     let green = Style::new().green();
 
-    let timelock = match contracts.validator_timelock_addr() {
-        Some(addr) => addr,
-        None => {
-            return OwnershipResult::skipped(
-                "Validator Timelock",
-                "validator_timelock_addr not configured",
-            );
-        }
+    let Some(timelock) = contracts.validator_timelock_addr() else {
+        return OwnershipResult::skipped(
+            "Validator Timelock",
+            "validator_timelock_addr not configured",
+        );
     };
 
     // Check if ownership acceptance is needed
@@ -388,11 +368,8 @@ where
 {
     let green = Style::new().green();
 
-    let verifier = match contracts.verifier_addr() {
-        Some(addr) => addr,
-        None => {
-            return OwnershipResult::skipped("Verifier", "verifier_addr not configured");
-        }
+    let Some(verifier) = contracts.verifier_addr() else {
+        return OwnershipResult::skipped("Verifier", "verifier_addr not configured");
     };
 
     // Check if ownership acceptance is needed
@@ -448,11 +425,8 @@ where
 {
     let green = Style::new().green();
 
-    let governance = match contracts.governance_addr() {
-        Some(addr) => addr,
-        None => {
-            return OwnershipResult::skipped("Governance", "governance_addr not configured");
-        }
+    let Some(governance) = contracts.governance_addr() else {
+        return OwnershipResult::skipped("Governance", "governance_addr not configured");
     };
 
     // Check if ownership acceptance is needed
@@ -514,24 +488,18 @@ where
 {
     let green = Style::new().green();
 
-    let da_manager = match contracts.l1_rollup_da_manager_addr() {
-        Some(addr) => addr,
-        None => {
-            return OwnershipResult::skipped(
-                "Rollup DA Manager",
-                "l1_rollup_da_manager not configured",
-            );
-        }
+    let Some(da_manager) = contracts.l1_rollup_da_manager_addr() else {
+        return OwnershipResult::skipped(
+            "Rollup DA Manager",
+            "l1_rollup_da_manager not configured",
+        );
     };
 
-    let governance = match contracts.governance_addr() {
-        Some(addr) => addr,
-        None => {
-            return OwnershipResult::skipped(
-                "Rollup DA Manager",
-                "governance_addr not configured (required for Governance timelock)",
-            );
-        }
+    let Some(governance) = contracts.governance_addr() else {
+        return OwnershipResult::skipped(
+            "Rollup DA Manager",
+            "governance_addr not configured (required for Governance timelock)",
+        );
     };
 
     // Check if ownership acceptance is needed by checking pendingOwner on DA Manager

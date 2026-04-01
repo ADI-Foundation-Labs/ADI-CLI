@@ -11,17 +11,4 @@ pub enum ToolkitError {
     /// Docker operation failed.
     #[error("Docker error: {0}")]
     Docker(#[from] adi_docker::DockerError),
-
-    /// Command execution failed.
-    #[error("Command failed with exit code {exit_code}: {message}")]
-    CommandFailed {
-        /// Exit code.
-        exit_code: i64,
-        /// Error message.
-        message: String,
-    },
-
-    /// Invalid protocol version.
-    #[error("Invalid protocol version: {0}")]
-    InvalidVersion(String),
 }

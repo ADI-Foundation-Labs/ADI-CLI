@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// All fields are optional to allow partial updates.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct PartialEcosystemMetadata {
     /// Ecosystem name.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -52,6 +53,7 @@ pub struct PartialEcosystemMetadata {
 ///
 /// All fields are optional to allow partial updates.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct PartialChainMetadata {
     /// Chain internal ID.
     #[serde(skip_serializing_if = "Option::is_none")]

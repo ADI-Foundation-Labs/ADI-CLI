@@ -21,9 +21,26 @@ use crate::governance::{
     encode_governance_calls, execute_governance, extract_stage1_calls,
     resolve_governance_contracts, GovernanceCalldata, GovernanceResult,
 };
-use crate::simulation::{run_simulation, SimulationResult, ToolkitRunnerTrait};
+use crate::runner::ToolkitRunnerTrait;
+use crate::simulation::{run_simulation, SimulationResult};
 use crate::upgrade_yaml;
 use crate::versions::VersionHandler;
+
+/// Parameters for constructing an [`UpgradeOrchestrator`].
+pub struct OrchestratorParams<'a, R, P> {
+    /// Version-specific handler.
+    pub handler: &'a dyn VersionHandler,
+    /// Upgrade configuration.
+    pub config: &'a UpgradeConfig,
+    /// Ecosystem state directory.
+    pub state_dir: &'a Path,
+    /// Toolkit runner for Docker execution.
+    pub runner: &'a R,
+    /// Alloy provider for on-chain queries.
+    pub provider: &'a P,
+    /// Target protocol version.
+    pub protocol_version: semver::Version,
+}
 
 /// Upgrade orchestrator that coordinates all phases.
 pub struct UpgradeOrchestrator<'a, R, P> {
@@ -41,21 +58,14 @@ where
     P: Provider + Clone,
 {
     /// Create a new upgrade orchestrator.
-    pub fn new(
-        handler: &'a dyn VersionHandler,
-        config: &'a UpgradeConfig,
-        state_dir: &'a Path,
-        runner: &'a R,
-        provider: &'a P,
-        protocol_version: semver::Version,
-    ) -> Self {
+    pub fn new(params: OrchestratorParams<'a, R, P>) -> Self {
         Self {
-            handler,
-            config,
-            state_dir,
-            runner,
-            provider,
-            protocol_version,
+            handler: params.handler,
+            config: params.config,
+            state_dir: params.state_dir,
+            runner: params.runner,
+            provider: params.provider,
+            protocol_version: params.protocol_version,
         }
     }
 
@@ -133,14 +143,14 @@ where
     }
 
     /// Phase 5: Extract stage1 calls and encode governance calldata.
-    pub fn encode_governance(&self) -> Result<GovernanceCalldata> {
+    pub async fn encode_governance(&self) -> Result<GovernanceCalldata> {
         let toml_path = self
             .state_dir
             .join("l1-contracts")
             .join("script-out")
             .join(self.handler.upgrade_output_toml());
 
-        let toml_content = std::fs::read_to_string(&toml_path).map_err(|e| {
+        let toml_content = tokio::fs::read_to_string(&toml_path).await.map_err(|e| {
             UpgradeError::GovernanceFailed(format!(
                 "Failed to read TOML output at {}: {e}",
                 toml_path.display()
@@ -153,7 +163,7 @@ where
 
     /// Phase 5: Resolve governance contracts and execute transactions.
     pub async fn execute_governance(&self) -> Result<GovernanceResult> {
-        let calldata = self.encode_governance()?;
+        let calldata = self.encode_governance().await?;
 
         let addresses =
             resolve_governance_contracts(self.provider, self.config.bridgehub_address).await?;

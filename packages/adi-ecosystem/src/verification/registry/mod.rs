@@ -3,6 +3,7 @@
 //! Maps contract types to their source file paths within zksync-era contracts.
 
 mod builders;
+mod ecosystem_targets;
 mod mappings;
 mod target;
 mod types;

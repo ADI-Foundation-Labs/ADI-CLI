@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-04-01
+
+### Added
+
+- **Chain contract types** (`ChainL1Contracts`, `ChainL2Contracts`, `BridgeContracts`, `BridgesConfig`) in `adi-types` for structured chain-level contract address management
+- **Funding event system** with `FundingEventHandler` trait, `LoggingEventHandler`, and `SpinnerEventHandler` for real-time progress reporting during wallet funding
+- **`ToolkitRunnerTrait`** abstraction in `adi-upgrade` to enable testing of toolkit container operations
+- **Signing provider builder** helper (`build_signing_provider`) in `adi-upgrade` for constructing wallet-backed RPC providers
+- **Funding config tests** covering CGT amount calculations, wallet role display names, and config builder patterns
+- **Invalid backend configuration** error variant in `adi-state`
+- **Transfer context** in `adi-funding` for improved balance checks and transfer execution
+
+### Changed
+
+- Docker image pulls now always fetch the latest version instead of skipping when a local copy exists
+- Image pull progress tracking extracted into composable helper functions with `cliclack` progress bars
+- Filesystem state backend uses atomic file operations (`OpenOptions`) instead of `exists()` checks followed by read/write, eliminating TOCTOU race conditions
+- State backend trait simplified by removing serialize/deserialize helpers from `FilesystemBackend`
+- Validator role transaction parameters grouped into `ValidatorRoleTxParams` struct, replacing long parameter lists
+- Ecosystem deployment enhanced with zkstack initialization and validator role configuration
+- S3 client uses improved object existence checking
+- Ecosystem contract counting simplified with `count_some` helper
+- Ownership transfer functions streamlined with improved context management
+- Verification command split into focused modules (`check`, `config`, `contracts`, `submit`)
+- Accept ownership command split into modules (`config`, `execute`)
+- Toolkit runner split into modules (`commands`, `params`)
+- Implementation address reader split into modules (`apply`, `contracts`, `readers`, `slots`, `types`)
+- Funding events split into modules (`logging`, `spinner`)
+- Contract types reorganized into module hierarchy (`bridge`, `chain`, `ecosystem`)
+- Verification registry builders refactored with extracted `ecosystem_targets` module
+
+### Fixed
+
+- `adi init` now respects user confirmation flag when saving chain configuration
+
+### Removed
+
+- Unused `eyre` dependency from `adi-toolkit`
+- Unused error variants (`CommandFailed`, `InvalidVersion`) from toolkit error type
+- Local image existence check from Docker image manager (always pull for freshness)
+
 ## [0.1.0] - 2026-03-30
 
 ### Added
@@ -38,4 +79,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Interactive UI** with themed prompts, confirmations, and multi-select pickers via `dialoguer` and `console`
 - **Colored terminal output** and structured logging via `env_logger` with configurable log levels
 
+[0.2.0]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/ADI-Foundation-Labs/ADI-CLI/releases/tag/0.1.0

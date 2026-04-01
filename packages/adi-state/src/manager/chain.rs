@@ -1,7 +1,7 @@
 //! Chain-level state operations.
 
 use crate::backend::StateBackend;
-use crate::error::Result;
+use crate::error::{Result, StateError};
 use crate::manager::ecosystem::merge_wallets;
 use crate::paths;
 use adi_types::{ChainContracts, ChainMetadata, Logger, Operators, PartialChainMetadata, Wallets};
@@ -277,7 +277,11 @@ impl ChainStateOps {
     pub async fn update_operators(&self, partial: &Operators) -> Result<()> {
         self.logger
             .debug(&format!("Updating chain '{}' operators", self.chain_name));
-        let current = self.operators().await.unwrap_or_default();
+        let current = match self.operators().await {
+            Ok(ops) => ops,
+            Err(StateError::NotFound(_)) => Operators::default(),
+            Err(e) => return Err(e),
+        };
         let merged = merge_operators(current, partial);
         self.backend
             .write_chain_operators(&self.chain_name, &merged)

@@ -138,14 +138,14 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
     let wrapper = ToolkitRunnerWrapper(runner);
 
     // Create orchestrator
-    let orchestrator = UpgradeOrchestrator::new(
-        handler.as_ref(),
-        &upgrade_config,
-        &state_dir,
-        &wrapper,
-        &provider,
-        version.to_semver(),
-    );
+    let orchestrator = UpgradeOrchestrator::new(adi_upgrade::OrchestratorParams {
+        handler: handler.as_ref(),
+        config: &upgrade_config,
+        state_dir: &state_dir,
+        runner: &wrapper,
+        provider: &provider,
+        protocol_version: version.to_semver(),
+    });
 
     // Determine upgrade targets
     let upgrade_ecosystem = matches!(args.target, UpgradeTarget::Ecosystem | UpgradeTarget::Both);

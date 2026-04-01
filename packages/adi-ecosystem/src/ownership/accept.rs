@@ -47,14 +47,12 @@ pub async fn accept_all_ownership(
     };
 
     let mut results = Vec::new();
-    let chain_admin = contracts.chain_admin_addr();
 
     // 1. Server Notifier (via multicall)
     results.push(
         accept_server_notifier(
             &ctx.provider,
             contracts,
-            chain_admin,
             ctx.governor_address,
             ctx.chain_id,
             &mut ctx.nonce,

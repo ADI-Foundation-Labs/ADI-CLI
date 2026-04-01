@@ -2,6 +2,7 @@
 //!
 //! These structs serialize to the TOML format required by forge upgrade scripts.
 
+use alloy_primitives::Address;
 use serde::Serialize;
 
 /// Top-level chain.toml configuration.
@@ -14,7 +15,7 @@ pub struct ChainTomlConfig {
     /// Governance upgrade timer initial delay.
     pub governance_upgrade_timer_initial_delay: u64,
     /// Owner address (governance contract).
-    pub owner_address: String,
+    pub owner_address: Address,
     /// Support L2 legacy shared bridge test.
     pub support_l2_legacy_shared_bridge_test: bool,
     /// Old protocol version hex.
@@ -50,7 +51,7 @@ pub struct ContractsSection {
     /// Create2 factory salt.
     pub create2_factory_salt: String,
     /// Create2 factory address.
-    pub create2_factory_addr: String,
+    pub create2_factory_addr: Address,
     /// Validator timelock execution delay.
     pub validator_timelock_execution_delay: u64,
     /// Genesis root hash.
@@ -86,26 +87,26 @@ pub struct ContractsSection {
     /// EVM emulator hash.
     pub evm_emulator_hash: String,
     /// Bridgehub proxy address.
-    pub bridgehub_proxy_address: String,
+    pub bridgehub_proxy_address: Address,
     /// Rollup DA manager address.
-    pub rollup_da_manager: String,
+    pub rollup_da_manager: Address,
     /// Governance security council address.
-    pub governance_security_council_address: String,
+    pub governance_security_council_address: Address,
     /// Latest protocol version (hex).
     pub latest_protocol_version: String,
     /// L1 bytecodes supplier address.
-    pub l1_bytecodes_supplier_addr: String,
+    pub l1_bytecodes_supplier_addr: Address,
     /// Protocol upgrade handler proxy address.
-    pub protocol_upgrade_handler_proxy_address: String,
+    pub protocol_upgrade_handler_proxy_address: Address,
     /// Protocol upgrade handler implementation address.
-    pub protocol_upgrade_handler_implementation_address: String,
+    pub protocol_upgrade_handler_implementation_address: Address,
 }
 
 /// Tokens configuration section.
 #[derive(Debug, Clone, Serialize)]
 pub struct TokensSection {
     /// WETH token address.
-    pub token_weth_address: String,
+    pub token_weth_address: Address,
 }
 
 /// Gateway configuration section.
@@ -121,30 +122,30 @@ pub struct GatewaySection {
 #[derive(Debug, Clone, Serialize)]
 pub struct GatewayStateTransitionSection {
     /// Chain type manager proxy address.
-    pub chain_type_manager_proxy_addr: String,
+    pub chain_type_manager_proxy_addr: Address,
     /// Rollup DA manager address.
-    pub rollup_da_manager: String,
+    pub rollup_da_manager: Address,
     /// Chain type manager proxy admin address.
-    pub chain_type_manager_proxy_admin: String,
+    pub chain_type_manager_proxy_admin: Address,
     /// Rollup SL DA validator address.
-    pub rollup_sl_da_validator: String,
+    pub rollup_sl_da_validator: Address,
 }
 
 /// State transition configuration section.
 #[derive(Debug, Clone, Serialize)]
 pub struct StateTransitionSection {
     /// Admin facet address.
-    pub admin_facet_addr: String,
+    pub admin_facet_addr: Address,
     /// Diamond init address.
-    pub diamond_init_addr: String,
+    pub diamond_init_addr: Address,
     /// Executor facet address.
-    pub executor_facet_addr: String,
+    pub executor_facet_addr: Address,
     /// Genesis upgrade address.
-    pub genesis_upgrade_addr: String,
+    pub genesis_upgrade_addr: Address,
     /// Getters facet address.
-    pub getters_facet_addr: String,
+    pub getters_facet_addr: Address,
     /// Mailbox facet address.
-    pub mailbox_facet_addr: String,
+    pub mailbox_facet_addr: Address,
     /// Force deployments data (hex).
     pub force_deployments_data: String,
 }
@@ -155,26 +156,26 @@ pub struct ZkSyncOsSection {
     /// Sample chain ID.
     pub sample_chain_id: u64,
     /// Optional CTM address.
-    pub optional_ctm_address: String,
+    pub optional_ctm_address: Address,
     /// Current dual verifier address.
-    pub current_dual_verifier: String,
+    pub current_dual_verifier: Address,
 }
 
 /// Values extracted from previous upgrade YAML for `[state_transition]` section.
 #[derive(Debug, Clone, Default)]
 pub struct PreviousUpgradeValues {
     /// Admin facet address.
-    pub admin_facet_addr: Option<String>,
+    pub admin_facet_addr: Option<Address>,
     /// Diamond init address.
-    pub diamond_init_addr: Option<String>,
+    pub diamond_init_addr: Option<Address>,
     /// Executor facet address.
-    pub executor_facet_addr: Option<String>,
+    pub executor_facet_addr: Option<Address>,
     /// Genesis upgrade address.
-    pub genesis_upgrade_addr: Option<String>,
+    pub genesis_upgrade_addr: Option<Address>,
     /// Getters facet address.
-    pub getters_facet_addr: Option<String>,
+    pub getters_facet_addr: Option<Address>,
     /// Mailbox facet address.
-    pub mailbox_facet_addr: Option<String>,
+    pub mailbox_facet_addr: Option<Address>,
     /// Force deployments data.
     pub force_deployments_data: Option<String>,
 }

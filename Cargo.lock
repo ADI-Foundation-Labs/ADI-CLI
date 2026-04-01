@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "adi-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "adi-ecosystem",
  "adi-funding",
@@ -44,7 +44,7 @@ dependencies = [
 
 [[package]]
 name = "adi-docker"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "adi-types",
  "bollard",
@@ -53,6 +53,7 @@ dependencies = [
  "docker_credential",
  "eyre",
  "futures-util",
+ "log",
  "thiserror",
  "tokio",
  "url",
@@ -60,7 +61,7 @@ dependencies = [
 
 [[package]]
 name = "adi-ecosystem"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "adi-types",
  "alloy-network",
@@ -87,7 +88,7 @@ dependencies = [
 
 [[package]]
 name = "adi-funding"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "adi-types",
  "alloy-contract",
@@ -112,7 +113,7 @@ dependencies = [
 
 [[package]]
 name = "adi-state"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "adi-types",
  "async-trait",
@@ -130,12 +131,11 @@ dependencies = [
 
 [[package]]
 name = "adi-toolkit"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "adi-docker",
  "adi-types",
  "console 0.15.11",
- "eyre",
  "semver 1.0.27",
  "serde",
  "strum 0.26.3",
@@ -146,7 +146,7 @@ dependencies = [
 
 [[package]]
 name = "adi-types"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "alloy-primitives",
  "clap",
@@ -159,7 +159,7 @@ dependencies = [
 
 [[package]]
 name = "adi-upgrade"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "adi-state",
  "adi-toolkit",
@@ -181,6 +181,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "thiserror",
+ "tokio",
  "toml",
  "url",
 ]

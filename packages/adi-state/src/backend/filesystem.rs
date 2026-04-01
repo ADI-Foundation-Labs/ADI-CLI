@@ -2,17 +2,12 @@
 
 use crate::backend::StateBackend;
 use crate::error::{Result, StateError};
-use crate::paths;
-use adi_types::{
-    Apps, ChainContracts, ChainMetadata, EcosystemContracts, EcosystemMetadata, Erc20Deployments,
-    InitialDeployments, Logger, Operators, Wallets,
-};
+use adi_types::Logger;
 use async_trait::async_trait;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
+use tokio::io::AsyncWriteExt;
 
 /// Filesystem-based state backend.
 ///
@@ -45,40 +40,20 @@ impl FilesystemBackend {
     fn full_path(&self, key: &str) -> PathBuf {
         self.base_path.join(key)
     }
-
-    /// Serialize value to YAML string.
-    fn serialize<T: Serialize>(&self, value: &T, key: &str) -> Result<String> {
-        serde_yaml::to_string(value).map_err(|e| StateError::YamlSerializeFailed {
-            path: self.full_path(key),
-            source: e,
-        })
-    }
-
-    /// Deserialize YAML string to value.
-    fn deserialize<T: DeserializeOwned>(&self, content: &str, key: &str) -> Result<T> {
-        serde_yaml::from_str(content).map_err(|e| StateError::YamlParseFailed {
-            path: self.full_path(key),
-            source: e,
-        })
-    }
 }
 
 #[async_trait]
 impl StateBackend for FilesystemBackend {
-    // ========== RAW OPERATIONS ==========
-
     async fn read_raw(&self, key: &str) -> Result<String> {
         let path = self.full_path(key);
         self.logger
             .debug(&format!("Reading state file: {}", path.display()));
 
-        if !path.exists() {
-            return Err(StateError::NotFound(path));
+        match fs::read_to_string(&path).await {
+            Ok(content) => Ok(content),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(StateError::NotFound(path)),
+            Err(e) => Err(StateError::ReadFailed { path, source: e }),
         }
-
-        fs::read_to_string(&path)
-            .await
-            .map_err(|e| StateError::ReadFailed { path, source: e })
     }
 
     async fn write_raw(&self, key: &str, content: &str) -> Result<()> {
@@ -86,12 +61,24 @@ impl StateBackend for FilesystemBackend {
         self.logger
             .debug(&format!("Writing state file: {}", path.display()));
 
-        // Per user requirement: file must exist for write operations
-        if !path.exists() {
-            return Err(StateError::NotFound(path));
-        }
+        // Open without create — fails with NotFound if file doesn't exist
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(&path)
+            .await
+            .map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    StateError::NotFound(path.clone())
+                } else {
+                    StateError::WriteFailed {
+                        path: path.clone(),
+                        source: e,
+                    }
+                }
+            })?;
 
-        fs::write(&path, content)
+        file.write_all(content.as_bytes())
             .await
             .map_err(|e| StateError::WriteFailed { path, source: e })
     }
@@ -101,24 +88,34 @@ impl StateBackend for FilesystemBackend {
         self.logger
             .debug(&format!("Creating state file: {}", path.display()));
 
-        // Safety check: file must NOT exist for create operations
-        if path.exists() {
-            return Err(StateError::AlreadyExists(path));
-        }
-
         // Create parent directories if needed
         if let Some(parent) = path.parent() {
-            if !parent.exists() {
-                fs::create_dir_all(parent)
-                    .await
-                    .map_err(|e| StateError::WriteFailed {
-                        path: parent.to_path_buf(),
-                        source: e,
-                    })?;
-            }
+            fs::create_dir_all(parent)
+                .await
+                .map_err(|e| StateError::WriteFailed {
+                    path: parent.to_path_buf(),
+                    source: e,
+                })?;
         }
 
-        fs::write(&path, content)
+        // create_new — fails with AlreadyExists if file exists
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .await
+            .map_err(|e| {
+                if e.kind() == std::io::ErrorKind::AlreadyExists {
+                    StateError::AlreadyExists(path.clone())
+                } else {
+                    StateError::WriteFailed {
+                        path: path.clone(),
+                        source: e,
+                    }
+                }
+            })?;
+
+        file.write_all(content.as_bytes())
             .await
             .map_err(|e| StateError::WriteFailed { path, source: e })
     }
@@ -129,7 +126,9 @@ impl StateBackend for FilesystemBackend {
             "Checking if state file exists: {}",
             path.display()
         ));
-        Ok(path.exists())
+        fs::try_exists(&path)
+            .await
+            .map_err(|e| StateError::ReadFailed { path, source: e })
     }
 
     async fn list(&self, prefix: &str) -> Result<Vec<String>> {
@@ -137,8 +136,17 @@ impl StateBackend for FilesystemBackend {
         self.logger
             .debug(&format!("Listing state directory: {}", dir_path.display()));
 
-        if !dir_path.exists() || !dir_path.is_dir() {
-            return Ok(Vec::new());
+        // Check existence and type asynchronously
+        match fs::metadata(&dir_path).await {
+            Ok(meta) if meta.is_dir() => {}
+            Ok(_) => return Ok(Vec::new()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => {
+                return Err(StateError::ReadFailed {
+                    path: dir_path,
+                    source: e,
+                })
+            }
         }
 
         let mut entries = Vec::new();
@@ -174,13 +182,13 @@ impl StateBackend for FilesystemBackend {
         self.logger
             .debug(&format!("Deleting state file: {}", path.display()));
 
-        if !path.exists() {
-            return Err(StateError::NotFound(path));
-        }
-
-        fs::remove_file(&path)
-            .await
-            .map_err(|e| StateError::DeleteFailed { path, source: e })
+        fs::remove_file(&path).await.map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                StateError::NotFound(path)
+            } else {
+                StateError::DeleteFailed { path, source: e }
+            }
+        })
     }
 
     async fn delete_dir(&self, key: &str) -> Result<()> {
@@ -188,273 +196,13 @@ impl StateBackend for FilesystemBackend {
         self.logger
             .debug(&format!("Deleting state directory: {}", path.display()));
 
-        if !path.exists() {
-            return Err(StateError::NotFound(path));
-        }
-
-        fs::remove_dir_all(&path)
-            .await
-            .map_err(|e| StateError::DeleteFailed { path, source: e })
-    }
-
-    // ========== ECOSYSTEM METADATA ==========
-
-    async fn read_ecosystem_metadata(&self) -> Result<EcosystemMetadata> {
-        let key = paths::ECOSYSTEM_METADATA;
-        self.logger
-            .debug(&format!("Reading ecosystem metadata from {}", key));
-        let content = self.read_raw(key).await?;
-        self.deserialize(&content, key)
-    }
-
-    async fn write_ecosystem_metadata(&self, data: &EcosystemMetadata) -> Result<()> {
-        let key = paths::ECOSYSTEM_METADATA;
-        self.logger
-            .debug(&format!("Writing ecosystem metadata to {}", key));
-        let yaml = self.serialize(data, key)?;
-        self.write_raw(key, &yaml).await
-    }
-
-    async fn create_ecosystem_metadata(&self, data: &EcosystemMetadata) -> Result<()> {
-        let key = paths::ECOSYSTEM_METADATA;
-        self.logger
-            .debug(&format!("Creating ecosystem metadata at {}", key));
-        let yaml = self.serialize(data, key)?;
-        self.create_raw(key, &yaml).await
-    }
-
-    // ========== ECOSYSTEM WALLETS ==========
-
-    async fn read_ecosystem_wallets(&self) -> Result<Wallets> {
-        let key = paths::ecosystem_wallets_path();
-        self.logger
-            .debug(&format!("Reading ecosystem wallets from {}", key));
-        let content = self.read_raw(&key).await?;
-        self.deserialize(&content, &key)
-    }
-
-    async fn write_ecosystem_wallets(&self, data: &Wallets) -> Result<()> {
-        let key = paths::ecosystem_wallets_path();
-        self.logger
-            .debug(&format!("Writing ecosystem wallets to {}", key));
-        let yaml = self.serialize(data, &key)?;
-        self.write_raw(&key, &yaml).await
-    }
-
-    async fn create_ecosystem_wallets(&self, data: &Wallets) -> Result<()> {
-        let key = paths::ecosystem_wallets_path();
-        self.logger
-            .debug(&format!("Creating ecosystem wallets at {}", key));
-        let yaml = self.serialize(data, &key)?;
-        self.create_raw(&key, &yaml).await
-    }
-
-    // ========== ECOSYSTEM CONTRACTS ==========
-
-    async fn read_ecosystem_contracts(&self) -> Result<EcosystemContracts> {
-        let key = paths::ecosystem_contracts_path();
-        self.logger
-            .debug(&format!("Reading ecosystem contracts from {}", key));
-        let content = self.read_raw(&key).await?;
-        self.deserialize(&content, &key)
-    }
-
-    async fn write_ecosystem_contracts(&self, data: &EcosystemContracts) -> Result<()> {
-        let key = paths::ecosystem_contracts_path();
-        self.logger
-            .debug(&format!("Writing ecosystem contracts to {}", key));
-        let yaml = self.serialize(data, &key)?;
-        self.write_raw(&key, &yaml).await
-    }
-
-    async fn create_ecosystem_contracts(&self, data: &EcosystemContracts) -> Result<()> {
-        let key = paths::ecosystem_contracts_path();
-        self.logger
-            .debug(&format!("Creating ecosystem contracts at {}", key));
-        let yaml = self.serialize(data, &key)?;
-        self.create_raw(&key, &yaml).await
-    }
-
-    // ========== INITIAL DEPLOYMENTS ==========
-
-    async fn read_initial_deployments(&self) -> Result<InitialDeployments> {
-        let key = paths::initial_deployments_path();
-        self.logger
-            .debug(&format!("Reading initial deployments from {}", key));
-        let content = self.read_raw(&key).await?;
-        self.deserialize(&content, &key)
-    }
-
-    async fn write_initial_deployments(&self, data: &InitialDeployments) -> Result<()> {
-        let key = paths::initial_deployments_path();
-        self.logger
-            .debug(&format!("Writing initial deployments to {}", key));
-        let yaml = self.serialize(data, &key)?;
-        self.write_raw(&key, &yaml).await
-    }
-
-    async fn create_initial_deployments(&self, data: &InitialDeployments) -> Result<()> {
-        let key = paths::initial_deployments_path();
-        self.logger
-            .debug(&format!("Creating initial deployments at {}", key));
-        let yaml = self.serialize(data, &key)?;
-        self.create_raw(&key, &yaml).await
-    }
-
-    // ========== ERC20 DEPLOYMENTS ==========
-
-    async fn read_erc20_deployments(&self) -> Result<Erc20Deployments> {
-        let key = paths::erc20_deployments_path();
-        self.logger
-            .debug(&format!("Reading ERC20 deployments from {}", key));
-        let content = self.read_raw(&key).await?;
-        self.deserialize(&content, &key)
-    }
-
-    async fn write_erc20_deployments(&self, data: &Erc20Deployments) -> Result<()> {
-        let key = paths::erc20_deployments_path();
-        self.logger
-            .debug(&format!("Writing ERC20 deployments to {}", key));
-        let yaml = self.serialize(data, &key)?;
-        self.write_raw(&key, &yaml).await
-    }
-
-    async fn create_erc20_deployments(&self, data: &Erc20Deployments) -> Result<()> {
-        let key = paths::erc20_deployments_path();
-        self.logger
-            .debug(&format!("Creating ERC20 deployments at {}", key));
-        let yaml = self.serialize(data, &key)?;
-        self.create_raw(&key, &yaml).await
-    }
-
-    // ========== APPS ==========
-
-    async fn read_apps(&self) -> Result<Apps> {
-        let key = paths::apps_path();
-        self.logger
-            .debug(&format!("Reading apps config from {}", key));
-        let content = self.read_raw(&key).await?;
-        self.deserialize(&content, &key)
-    }
-
-    async fn write_apps(&self, data: &Apps) -> Result<()> {
-        let key = paths::apps_path();
-        self.logger
-            .debug(&format!("Writing apps config to {}", key));
-        let yaml = self.serialize(data, &key)?;
-        self.write_raw(&key, &yaml).await
-    }
-
-    async fn create_apps(&self, data: &Apps) -> Result<()> {
-        let key = paths::apps_path();
-        self.logger
-            .debug(&format!("Creating apps config at {}", key));
-        let yaml = self.serialize(data, &key)?;
-        self.create_raw(&key, &yaml).await
-    }
-
-    // ========== CHAIN METADATA ==========
-
-    async fn read_chain_metadata(&self, chain: &str) -> Result<ChainMetadata> {
-        let key = paths::chain_metadata_path(chain);
-        self.logger
-            .debug(&format!("Reading chain '{}' metadata from {}", chain, key));
-        let content = self.read_raw(&key).await?;
-        self.deserialize(&content, &key)
-    }
-
-    async fn write_chain_metadata(&self, chain: &str, data: &ChainMetadata) -> Result<()> {
-        let key = paths::chain_metadata_path(chain);
-        self.logger
-            .debug(&format!("Writing chain '{}' metadata to {}", chain, key));
-        let yaml = self.serialize(data, &key)?;
-        self.write_raw(&key, &yaml).await
-    }
-
-    async fn create_chain_metadata(&self, chain: &str, data: &ChainMetadata) -> Result<()> {
-        let key = paths::chain_metadata_path(chain);
-        self.logger
-            .debug(&format!("Creating chain '{}' metadata at {}", chain, key));
-        let yaml = self.serialize(data, &key)?;
-        self.create_raw(&key, &yaml).await
-    }
-
-    // ========== CHAIN WALLETS ==========
-
-    async fn read_chain_wallets(&self, chain: &str) -> Result<Wallets> {
-        let key = paths::chain_wallets_path(chain);
-        self.logger
-            .debug(&format!("Reading chain '{}' wallets from {}", chain, key));
-        let content = self.read_raw(&key).await?;
-        self.deserialize(&content, &key)
-    }
-
-    async fn write_chain_wallets(&self, chain: &str, data: &Wallets) -> Result<()> {
-        let key = paths::chain_wallets_path(chain);
-        self.logger
-            .debug(&format!("Writing chain '{}' wallets to {}", chain, key));
-        let yaml = self.serialize(data, &key)?;
-        self.write_raw(&key, &yaml).await
-    }
-
-    async fn create_chain_wallets(&self, chain: &str, data: &Wallets) -> Result<()> {
-        let key = paths::chain_wallets_path(chain);
-        self.logger
-            .debug(&format!("Creating chain '{}' wallets at {}", chain, key));
-        let yaml = self.serialize(data, &key)?;
-        self.create_raw(&key, &yaml).await
-    }
-
-    // ========== CHAIN CONTRACTS ==========
-
-    async fn read_chain_contracts(&self, chain: &str) -> Result<ChainContracts> {
-        let key = paths::chain_contracts_path(chain);
-        self.logger
-            .debug(&format!("Reading chain '{}' contracts from {}", chain, key));
-        let content = self.read_raw(&key).await?;
-        self.deserialize(&content, &key)
-    }
-
-    async fn write_chain_contracts(&self, chain: &str, data: &ChainContracts) -> Result<()> {
-        let key = paths::chain_contracts_path(chain);
-        self.logger
-            .debug(&format!("Writing chain '{}' contracts to {}", chain, key));
-        let yaml = self.serialize(data, &key)?;
-        self.write_raw(&key, &yaml).await
-    }
-
-    async fn create_chain_contracts(&self, chain: &str, data: &ChainContracts) -> Result<()> {
-        let key = paths::chain_contracts_path(chain);
-        self.logger
-            .debug(&format!("Creating chain '{}' contracts at {}", chain, key));
-        let yaml = self.serialize(data, &key)?;
-        self.create_raw(&key, &yaml).await
-    }
-
-    // ========== CHAIN OPERATORS ==========
-
-    async fn read_chain_operators(&self, chain: &str) -> Result<Operators> {
-        let key = paths::chain_operators_path(chain);
-        self.logger
-            .debug(&format!("Reading chain '{}' operators from {}", chain, key));
-        let content = self.read_raw(&key).await?;
-        self.deserialize(&content, &key)
-    }
-
-    async fn write_chain_operators(&self, chain: &str, data: &Operators) -> Result<()> {
-        let key = paths::chain_operators_path(chain);
-        self.logger
-            .debug(&format!("Writing chain '{}' operators to {}", chain, key));
-        let yaml = self.serialize(data, &key)?;
-        self.write_raw(&key, &yaml).await
-    }
-
-    async fn create_chain_operators(&self, chain: &str, data: &Operators) -> Result<()> {
-        let key = paths::chain_operators_path(chain);
-        self.logger
-            .debug(&format!("Creating chain '{}' operators at {}", chain, key));
-        let yaml = self.serialize(data, &key)?;
-        self.create_raw(&key, &yaml).await
+        fs::remove_dir_all(&path).await.map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                StateError::NotFound(path)
+            } else {
+                StateError::DeleteFailed { path, source: e }
+            }
+        })
     }
 }
 

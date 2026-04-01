@@ -11,7 +11,7 @@ use crate::validator::{
 };
 use adi_types::{normalize_rpc_url, ChainContracts, Logger, Operators};
 use alloy_network::{EthereumWallet, TransactionBuilder};
-use alloy_primitives::{Address, Bytes, B256};
+use alloy_primitives::{Address, B256};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
 use console::Style;
@@ -143,16 +143,15 @@ pub async fn add_validator_roles(
         return Ok(Vec::new());
     }
 
-    execute_validator_role_txs(
+    execute_validator_role_txs(ValidatorRoleTxParams {
         rpc_url,
         contracts,
         assignments,
         governor_key,
         gas_multiplier,
-        ValidatorRoleMode::Add,
-        build_add_validator_roles_calldata,
+        mode: ValidatorRoleMode::Add,
         logger,
-    )
+    })
     .await
 }
 
@@ -228,39 +227,48 @@ pub async fn remove_validator_roles(
         return Ok(Vec::new());
     }
 
-    execute_validator_role_txs(
+    execute_validator_role_txs(ValidatorRoleTxParams {
         rpc_url,
         contracts,
-        revocations,
+        assignments: revocations,
         governor_key,
         gas_multiplier,
-        ValidatorRoleMode::Remove,
-        build_remove_validator_roles_calldata,
+        mode: ValidatorRoleMode::Remove,
         logger,
-    )
+    })
     .await
 }
 
-/// Execute validator role transactions for a list of assignments.
-#[allow(clippy::too_many_arguments)]
-async fn execute_validator_role_txs(
-    rpc_url: &str,
-    contracts: &DeployedContracts,
+/// Parameters for executing validator role transactions.
+struct ValidatorRoleTxParams<'a> {
+    /// L1 RPC endpoint URL.
+    rpc_url: &'a str,
+    /// Deployed contract addresses.
+    contracts: &'a DeployedContracts,
+    /// Role assignments to execute.
     assignments: Vec<ValidatorRoleAssignment>,
-    governor_key: &SecretString,
+    /// Chain governor private key for signing transactions.
+    governor_key: &'a SecretString,
+    /// Gas price multiplier percentage. None to use raw estimate.
     gas_multiplier: Option<u64>,
+    /// Whether adding or removing roles.
     mode: ValidatorRoleMode,
-    calldata_builder: impl Fn(Address, Address, Address, ValidatorRoles) -> Bytes,
-    logger: &dyn Logger,
-) -> Result<Vec<B256>> {
-    let signer = create_signer(governor_key)?;
+    /// Logger for debug/info/warning output.
+    logger: &'a dyn Logger,
+}
+
+/// Execute validator role transactions for a list of assignments.
+async fn execute_validator_role_txs(params: ValidatorRoleTxParams<'_>) -> Result<Vec<B256>> {
+    let signer = create_signer(params.governor_key)?;
     let governor_address = signer.address();
-    logger.debug(&format!("Governor address: {}", governor_address));
+    params
+        .logger
+        .debug(&format!("Governor address: {}", governor_address));
 
     let wallet = EthereumWallet::from(signer);
-    let normalized_rpc = normalize_rpc_url(rpc_url);
+    let normalized_rpc = normalize_rpc_url(params.rpc_url);
     let url: url::Url = normalized_rpc.parse().map_err(|e| {
-        EcosystemError::InvalidConfig(format!("Invalid RPC URL '{}': {}", rpc_url, e))
+        EcosystemError::InvalidConfig(format!("Invalid RPC URL '{}': {}", params.rpc_url, e))
     })?;
     let provider = ProviderBuilder::new().wallet(wallet).connect_http(url);
 
@@ -286,21 +294,25 @@ async fn execute_validator_role_txs(
             .map_err(|e| EcosystemError::TransactionFailed {
                 reason: format!("Failed to get gas price: {}", e),
             })?;
-    let gas_price = gas_multiplier.map_or(estimated, |m| estimated * u128::from(m) / 100);
-    logger.debug(&format!("Using gas price: {} wei", gas_price));
+    let gas_price = params
+        .gas_multiplier
+        .map_or(estimated, |m| estimated * u128::from(m) / 100);
+    params
+        .logger
+        .debug(&format!("Using gas price: {} wei", gas_price));
 
-    let (verb, past_verb, style) = match mode {
+    let (verb, past_verb, style) = match params.mode {
         ValidatorRoleMode::Add => ("Assigning", "Confirmed", Style::new().green()),
         ValidatorRoleMode::Remove => ("Revoking", "Revoked", Style::new().yellow()),
     };
 
-    let mut tx_hashes = Vec::with_capacity(assignments.len());
+    let mut tx_hashes = Vec::with_capacity(params.assignments.len());
 
-    for assignment in assignments {
-        logger.debug(&format!(
+    for assignment in params.assignments {
+        params.logger.debug(&format!(
             "{} roles {} {} ({}): [{}]",
             verb,
-            if matches!(mode, ValidatorRoleMode::Add) {
+            if matches!(params.mode, ValidatorRoleMode::Add) {
                 "to"
             } else {
                 "from"
@@ -318,16 +330,24 @@ async fn execute_validator_role_txs(
             style.apply_to(assignment.operator)
         ));
 
-        let calldata = calldata_builder(
-            contracts.validator_timelock,
-            contracts.diamond_proxy,
-            assignment.operator,
-            assignment.roles,
-        );
+        let calldata = match params.mode {
+            ValidatorRoleMode::Add => build_add_validator_roles_calldata(
+                params.contracts.validator_timelock,
+                params.contracts.diamond_proxy,
+                assignment.operator,
+                assignment.roles,
+            ),
+            ValidatorRoleMode::Remove => build_remove_validator_roles_calldata(
+                params.contracts.validator_timelock,
+                params.contracts.diamond_proxy,
+                assignment.operator,
+                assignment.roles,
+            ),
+        };
 
         let tx = TransactionRequest::default()
             .with_from(governor_address)
-            .with_to(contracts.chain_admin)
+            .with_to(params.contracts.chain_admin)
             .with_input(calldata)
             .with_nonce(nonce)
             .with_gas_limit(500_000)
@@ -345,7 +365,9 @@ async fn execute_validator_role_txs(
         })?;
 
         let tx_hash = *pending.tx_hash();
-        logger.debug(&format!("Transaction sent: {}", tx_hash));
+        params
+            .logger
+            .debug(&format!("Transaction sent: {}", tx_hash));
 
         let receipt = pending.get_receipt().await.map_err(|e| {
             spinner.error(format!("Confirmation failed: {}", e));
@@ -373,7 +395,7 @@ async fn execute_validator_role_txs(
             receipt.gas_used
         ));
 
-        logger.debug(&format!(
+        params.logger.debug(&format!(
             "Confirmed {} in block {}: tx_hash={}",
             assignment.name,
             receipt.block_number.unwrap_or_default(),

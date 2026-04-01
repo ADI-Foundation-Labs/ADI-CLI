@@ -2,7 +2,7 @@
 
 use crate::error::{DockerError, Result};
 use adi_types::Logger;
-use bollard::container::LogsOptions;
+use bollard::container::{LogOutput, LogsOptions};
 use bollard::Docker;
 use console::{Style, Term};
 use futures_util::StreamExt;
@@ -83,6 +83,20 @@ impl LogDisplay {
         Ok(())
     }
 
+    /// Update display from raw container output bytes.
+    fn update_from_output(&mut self, bytes: &[u8], quiet: bool) {
+        if quiet {
+            return;
+        }
+        let Ok(text) = std::str::from_utf8(bytes) else {
+            return;
+        };
+        text.lines()
+            .filter(|line| !line.is_empty())
+            .for_each(|line| self.push_line(line));
+        self.render().ok();
+    }
+
     fn clear(&mut self) -> std::io::Result<()> {
         let term = Term::stderr();
         if self.rendered_count > 0 {
@@ -104,6 +118,27 @@ impl OutputStreamer {
     /// Create a new OutputStreamer.
     pub fn new(docker: Docker, logger: Arc<dyn Logger>) -> Self {
         Self { docker, logger }
+    }
+
+    /// Process a single log chunk. Returns `Some(bytes)` to continue, `None` to stop.
+    fn process_log_chunk(
+        &self,
+        chunk: Option<std::result::Result<LogOutput, bollard::errors::Error>>,
+        display: &mut LogDisplay,
+        quiet: bool,
+    ) -> Option<Vec<u8>> {
+        match chunk {
+            Some(Ok(output)) => {
+                let bytes = output.into_bytes();
+                display.update_from_output(&bytes, quiet);
+                Some(bytes.to_vec())
+            }
+            Some(Err(e)) => {
+                self.logger.debug(&format!("Log stream ended: {e}"));
+                None
+            }
+            None => None,
+        }
     }
 
     /// Stream container logs with real-time display.
@@ -153,36 +188,14 @@ impl OutputStreamer {
         let stream_result: Result<()> = loop {
             tokio::select! {
                 _ = tokio::signal::ctrl_c() => {
-                    if !quiet {
-                        display.clear().ok();
-                    }
+                    if !quiet { display.clear().ok(); }
                     Self::save_log(&buffer, &log_path, quiet).await?;
                     break Err(DockerError::StreamError("Interrupted by CTRL+C".to_string()));
                 }
-
-                result = stream.next() => {
-                    match result {
-                        Some(Ok(output)) => {
-                            let bytes = output.into_bytes();
-                            if let Ok(text) = std::str::from_utf8(&bytes) {
-                                if !quiet {
-                                    for line in text.lines() {
-                                        if !line.is_empty() {
-                                            display.push_line(line);
-                                        }
-                                    }
-                                    display.render().ok();
-                                }
-                            }
-                            buffer.extend(bytes);
-                        }
-                        Some(Err(e)) => {
-                            self.logger.debug(&format!("Log stream ended: {}", e));
-                            break Ok(());
-                        }
-                        None => {
-                            break Ok(());
-                        }
+                chunk = stream.next() => {
+                    match self.process_log_chunk(chunk, &mut display, quiet) {
+                        Some(bytes) => buffer.extend(bytes),
+                        None => break Ok(()),
                     }
                 }
             }

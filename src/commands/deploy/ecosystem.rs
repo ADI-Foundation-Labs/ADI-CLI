@@ -19,7 +19,7 @@ use adi_funding::{
     FundingPlanBuilder, FundingTargetStatus, LoggingEventHandler, SpinnerEventHandler,
 };
 use adi_state::StateManager;
-use adi_toolkit::{ProtocolVersion, ToolkitRunner};
+use adi_toolkit::{EcosystemInitParams, ProtocolVersion, ToolkitRunner};
 use adi_types::{Operators, Wallets};
 use alloy_primitives::{Address, U256};
 use clap::Args;
@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use url::Url;
 
-use super::ownership::run_post_deploy_ownership;
+use super::ownership::{run_post_deploy_ownership, OwnershipOperationResult};
 use crate::commands::helpers::{
     create_state_manager_with_s3, resolve_protocol_version, resolve_rpc_url,
     select_chain_from_state,
@@ -717,90 +717,27 @@ async fn run_ecosystem_deployment(
         ui::info("Ecosystem contracts already exist, deploying chain only")?;
     }
 
-    let runner = ToolkitRunner::with_config_and_logger(
-        context.toolkit_config(),
-        std::sync::Arc::clone(context.logger()),
+    // Run zkstack init and get gas multiplier for reuse
+    let gas_multiplier = run_zkstack_init(
+        context,
+        args,
+        ecosystem_name,
+        chain_name,
+        rpc_url,
+        &protocol_version,
+        deploy_ecosystem,
     )
-    .await
-    .wrap_err("Failed to create toolkit runner")?;
-
-    let ecosystem_path = context.config().state_dir.join(ecosystem_name);
-
-    // Resolve gas multiplier from args or config
-    let gas_multiplier = resolve_gas_multiplier(args, context);
-
-    // Compute gas price: skip for localhost, estimate + apply multiplier for testnets
-    let gas_price_wei = if is_localhost_rpc(rpc_url.as_str()) {
-        None
-    } else {
-        // Estimate gas price and apply multiplier
-        let provider = adi_funding::FundingProvider::new(rpc_url.as_str())
-            .wrap_err("Failed to create provider for gas estimation")?;
-        let estimated = provider
-            .get_gas_price()
-            .await
-            .wrap_err("Failed to estimate gas price")?;
-        Some(estimated * u128::from(gas_multiplier) / 100)
-    };
-
-    let init_msg = if deploy_ecosystem {
-        "Running zkstack ecosystem init..."
-    } else {
-        "Running zkstack chain init..."
-    };
-    ui::info(init_msg)?;
-
-    let exit_code = runner
-        .run_zkstack_ecosystem_init(
-            &ecosystem_path,
-            rpc_url.as_str(),
-            gas_price_wei,
-            &protocol_version.to_semver(),
-            deploy_ecosystem,
-            chain_name,
-        )
-        .await
-        .wrap_err("Failed to run zkstack ecosystem init")?;
-
-    if exit_code != 0 {
-        return Err(eyre::eyre!(
-            "zkstack ecosystem init failed with exit code {}",
-            exit_code
-        ));
-    }
-
-    let success_msg = if deploy_ecosystem {
-        "Ecosystem contracts deployed successfully!"
-    } else {
-        "Chain contracts deployed successfully!"
-    };
-    ui::success(success_msg)?;
+    .await?;
 
     // Enrich ecosystem contracts with facet and implementation addresses
     enrich_ecosystem_contracts(context, state_manager, rpc_url).await?;
 
     // Log all deployment files (with warnings for unhandled ones)
+    let ecosystem_path = context.config().state_dir.join(ecosystem_name);
     log_deployment_files(&ecosystem_path, chain_name)?;
 
-    // Re-read chain contracts from state (now populated after deployment)
-    let chain_contracts = state_manager
-        .chain(chain_name)
-        .contracts()
-        .await
-        .wrap_err("Failed to load chain contracts after deployment")?;
-
-    let deployed = DeployedContracts::try_from_chain_contracts(&chain_contracts)
-        .wrap_err("Missing required contract addresses after deployment")?;
-
-    ui::note(
-        "Deployed Contracts",
-        format!(
-            "Diamond proxy: {}\nValidator timelock: {}\nChain admin: {}",
-            ui::green(deployed.diamond_proxy),
-            ui::green(deployed.validator_timelock),
-            ui::green(deployed.chain_admin)
-        ),
-    )?;
+    // Read and display deployed contracts
+    let deployed = read_deployed_contracts(state_manager, chain_name).await?;
 
     // Get chain governor private key for signing validator role txs
     let governor_key = chain_wallets
@@ -820,7 +757,164 @@ async fn run_ecosystem_deployment(
         Some(gas_multiplier)
     };
 
-    // Add validator roles
+    // Configure validator roles
+    configure_validator_roles(
+        context,
+        state_manager,
+        chain_name,
+        &normalized_rpc,
+        &deployed,
+        &governor_key,
+        validator_gas_multiplier,
+    )
+    .await?;
+
+    // Configure calldata DA mode if blobs are disabled (L3 chains settling on L2)
+    if !resolve_blobs_mode(args, context, chain_name) {
+        configure_calldata_da(
+            context,
+            state_manager,
+            chain_name,
+            &normalized_rpc,
+            &deployed,
+            &governor_key,
+            validator_gas_multiplier,
+        )
+        .await?;
+    }
+
+    // Post-deployment ownership operations (config-driven)
+    let ownership_result = run_post_deploy_ownership(
+        &normalized_rpc,
+        state_manager,
+        chain_name,
+        validator_gas_multiplier,
+        context,
+    )
+    .await?;
+
+    // Display summary
+    display_deployment_summary(ecosystem_name, chain_name, &deployed, &ownership_result)?;
+
+    Ok(())
+}
+
+/// Run zkstack ecosystem or chain init with gas price estimation.
+///
+/// Creates a toolkit runner, estimates gas price (skipped for localhost),
+/// and runs the appropriate init command. Returns the gas multiplier
+/// for reuse in downstream operations.
+async fn run_zkstack_init(
+    context: &Context,
+    args: &DeployArgs,
+    ecosystem_name: &str,
+    chain_name: &str,
+    rpc_url: &Url,
+    protocol_version: &ProtocolVersion,
+    deploy_ecosystem: bool,
+) -> Result<u64> {
+    let runner = ToolkitRunner::with_config_and_logger(
+        context.toolkit_config(),
+        std::sync::Arc::clone(context.logger()),
+    )
+    .await
+    .wrap_err("Failed to create toolkit runner")?;
+
+    let ecosystem_path = context.config().state_dir.join(ecosystem_name);
+
+    // Resolve gas multiplier from args or config
+    let gas_multiplier = resolve_gas_multiplier(args, context);
+
+    // Compute gas price: skip for localhost, estimate + apply multiplier for testnets
+    let gas_price_wei = if is_localhost_rpc(rpc_url.as_str()) {
+        None
+    } else {
+        let provider = adi_funding::FundingProvider::new(rpc_url.as_str())
+            .wrap_err("Failed to create provider for gas estimation")?;
+        let estimated = provider
+            .get_gas_price()
+            .await
+            .wrap_err("Failed to estimate gas price")?;
+        Some(estimated * u128::from(gas_multiplier) / 100)
+    };
+
+    let init_msg = if deploy_ecosystem {
+        "Running zkstack ecosystem init..."
+    } else {
+        "Running zkstack chain init..."
+    };
+    ui::info(init_msg)?;
+
+    let exit_code = runner
+        .run_zkstack_ecosystem_init(&EcosystemInitParams {
+            ecosystem_dir: &ecosystem_path,
+            l1_rpc_url: rpc_url.as_str(),
+            gas_price_wei,
+            protocol_version: &protocol_version.to_semver(),
+            deploy_ecosystem,
+            chain_name,
+        })
+        .await
+        .wrap_err("Failed to run zkstack ecosystem init")?;
+
+    if exit_code != 0 {
+        return Err(eyre::eyre!(
+            "zkstack ecosystem init failed with exit code {}",
+            exit_code
+        ));
+    }
+
+    let success_msg = if deploy_ecosystem {
+        "Ecosystem contracts deployed successfully!"
+    } else {
+        "Chain contracts deployed successfully!"
+    };
+    ui::success(success_msg)?;
+
+    Ok(gas_multiplier)
+}
+
+/// Read deployed contract addresses from state and display them.
+async fn read_deployed_contracts(
+    state_manager: &StateManager,
+    chain_name: &str,
+) -> Result<DeployedContracts> {
+    let chain_contracts = state_manager
+        .chain(chain_name)
+        .contracts()
+        .await
+        .wrap_err("Failed to load chain contracts after deployment")?;
+
+    let deployed = DeployedContracts::try_from_chain_contracts(&chain_contracts)
+        .wrap_err("Missing required contract addresses after deployment")?;
+
+    ui::note(
+        "Deployed Contracts",
+        format!(
+            "Diamond proxy: {}\nValidator timelock: {}\nChain admin: {}",
+            ui::green(deployed.diamond_proxy),
+            ui::green(deployed.validator_timelock),
+            ui::green(deployed.chain_admin)
+        ),
+    )?;
+
+    Ok(deployed)
+}
+
+/// Configure validator roles for the deployed chain.
+///
+/// Revokes default blob_operator roles assigned by zkstack, builds operator
+/// addresses from config with wallet fallback, persists them to state,
+/// revokes replaced default operators, and assigns final roles.
+async fn configure_validator_roles(
+    context: &Context,
+    state_manager: &StateManager,
+    chain_name: &str,
+    rpc_url: &str,
+    deployed: &DeployedContracts,
+    governor_key: &SecretString,
+    gas_multiplier: Option<u64>,
+) -> Result<()> {
     ui::section("Configuring Validator Roles")?;
 
     // Load chain wallets for operator addresses
@@ -838,11 +932,11 @@ async fn run_ecosystem_deployment(
         };
 
         let revoke_hashes = remove_validator_roles(
-            &normalized_rpc,
-            &deployed,
+            rpc_url,
+            deployed,
             &blob_revoke,
-            &governor_key,
-            validator_gas_multiplier,
+            governor_key,
+            gas_multiplier,
             context.logger().as_ref(),
         )
         .await
@@ -892,112 +986,123 @@ async fn run_ecosystem_deployment(
     if !operators.has_any() {
         ui::warning("No operators configured - skipping validator role assignment")?;
         ui::info("Operators will be assigned from wallets.yaml or via --operator CLI flag")?;
-    } else {
-        // Identify default operators to revoke (wallet operators being replaced by config)
-        let wallet_operator = chain_wallets.operator.as_ref().map(|w| w.address);
-        let wallet_prove = chain_wallets.prove_operator.as_ref().map(|w| w.address);
-        let wallet_execute = chain_wallets.execute_operator.as_ref().map(|w| w.address);
+        return Ok(());
+    }
 
-        let operators_to_revoke = Operators {
-            operator: if config_operators.operator.is_some()
-                && config_operators.operator != wallet_operator
-            {
-                wallet_operator
-            } else {
-                None
-            },
-            prove_operator: if config_operators.prove_operator.is_some()
-                && config_operators.prove_operator != wallet_prove
-            {
-                wallet_prove
-            } else {
-                None
-            },
-            execute_operator: if config_operators.execute_operator.is_some()
-                && config_operators.execute_operator != wallet_execute
-            {
-                wallet_execute
-            } else {
-                None
-            },
-            ..Default::default()
-        };
+    // Identify default operators to revoke (wallet operators being replaced by config)
+    let wallet_operator = chain_wallets.operator.as_ref().map(|w| w.address);
+    let wallet_prove = chain_wallets.prove_operator.as_ref().map(|w| w.address);
+    let wallet_execute = chain_wallets.execute_operator.as_ref().map(|w| w.address);
 
-        // Revoke roles from default operators being replaced
-        if operators_to_revoke.has_any() {
-            let revoke_hashes = remove_validator_roles(
-                &normalized_rpc,
-                &deployed,
-                &operators_to_revoke,
-                &governor_key,
-                validator_gas_multiplier,
-                context.logger().as_ref(),
-            )
-            .await
-            .wrap_err("Failed to revoke default validator roles")?;
+    let operators_to_revoke = Operators {
+        operator: if config_operators.operator.is_some()
+            && config_operators.operator != wallet_operator
+        {
+            wallet_operator
+        } else {
+            None
+        },
+        prove_operator: if config_operators.prove_operator.is_some()
+            && config_operators.prove_operator != wallet_prove
+        {
+            wallet_prove
+        } else {
+            None
+        },
+        execute_operator: if config_operators.execute_operator.is_some()
+            && config_operators.execute_operator != wallet_execute
+        {
+            wallet_execute
+        } else {
+            None
+        },
+        ..Default::default()
+    };
 
-            ui::success(format!(
-                "Revoked default validator roles: {} transactions",
-                ui::green(revoke_hashes.len())
-            ))?;
-        }
-
-        // Add validator roles to the final operators
-        let tx_hashes = add_validator_roles(
-            &normalized_rpc,
-            &deployed,
-            &operators,
-            &governor_key,
-            validator_gas_multiplier,
+    // Revoke roles from default operators being replaced
+    if operators_to_revoke.has_any() {
+        let revoke_hashes = remove_validator_roles(
+            rpc_url,
+            deployed,
+            &operators_to_revoke,
+            governor_key,
+            gas_multiplier,
             context.logger().as_ref(),
         )
         .await
-        .wrap_err("Failed to add validator roles")?;
+        .wrap_err("Failed to revoke default validator roles")?;
 
         ui::success(format!(
-            "Validator roles configured: {} transactions confirmed",
-            ui::green(tx_hashes.len())
+            "Revoked default validator roles: {} transactions",
+            ui::green(revoke_hashes.len())
         ))?;
     }
 
-    // Configure calldata DA mode if blobs are disabled (L3 chains settling on L2)
-    let use_blobs = resolve_blobs_mode(args, context, chain_name);
-    if !use_blobs {
-        ui::section("Configuring Calldata DA Mode")?;
-
-        let l1_da_validator = get_l1_da_validator_address(state_manager, chain_name)
-            .await
-            .wrap_err("Failed to get L1 DA validator address")?;
-
-        let tx_hash = configure_l3_da(
-            &normalized_rpc,
-            deployed.chain_admin,
-            deployed.diamond_proxy,
-            l1_da_validator,
-            &governor_key,
-            validator_gas_multiplier,
-            context.logger().as_ref(),
-        )
-        .await
-        .wrap_err("Failed to configure calldata DA mode")?;
-
-        ui::success(format!(
-            "Calldata DA mode configured: {}",
-            ui::green(tx_hash)
-        ))?;
-    }
-
-    // Post-deployment ownership operations (config-driven)
-    let ownership_result = run_post_deploy_ownership(
-        &normalized_rpc,
-        state_manager,
-        chain_name,
-        validator_gas_multiplier,
-        context,
+    // Add validator roles to the final operators
+    let tx_hashes = add_validator_roles(
+        rpc_url,
+        deployed,
+        &operators,
+        governor_key,
+        gas_multiplier,
+        context.logger().as_ref(),
     )
-    .await?;
+    .await
+    .wrap_err("Failed to add validator roles")?;
 
-    // Final success message
+    ui::success(format!(
+        "Validator roles configured: {} transactions confirmed",
+        ui::green(tx_hashes.len())
+    ))?;
+
+    Ok(())
+}
+
+/// Configure calldata DA mode for L3 chains settling on L2.
+///
+/// Switches from blob to calldata DA mode by calling `configure_l3_da` on-chain.
+async fn configure_calldata_da(
+    context: &Context,
+    state_manager: &StateManager,
+    chain_name: &str,
+    rpc_url: &str,
+    deployed: &DeployedContracts,
+    governor_key: &SecretString,
+    gas_multiplier: Option<u64>,
+) -> Result<()> {
+    ui::section("Configuring Calldata DA Mode")?;
+
+    let l1_da_validator = get_l1_da_validator_address(state_manager, chain_name)
+        .await
+        .wrap_err("Failed to get L1 DA validator address")?;
+
+    let tx_hash = configure_l3_da(
+        rpc_url,
+        deployed.chain_admin,
+        deployed.diamond_proxy,
+        l1_da_validator,
+        governor_key,
+        gas_multiplier,
+        context.logger().as_ref(),
+    )
+    .await
+    .wrap_err("Failed to configure calldata DA mode")?;
+
+    ui::success(format!(
+        "Calldata DA mode configured: {}",
+        ui::green(tx_hash)
+    ))?;
+
+    Ok(())
+}
+
+/// Display deployment summary and completion message.
+fn display_deployment_summary(
+    ecosystem_name: &str,
+    chain_name: &str,
+    deployed: &DeployedContracts,
+    ownership_result: &OwnershipOperationResult,
+) -> Result<()> {
     ui::note(
         "Deployment Summary",
         format!(
@@ -1008,7 +1113,6 @@ async fn run_ecosystem_deployment(
         ),
     )?;
 
-    // Update outro based on ownership operations
     let outro_msg = if ownership_result.new_owner_accepted {
         "Deployment complete with ownership transferred and accepted!"
     } else if ownership_result.transferred {

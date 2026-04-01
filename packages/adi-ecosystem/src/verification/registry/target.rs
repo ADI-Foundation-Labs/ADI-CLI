@@ -31,7 +31,6 @@ pub struct VerificationTarget {
 
 impl VerificationTarget {
     /// Create a new verification target.
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         contract_type: ContractType,
         address: Address,
@@ -53,76 +52,25 @@ impl VerificationTarget {
         }
     }
 
-    /// Create a new verification target with proxy info.
-    #[allow(clippy::too_many_arguments)]
-    pub fn new_with_proxy(
-        contract_type: ContractType,
-        address: Address,
-        root_path: &'static str,
-        source_path: &'static str,
-        contract_name: &'static str,
-        is_proxy: bool,
-        proxy_info: Option<ProxyVerificationInfo>,
-    ) -> Self {
-        Self {
-            contract_type,
-            address,
-            root_path,
-            source_path,
-            contract_name,
-            is_proxy,
-            proxy_info,
-            verifier_info: None,
-            chain_admin_info: None,
-        }
+    /// Set proxy verification info.
+    #[must_use]
+    pub fn with_proxy_info(mut self, proxy_info: ProxyVerificationInfo) -> Self {
+        self.proxy_info = Some(proxy_info);
+        self
     }
 
-    /// Create a new verification target with verifier info.
-    #[allow(clippy::too_many_arguments)]
-    pub fn new_with_verifier(
-        contract_type: ContractType,
-        address: Address,
-        root_path: &'static str,
-        source_path: &'static str,
-        contract_name: &'static str,
-        is_proxy: bool,
-        verifier_info: Option<VerifierVerificationInfo>,
-    ) -> Self {
-        Self {
-            contract_type,
-            address,
-            root_path,
-            source_path,
-            contract_name,
-            is_proxy,
-            proxy_info: None,
-            verifier_info,
-            chain_admin_info: None,
-        }
+    /// Set verifier verification info.
+    #[must_use]
+    pub fn with_verifier_info(mut self, verifier_info: VerifierVerificationInfo) -> Self {
+        self.verifier_info = Some(verifier_info);
+        self
     }
 
-    /// Create a new verification target with chain admin info.
-    #[allow(clippy::too_many_arguments)]
-    pub fn new_with_chain_admin(
-        contract_type: ContractType,
-        address: Address,
-        root_path: &'static str,
-        source_path: &'static str,
-        contract_name: &'static str,
-        is_proxy: bool,
-        chain_admin_info: Option<ChainAdminVerificationInfo>,
-    ) -> Self {
-        Self {
-            contract_type,
-            address,
-            root_path,
-            source_path,
-            contract_name,
-            is_proxy,
-            proxy_info: None,
-            verifier_info: None,
-            chain_admin_info,
-        }
+    /// Set chain admin verification info.
+    #[must_use]
+    pub fn with_chain_admin_info(mut self, chain_admin_info: ChainAdminVerificationInfo) -> Self {
+        self.chain_admin_info = Some(chain_admin_info);
+        self
     }
 
     /// Get the full contract path for forge verify-contract.

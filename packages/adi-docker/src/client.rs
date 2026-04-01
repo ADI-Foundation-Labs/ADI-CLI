@@ -81,22 +81,11 @@ impl DockerClient {
         Ok(())
     }
 
-    /// Check if an image exists locally by full URI.
+    /// Pull an image from registry, ensuring the latest version is used.
     ///
-    /// # Arguments
-    ///
-    /// * `image_uri` - The full image URI (e.g., "registry/image:tag").
-    pub async fn image_exists(&self, image_uri: &str) -> Result<bool> {
-        self.logger
-            .debug(&format!("Checking if image exists: {}", image_uri));
-        let image_manager = ImageManager::new(self.inner.clone(), Arc::clone(&self.logger));
-        let exists = image_manager.exists(image_uri).await?;
-        self.logger
-            .debug(&format!("Image {} exists: {}", image_uri, exists));
-        Ok(exists)
-    }
-
-    /// Pull an image from registry if not available locally.
+    /// Always pulls from the registry to check for updates, even if the
+    /// image exists locally. Docker handles layer caching, so this is
+    /// fast when the image is already up to date.
     ///
     /// # Arguments
     ///
@@ -110,9 +99,9 @@ impl DockerClient {
     /// - Image does not exist in registry
     pub async fn pull_image(&self, image_uri: &str) -> Result<()> {
         self.logger
-            .debug(&format!("Ensuring image is available: {}", image_uri));
-        let image_manager = ImageManager::new(self.inner.clone(), Arc::clone(&self.logger));
-        image_manager.pull_if_missing(image_uri).await
+            .debug(&format!("Pulling latest image: {}", image_uri));
+        let image_manager = ImageManager::new(self.inner.clone());
+        image_manager.pull(image_uri).await
     }
 
     /// Get a reference to the inner bollard Docker client.

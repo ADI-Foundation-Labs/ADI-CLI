@@ -48,6 +48,8 @@ pub enum TransferType {
         amount: U256,
         /// Token symbol for display.
         symbol: String,
+        /// Token decimals for display formatting.
+        decimals: u8,
     },
 }
 
@@ -74,20 +76,14 @@ impl Transfer {
         role: WalletRole,
         from: Address,
         to: Address,
-        token_address: Address,
-        amount: U256,
-        symbol: String,
+        transfer_type: TransferType,
         gas_estimate: u64,
     ) -> Self {
         Self {
             role,
             from,
             to,
-            transfer_type: TransferType::Token {
-                token_address,
-                amount,
-                symbol,
-            },
+            transfer_type,
             gas_estimate,
         }
     }
@@ -111,10 +107,15 @@ impl Transfer {
             TransferType::Eth { amount } => {
                 format!("{} ETH to {} ({})", format_eth(*amount), self.to, self.role)
             }
-            TransferType::Token { amount, symbol, .. } => {
+            TransferType::Token {
+                amount,
+                symbol,
+                decimals,
+                ..
+            } => {
                 format!(
                     "{} {} to {} ({})",
-                    format_token(*amount),
+                    format_with_decimals(*amount, usize::from(*decimals)),
                     symbol,
                     self.to,
                     self.role
@@ -127,8 +128,17 @@ impl Transfer {
     pub fn amount_description(&self) -> String {
         match &self.transfer_type {
             TransferType::Eth { amount } => format!("{} ETH", format_eth(*amount)),
-            TransferType::Token { amount, symbol, .. } => {
-                format!("{} {}", format_token(*amount), symbol)
+            TransferType::Token {
+                amount,
+                symbol,
+                decimals,
+                ..
+            } => {
+                format!(
+                    "{} {}",
+                    format_with_decimals(*amount, usize::from(*decimals)),
+                    symbol
+                )
             }
         }
     }
@@ -201,24 +211,160 @@ pub fn build_token_transfer_calldata(to: Address, amount: U256) -> Bytes {
 /// Number of decimal places to display.
 const DISPLAY_DECIMALS: usize = 4;
 
-/// Format ETH amount for display (converts from wei to ETH).
-fn format_eth(amount: U256) -> String {
+/// Format a token amount for display given the number of decimals.
+///
+/// Converts from smallest units to human-readable form with up to
+/// [`DISPLAY_DECIMALS`] fractional digits.
+fn format_with_decimals(amount: U256, decimals: usize) -> String {
     let base = U256::from(10);
-    let wei_per_eth = base.pow(U256::from(ETH_DECIMALS));
-    let decimal_divisor = base.pow(U256::from(ETH_DECIMALS - DISPLAY_DECIMALS));
+    let unit = base.pow(U256::from(decimals));
+    let display_dec = DISPLAY_DECIMALS.min(decimals);
+    let decimal_divisor = base.pow(U256::from(decimals - display_dec));
 
-    let eth = amount / wei_per_eth;
-    let remainder = amount % wei_per_eth;
+    let whole = amount / unit;
+    let remainder = amount % unit;
 
     if remainder.is_zero() {
-        format!("{eth}")
+        format!("{whole}")
     } else {
-        let decimals = remainder / decimal_divisor;
-        format!("{eth}.{decimals:0width$}", width = DISPLAY_DECIMALS)
+        let frac = remainder / decimal_divisor;
+        format!("{whole}.{frac:0width$}", width = display_dec)
     }
 }
 
-/// Format token amount for display (assumes 18 decimals).
-fn format_token(amount: U256) -> String {
-    format_eth(amount)
+/// Format ETH amount for display (converts from wei to ETH).
+fn format_eth(amount: U256) -> String {
+    format_with_decimals(amount, ETH_DECIMALS)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use alloy_primitives::Address;
+
+    #[test]
+    fn format_with_decimals_18_whole() {
+        // 1 ETH = 10^18 wei
+        let one_eth = U256::from(10).pow(U256::from(18));
+        assert_eq!(format_with_decimals(one_eth, 18), "1");
+    }
+
+    #[test]
+    fn format_with_decimals_18_fractional() {
+        // 1.5 ETH
+        let amount = U256::from(15) * U256::from(10).pow(U256::from(17));
+        assert_eq!(format_with_decimals(amount, 18), "1.5000");
+    }
+
+    #[test]
+    fn format_with_decimals_18_zero() {
+        assert_eq!(format_with_decimals(U256::ZERO, 18), "0");
+    }
+
+    #[test]
+    fn format_with_decimals_6_usdc() {
+        // 100 USDC = 100_000_000 (6 decimals)
+        let amount = U256::from(100_000_000u64);
+        assert_eq!(format_with_decimals(amount, 6), "100");
+    }
+
+    #[test]
+    fn format_with_decimals_6_fractional() {
+        // 1.5 USDC = 1_500_000
+        let amount = U256::from(1_500_000u64);
+        assert_eq!(format_with_decimals(amount, 6), "1.5000");
+    }
+
+    #[test]
+    fn format_with_decimals_8_btc() {
+        // 1 WBTC = 100_000_000 (8 decimals)
+        let amount = U256::from(100_000_000u64);
+        assert_eq!(format_with_decimals(amount, 8), "1");
+    }
+
+    #[test]
+    fn format_with_decimals_8_fractional() {
+        // 0.1234 WBTC = 12_340_000
+        let amount = U256::from(12_340_000u64);
+        assert_eq!(format_with_decimals(amount, 8), "0.1234");
+    }
+
+    #[test]
+    fn format_eth_delegates_correctly() {
+        let one_eth = U256::from(10).pow(U256::from(18));
+        assert_eq!(format_eth(one_eth), "1");
+    }
+
+    #[test]
+    fn transfer_description_eth() {
+        let addr = Address::ZERO;
+        let t = Transfer::eth(
+            WalletRole::Deployer,
+            addr,
+            addr,
+            U256::from(10).pow(U256::from(18)),
+            21000,
+        );
+        assert!(t.description().contains("ETH"));
+        assert!(t.description().contains("deployer"));
+    }
+
+    #[test]
+    fn transfer_amount_description_eth() {
+        let addr = Address::ZERO;
+        let t = Transfer::eth(
+            WalletRole::Deployer,
+            addr,
+            addr,
+            U256::from(10).pow(U256::from(18)),
+            21000,
+        );
+        assert_eq!(t.amount_description(), "1 ETH");
+    }
+
+    #[test]
+    fn transfer_amount_description_token_6_decimals() {
+        let addr = Address::ZERO;
+        let t = Transfer::token(
+            WalletRole::Governor,
+            addr,
+            addr,
+            TransferType::Token {
+                token_address: addr,
+                amount: U256::from(5_000_000u64), // 5 USDC (6 decimals)
+                symbol: "USDC".to_string(),
+                decimals: 6,
+            },
+            60000,
+        );
+        assert_eq!(t.amount_description(), "5 USDC");
+    }
+
+    #[test]
+    fn transfer_is_eth() {
+        let addr = Address::ZERO;
+        let eth = Transfer::eth(WalletRole::Deployer, addr, addr, U256::from(1), 21000);
+        let tok = Transfer::token(
+            WalletRole::Governor,
+            addr,
+            addr,
+            TransferType::Token {
+                token_address: addr,
+                amount: U256::from(1),
+                symbol: "T".to_string(),
+                decimals: 18,
+            },
+            60000,
+        );
+        assert!(eth.is_eth());
+        assert!(!tok.is_eth());
+    }
+
+    #[test]
+    fn transfer_amount() {
+        let addr = Address::ZERO;
+        let eth = Transfer::eth(WalletRole::Deployer, addr, addr, U256::from(42), 21000);
+        assert_eq!(eth.amount(), U256::from(42));
+    }
 }

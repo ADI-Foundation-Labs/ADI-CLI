@@ -27,14 +27,10 @@ const DEFAULT_REGISTRY: &str = "https://index.docker.io/v1/";
 ///
 /// The registry hostname or default Docker Hub registry.
 fn extract_registry(image_uri: &str) -> &str {
-    // Split by '/' to get path segments
-    let parts: Vec<&str> = image_uri.split('/').collect();
-
-    // If first part contains '.', it's a registry hostname
+    // If first path segment contains '.', it's a registry hostname
     // (ports like :5000 would come after the hostname which contains '.')
-    if let Some(first) = parts.first() {
+    if let Some(first) = image_uri.split('/').next() {
         if first.contains('.') {
-            // Return the first segment (hostname potentially with port)
             return first;
         }
     }
@@ -64,7 +60,10 @@ pub(crate) fn get_credentials_for_image(image_uri: &str) -> Option<DockerCredent
         Ok(credential) => Some(convert_credential(credential)),
         Err(CredentialRetrievalError::NoCredentialConfigured) => None,
         Err(CredentialRetrievalError::ConfigNotFound) => None,
-        Err(_) => None,
+        Err(e) => {
+            log::debug!("Failed to retrieve credentials for {}: {:?}", registry, e);
+            None
+        }
     }
 }
 

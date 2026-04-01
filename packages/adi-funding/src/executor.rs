@@ -27,6 +27,10 @@ pub struct FundingResult {
 
 impl FundingResult {
     /// Check if all transfers were successful.
+    ///
+    /// The executor uses abort-on-failure behavior (stops on first error),
+    /// so when `execute()` returns `Ok`, all planned transfers succeeded.
+    /// Returns `false` only when zero transfers were executed.
     pub fn is_success(&self) -> bool {
         self.successful > 0
     }
@@ -130,15 +134,14 @@ impl FundingExecutor {
                 .await;
 
             // Execute the transfer (abort on failure)
+            let ctx = TransferContext {
+                chain_id,
+                nonce,
+                gas_price: plan.gas_price,
+                index,
+            };
             let (tx_hash, gas_used) = self
-                .execute_transfer(
-                    &signing_provider,
-                    transfer,
-                    chain_id,
-                    nonce,
-                    plan.gas_price,
-                    index,
-                )
+                .execute_transfer(&signing_provider, transfer, &ctx)
                 .await?;
 
             self.event_handler
@@ -174,20 +177,17 @@ impl FundingExecutor {
         &self,
         provider: &P,
         transfer: &Transfer,
-        chain_id: u64,
-        nonce: u64,
-        gas_price: u128,
-        index: usize,
+        ctx: &TransferContext,
     ) -> Result<(B256, u64)> {
         let tx = match &transfer.transfer_type {
             TransferType::Eth { amount } => TransactionRequest::default()
                 .with_from(transfer.from)
                 .with_to(transfer.to)
                 .with_value(*amount)
-                .with_nonce(nonce)
+                .with_nonce(ctx.nonce)
                 .with_gas_limit(transfer.gas_estimate)
-                .with_gas_price(gas_price)
-                .with_chain_id(chain_id),
+                .with_gas_price(ctx.gas_price)
+                .with_chain_id(ctx.chain_id),
             TransferType::Token {
                 token_address,
                 amount,
@@ -199,10 +199,10 @@ impl FundingExecutor {
                     .with_from(transfer.from)
                     .with_to(*token_address)
                     .with_input(calldata)
-                    .with_nonce(nonce)
+                    .with_nonce(ctx.nonce)
                     .with_gas_limit(transfer.gas_estimate)
-                    .with_gas_price(gas_price)
-                    .with_chain_id(chain_id)
+                    .with_gas_price(ctx.gas_price)
+                    .with_chain_id(ctx.chain_id)
             }
         };
 
@@ -219,7 +219,10 @@ impl FundingExecutor {
         let tx_hash = *pending.tx_hash();
 
         self.event_handler
-            .on_event(FundingEvent::TransferSubmitted { index, tx_hash })
+            .on_event(FundingEvent::TransferSubmitted {
+                index: ctx.index,
+                tx_hash,
+            })
             .await;
 
         // Wait for confirmation
@@ -240,4 +243,16 @@ impl FundingExecutor {
 
         Ok((tx_hash, receipt.gas_used))
     }
+}
+
+/// Context for executing a single transfer.
+struct TransferContext {
+    /// Chain ID for transaction signing.
+    chain_id: u64,
+    /// Current nonce for the funder address.
+    nonce: u64,
+    /// Gas price to use.
+    gas_price: u128,
+    /// Transfer index (0-based) for event reporting.
+    index: usize,
 }

@@ -71,6 +71,10 @@ pub enum StateError {
         source: std::io::Error,
     },
 
+    /// Invalid backend configuration.
+    #[error("Invalid backend configuration: {0}")]
+    InvalidConfig(String),
+
     /// Chain not found in ecosystem.
     #[error("Chain '{name}' not found in ecosystem")]
     ChainNotFound {

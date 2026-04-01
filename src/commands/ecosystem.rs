@@ -473,139 +473,64 @@ fn count_ecosystem_contracts(contracts: &EcosystemContracts) -> usize {
     count
 }
 
+/// Count non-None addresses in a slice of optional addresses.
+fn count_some(addrs: &[Option<Address>]) -> usize {
+    addrs.iter().filter(|a| a.is_some()).count()
+}
+
 /// Count non-None addresses in ZkSyncOsCtm.
 fn count_ctm_contracts(ctm: &ZkSyncOsCtm) -> usize {
-    let mut count = 0;
+    let core = count_some(&[
+        ctm.governance,
+        ctm.chain_admin,
+        ctm.proxy_admin,
+        ctm.state_transition_proxy_addr,
+        ctm.validator_timelock_addr,
+        ctm.server_notifier_proxy_addr,
+        ctm.verifier_addr,
+        ctm.l1_rollup_da_manager,
+        ctm.l1_bytecodes_supplier_addr,
+        ctm.l1_wrapped_base_token_store,
+        ctm.default_upgrade_addr,
+        ctm.genesis_upgrade_addr,
+        ctm.rollup_l1_da_validator_addr,
+        ctm.no_da_validium_l1_validator_addr,
+        ctm.blobs_zksync_os_l1_da_validator_addr,
+        ctm.avail_l1_da_validator_addr,
+    ]);
 
-    // Core CTM addresses
-    if ctm.governance.is_some() {
-        count += 1;
-    }
-    if ctm.chain_admin.is_some() {
-        count += 1;
-    }
-    if ctm.proxy_admin.is_some() {
-        count += 1;
-    }
-    if ctm.state_transition_proxy_addr.is_some() {
-        count += 1;
-    }
-    if ctm.validator_timelock_addr.is_some() {
-        count += 1;
-    }
-    if ctm.server_notifier_proxy_addr.is_some() {
-        count += 1;
-    }
-    if ctm.verifier_addr.is_some() {
-        count += 1;
-    }
-    if ctm.l1_rollup_da_manager.is_some() {
-        count += 1;
-    }
-    if ctm.l1_bytecodes_supplier_addr.is_some() {
-        count += 1;
-    }
-    if ctm.l1_wrapped_base_token_store.is_some() {
-        count += 1;
-    }
-    if ctm.default_upgrade_addr.is_some() {
-        count += 1;
-    }
-    if ctm.genesis_upgrade_addr.is_some() {
-        count += 1;
-    }
-    if ctm.rollup_l1_da_validator_addr.is_some() {
-        count += 1;
-    }
-    if ctm.no_da_validium_l1_validator_addr.is_some() {
-        count += 1;
-    }
-    if ctm.blobs_zksync_os_l1_da_validator_addr.is_some() {
-        count += 1;
-    }
-    if ctm.avail_l1_da_validator_addr.is_some() {
-        count += 1;
-    }
+    let facets = count_some(&[
+        ctm.admin_facet_addr,
+        ctm.executor_facet_addr,
+        ctm.mailbox_facet_addr,
+        ctm.getters_facet_addr,
+        ctm.diamond_init_addr,
+    ]);
 
-    // Diamond facets
-    if ctm.admin_facet_addr.is_some() {
-        count += 1;
-    }
-    if ctm.executor_facet_addr.is_some() {
-        count += 1;
-    }
-    if ctm.mailbox_facet_addr.is_some() {
-        count += 1;
-    }
-    if ctm.getters_facet_addr.is_some() {
-        count += 1;
-    }
-    if ctm.diamond_init_addr.is_some() {
-        count += 1;
-    }
+    let impls = count_some(&[
+        ctm.bridgehub_impl_addr,
+        ctm.message_root_impl_addr,
+        ctm.native_token_vault_impl_addr,
+        ctm.stm_deployment_tracker_impl_addr,
+        ctm.chain_type_manager_impl_addr,
+        ctm.server_notifier_impl_addr,
+        ctm.erc20_bridge_impl_addr,
+        ctm.shared_bridge_impl_addr,
+        ctm.l1_nullifier_impl_addr,
+        ctm.validator_timelock_impl_addr,
+    ]);
 
-    // Implementation contracts
-    if ctm.bridgehub_impl_addr.is_some() {
-        count += 1;
-    }
-    if ctm.message_root_impl_addr.is_some() {
-        count += 1;
-    }
-    if ctm.native_token_vault_impl_addr.is_some() {
-        count += 1;
-    }
-    if ctm.stm_deployment_tracker_impl_addr.is_some() {
-        count += 1;
-    }
-    if ctm.chain_type_manager_impl_addr.is_some() {
-        count += 1;
-    }
-    if ctm.server_notifier_impl_addr.is_some() {
-        count += 1;
-    }
-    if ctm.erc20_bridge_impl_addr.is_some() {
-        count += 1;
-    }
-    if ctm.shared_bridge_impl_addr.is_some() {
-        count += 1;
-    }
-    if ctm.l1_nullifier_impl_addr.is_some() {
-        count += 1;
-    }
-    if ctm.validator_timelock_impl_addr.is_some() {
-        count += 1;
-    }
+    let other = count_some(&[
+        ctm.verifier_fflonk_addr,
+        ctm.verifier_plonk_addr,
+        ctm.bridged_standard_erc20_addr,
+        ctm.bridged_token_beacon_addr,
+        ctm.dummy_avail_bridge_addr,
+        ctm.dummy_vector_x_addr,
+        ctm.server_notifier_proxy_admin_addr,
+    ]);
 
-    // Verifier components
-    if ctm.verifier_fflonk_addr.is_some() {
-        count += 1;
-    }
-    if ctm.verifier_plonk_addr.is_some() {
-        count += 1;
-    }
-
-    // Bridge token contracts
-    if ctm.bridged_standard_erc20_addr.is_some() {
-        count += 1;
-    }
-    if ctm.bridged_token_beacon_addr.is_some() {
-        count += 1;
-    }
-
-    // Avail test contracts
-    if ctm.dummy_avail_bridge_addr.is_some() {
-        count += 1;
-    }
-    if ctm.dummy_vector_x_addr.is_some() {
-        count += 1;
-    }
-
-    // Server notifier proxy admin
-    if ctm.server_notifier_proxy_admin_addr.is_some() {
-        count += 1;
-    }
-
-    count
+    core + facets + impls + other
 }
 
 /// Count unique chain-specific contract addresses.
@@ -918,7 +843,7 @@ pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
     ui::intro("ADI CLI")?;
 
     let ecosystem_name = resolve_ecosystem_name(args.ecosystem_name.as_ref(), context.config())?;
-    let state_manager = create_state_manager_with_context(&ecosystem_name, context);
+    let state_manager = create_state_manager_with_context(&ecosystem_name, context)?;
 
     // Check if ecosystem exists
     if !ecosystem_exists(&state_manager).await? {

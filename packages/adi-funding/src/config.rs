@@ -18,6 +18,7 @@ fn eth_tenths(tenths: u64) -> U256 {
 
 /// Default ETH amounts per wallet role (in wei).
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct DefaultAmounts {
     /// Deployer: 1 ETH.
     pub deployer_eth: U256,
@@ -255,5 +256,99 @@ impl FundingConfig {
     pub fn with_amounts(mut self, amounts: DefaultAmounts) -> Self {
         self.default_amounts = amounts;
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn governor_cgt_amount_18_decimals() {
+        let amounts = DefaultAmounts::default();
+        // 5.0 tokens with 18 decimals = 5 * 10^18
+        let result = amounts.governor_cgt_amount(18);
+        let expected = U256::from(5) * U256::from(10).pow(U256::from(18));
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn governor_cgt_amount_6_decimals() {
+        let amounts = DefaultAmounts::default();
+        // 5.0 tokens with 6 decimals = 5_000_000
+        let result = amounts.governor_cgt_amount(6);
+        assert_eq!(result, U256::from(5_000_000u64));
+    }
+
+    #[test]
+    fn governor_cgt_amount_zero_units() {
+        let amounts = DefaultAmounts {
+            governor_cgt_units: 0.0,
+            ..DefaultAmounts::default()
+        };
+        assert_eq!(amounts.governor_cgt_amount(18), U256::ZERO);
+    }
+
+    #[test]
+    fn governor_cgt_amount_negative_units() {
+        let amounts = DefaultAmounts {
+            governor_cgt_units: -1.0,
+            ..DefaultAmounts::default()
+        };
+        assert_eq!(amounts.governor_cgt_amount(18), U256::ZERO);
+    }
+
+    #[test]
+    fn wallet_role_display_name_all_variants() {
+        assert_eq!(WalletRole::Deployer.display_name(), "deployer");
+        assert_eq!(WalletRole::Operator.display_name(), "operator");
+        assert_eq!(WalletRole::BlobOperator.display_name(), "blob_operator");
+        assert_eq!(WalletRole::ProveOperator.display_name(), "prove_operator");
+        assert_eq!(
+            WalletRole::ExecuteOperator.display_name(),
+            "execute_operator"
+        );
+        assert_eq!(WalletRole::FeeAccount.display_name(), "fee_account");
+        assert_eq!(WalletRole::Governor.display_name(), "governor");
+        assert_eq!(
+            WalletRole::TokenMultiplierSetter.display_name(),
+            "token_multiplier_setter"
+        );
+    }
+
+    #[test]
+    fn default_amounts_non_zero() {
+        let amounts = DefaultAmounts::default();
+        assert!(!amounts.deployer_eth.is_zero());
+        assert!(!amounts.governor_eth.is_zero());
+        assert!(!amounts.operator_eth.is_zero());
+        assert!(!amounts.blob_operator_eth.is_zero());
+        assert!(amounts.fee_account_eth.is_zero()); // Intentionally zero
+        assert!(!amounts.token_multiplier_setter_eth.is_zero());
+    }
+
+    #[test]
+    fn funding_target_with_token() {
+        let target = FundingTarget::new(
+            WalletRole::Governor,
+            WalletSource::Ecosystem,
+            Address::ZERO,
+            U256::from(1),
+        )
+        .with_token(U256::from(500));
+
+        assert_eq!(target.token_amount, Some(U256::from(500)));
+    }
+
+    #[test]
+    fn funding_config_builder() {
+        let config = FundingConfig::new("http://localhost:8545")
+            .with_gas_multiplier(150)
+            .with_token(Address::ZERO, Some("USDC".to_string()));
+
+        assert_eq!(config.rpc_url, "http://localhost:8545");
+        assert_eq!(config.gas_price_multiplier, 150);
+        assert_eq!(config.token_address, Some(Address::ZERO));
+        assert_eq!(config.token_symbol, Some("USDC".to_string()));
     }
 }

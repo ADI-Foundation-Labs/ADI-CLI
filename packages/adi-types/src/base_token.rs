@@ -25,6 +25,7 @@ pub const ETH_TOKEN_ADDRESS_STR: &str = "0x0000000000000000000000000000000000000
 ///   denominator: 1
 /// ```
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub struct BaseToken {
     /// Token contract address on settlement layer.
     pub address: Address,

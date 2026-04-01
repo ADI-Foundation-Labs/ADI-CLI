@@ -4,6 +4,8 @@
 
 use std::path::{Path, PathBuf};
 
+use alloy_primitives::Address;
+
 use crate::chain_toml::PreviousUpgradeValues;
 use crate::error::{Result, UpgradeError};
 
@@ -85,18 +87,20 @@ fn parse_upgrade_yaml(content: &str) -> PreviousUpgradeValues {
 }
 
 /// Extract an address value from YAML (skips zero addresses).
-fn extract_yaml_address(content: &str, key: &str) -> Option<String> {
+fn extract_yaml_address(content: &str, key: &str) -> Option<Address> {
     for line in content.lines() {
         let trimmed = line.trim();
         if !trimmed.contains(key) {
             continue;
         }
-        if let Some(addr) = extract_hex_from_line(trimmed) {
+        if let Some(addr_hex) = extract_hex_from_line(trimmed) {
             // Skip zero addresses
-            if addr.trim_start_matches("0x").chars().all(|c| c == '0') {
+            if addr_hex.trim_start_matches("0x").chars().all(|c| c == '0') {
                 continue;
             }
-            return Some(addr);
+            if let Ok(addr) = addr_hex.parse::<Address>() {
+                return Some(addr);
+            }
         }
     }
     None
@@ -132,6 +136,8 @@ fn extract_hex_from_line(line: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    use alloy_primitives::address;
+
     use super::*;
 
     #[test]
@@ -152,10 +158,10 @@ mod tests {
 
     #[test]
     fn test_extract_yaml_address_returns_nonzero() {
-        let content = "admin_facet_addr: \"0xABCDEF1234567890\"";
+        let content = "admin_facet_addr: \"0x1111111111111111111111111111111111111111\"";
         assert_eq!(
             extract_yaml_address(content, "admin_facet_addr"),
-            Some("0xABCDEF1234567890".to_string())
+            Some(address!("1111111111111111111111111111111111111111"))
         );
     }
 

@@ -126,18 +126,17 @@ impl ExplorerClient {
                 tokio::time::sleep(Duration::from_millis(delay)).await;
             }
 
-            match self.execute_status_check(&url).await {
-                Ok(status) => return Ok(status),
-                Err(VerificationError::RateLimited) => {
-                    self.logger.warning(&format!(
-                        "Rate limited, retrying ({}/{})",
-                        attempt + 1,
-                        MAX_RETRIES
-                    ));
-                    last_error = Some(VerificationError::RateLimited);
-                }
-                Err(e) => return Err(e),
+            let result = self.execute_status_check(&url).await;
+            if let Err(VerificationError::RateLimited) = &result {
+                self.logger.warning(&format!(
+                    "Rate limited, retrying ({}/{})",
+                    attempt + 1,
+                    MAX_RETRIES
+                ));
+                last_error = Some(VerificationError::RateLimited);
+                continue;
             }
+            return result;
         }
 
         Err(last_error.unwrap_or(VerificationError::RateLimited))

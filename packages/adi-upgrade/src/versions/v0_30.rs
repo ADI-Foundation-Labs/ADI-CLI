@@ -1,5 +1,7 @@
 //! Version handlers for v0.30.x protocol versions.
 
+use alloy_primitives::{address, Address};
+
 use super::{PostUpgradeHook, VersionHandler};
 use crate::chain_toml::{
     ChainTomlConfig, ContractsSection, GatewaySection, GatewayStateTransitionSection,
@@ -48,7 +50,7 @@ impl VersionHandler for V0_30_1Handler {
             era_chain_id: 0, // Set dynamically
             testnet_verifier: false,
             governance_upgrade_timer_initial_delay: 0,
-            owner_address: String::new(), // Set dynamically
+            owner_address: Address::ZERO, // Set dynamically
             support_l2_legacy_shared_bridge_test: false,
             old_protocol_version: "0x1e00000000".to_string(),
             priority_txs_l2_gas_limit: 2000000,
@@ -59,7 +61,7 @@ impl VersionHandler for V0_30_1Handler {
                 governance_min_delay: 0,
                 max_number_of_chains: 100,
                 create2_factory_salt: String::new(), // Set dynamically
-                create2_factory_addr: String::new(), // Set dynamically
+                create2_factory_addr: Address::ZERO, // Set dynamically
                 validator_timelock_execution_delay: 0,
                 genesis_root: "0x423c107626aff95d3d086eabd92132dc9485e021ae3cb4c7735d5e963578e3d0"
                     .to_string(),
@@ -85,46 +87,45 @@ impl VersionHandler for V0_30_1Handler {
                     "0x0000000000000000000000000000000000000000000000000000000000000001".to_string(),
                 evm_emulator_hash:
                     "0x0000000000000000000000000000000000000000000000000000000000000001".to_string(),
-                bridgehub_proxy_address: String::new(), // Set dynamically
-                rollup_da_manager: "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45".to_string(),
-                governance_security_council_address: "0xed04b1ac422251851a3EC953Ff4395e5c2443647"
-                    .to_string(),
+                bridgehub_proxy_address: Address::ZERO, // Set dynamically
+                rollup_da_manager: address!("E689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"),
+                governance_security_council_address: address!(
+                    "ed04b1ac422251851a3EC953Ff4395e5c2443647"
+                ),
                 latest_protocol_version: "0x1e00000001".to_string(),
-                l1_bytecodes_supplier_addr: "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
-                    .to_string(),
-                protocol_upgrade_handler_proxy_address:
-                    "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3".to_string(),
-                protocol_upgrade_handler_implementation_address:
-                    "0x36625Bd3dDB469377C6e9893712158cA3c0cC14B".to_string(),
+                l1_bytecodes_supplier_addr: address!("C9F20FC268Fc3e0e597660550033Bf2C24218fd8"),
+                protocol_upgrade_handler_proxy_address: address!(
+                    "E30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3"
+                ),
+                protocol_upgrade_handler_implementation_address: address!(
+                    "36625Bd3dDB469377C6e9893712158cA3c0cC14B"
+                ),
             },
             tokens: TokensSection {
-                token_weth_address: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2".to_string(),
+                token_weth_address: address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"),
             },
             gateway: GatewaySection {
                 chain_id: 0, // Set dynamically
                 gateway_state_transition: GatewayStateTransitionSection {
-                    chain_type_manager_proxy_addr: "0x0000000000000000000000000000000000000000"
-                        .to_string(),
-                    rollup_da_manager: "0x0000000000000000000000000000000000000000".to_string(),
-                    chain_type_manager_proxy_admin: "0x0000000000000000000000000000000000000000"
-                        .to_string(),
-                    rollup_sl_da_validator: "0x0000000000000000000000000000000000000000"
-                        .to_string(),
+                    chain_type_manager_proxy_addr: Address::ZERO,
+                    rollup_da_manager: Address::ZERO,
+                    chain_type_manager_proxy_admin: Address::ZERO,
+                    rollup_sl_da_validator: Address::ZERO,
                 },
             },
             state_transition: StateTransitionSection {
-                admin_facet_addr: String::new(), // Set from previous upgrade
-                diamond_init_addr: String::new(),
-                executor_facet_addr: String::new(),
-                genesis_upgrade_addr: String::new(),
-                getters_facet_addr: String::new(),
-                mailbox_facet_addr: String::new(),
+                admin_facet_addr: Address::ZERO, // Set from previous upgrade
+                diamond_init_addr: Address::ZERO,
+                executor_facet_addr: Address::ZERO,
+                genesis_upgrade_addr: Address::ZERO,
+                getters_facet_addr: Address::ZERO,
+                mailbox_facet_addr: Address::ZERO,
                 force_deployments_data: String::new(),
             },
             zksync_os: ZkSyncOsSection {
                 sample_chain_id: 0,                   // Set dynamically
-                optional_ctm_address: String::new(),  // Set dynamically
-                current_dual_verifier: String::new(), // Set dynamically
+                optional_ctm_address: Address::ZERO,  // Set dynamically
+                current_dual_verifier: Address::ZERO, // Set dynamically
             },
         }
     }

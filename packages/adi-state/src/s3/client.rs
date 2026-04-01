@@ -7,11 +7,12 @@
 //! enabling multi-tenant bucket usage with clear folder separation.
 
 use crate::error::{Result, StateError};
-use adi_types::Logger;
 use s3::bucket::Bucket;
 use s3::creds::Credentials;
 use s3::region::Region;
-use std::sync::Arc;
+
+/// HTTP 404 Not Found status code.
+const HTTP_NOT_FOUND: u16 = 404;
 
 /// Configuration for S3 synchronization.
 #[derive(Clone, Debug)]
@@ -34,8 +35,6 @@ pub struct S3Config {
 pub struct S3Client {
     bucket: Box<Bucket>,
     key_prefix: String,
-    #[allow(dead_code)]
-    logger: Arc<dyn Logger>,
 }
 
 impl S3Client {
@@ -47,12 +46,11 @@ impl S3Client {
     /// # Arguments
     ///
     /// * `config` - S3 configuration with bucket, region, credentials, and tenant_id
-    /// * `logger` - Logger instance for debug output
     ///
     /// # Errors
     ///
     /// Returns error if client initialization fails.
-    pub async fn new(config: S3Config, logger: Arc<dyn Logger>) -> Result<Self> {
+    pub async fn new(config: S3Config) -> Result<Self> {
         let credentials = Credentials::new(
             Some(&config.access_key_id),
             Some(&config.secret_access_key),
@@ -67,7 +65,6 @@ impl S3Client {
 
         // Use tenant_id as key prefix for multi-tenant bucket usage
         let key_prefix = format!("{}/", config.tenant_id);
-        logger.debug(&format!("S3 key prefix: {}", key_prefix));
 
         // Determine region: custom endpoint or standard AWS region
         let region = if let Some(endpoint) = &config.endpoint_url {
@@ -92,11 +89,7 @@ impl S3Client {
             bucket = bucket.with_path_style();
         }
 
-        Ok(Self {
-            bucket,
-            key_prefix,
-            logger,
-        })
+        Ok(Self { bucket, key_prefix })
     }
 
     /// Get the full S3 key with prefix.
@@ -174,20 +167,15 @@ impl S3Client {
     pub async fn exists(&self, key: &str) -> Result<bool> {
         let full_key = self.full_key(key);
 
-        match self.bucket.head_object(&full_key).await {
-            Ok(_) => Ok(true),
-            Err(e) => {
-                // Check if it's a "not found" error (HTTP 404)
-                let error_str = e.to_string();
-                if error_str.contains("404") || error_str.contains("NoSuchKey") {
-                    Ok(false)
-                } else {
-                    Err(StateError::S3DownloadFailed {
-                        key: full_key,
-                        reason: error_str,
-                    })
-                }
-            }
-        }
+        let (_, status) =
+            self.bucket
+                .head_object(&full_key)
+                .await
+                .map_err(|e| StateError::S3DownloadFailed {
+                    key: full_key,
+                    reason: e.to_string(),
+                })?;
+
+        Ok(status != HTTP_NOT_FOUND)
     }
 }

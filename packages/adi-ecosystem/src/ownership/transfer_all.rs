@@ -12,6 +12,7 @@ use super::context::build_signing_context;
 use super::transfer::{
     transfer_bridged_token_beacon, transfer_chain_chain_admin, transfer_chain_governance,
     transfer_ecosystem_chain_admin, transfer_governance, transfer_validator_timelock,
+    TransferContext,
 };
 use super::types::OwnershipSummary;
 
@@ -47,10 +48,11 @@ pub async fn transfer_all_ownership(
     gas_multiplier: Option<u64>,
     logger: &dyn Logger,
 ) -> OwnershipSummary {
-    let mut ctx = match build_signing_context(rpc_url, governor_key, gas_multiplier, logger).await {
-        Ok(c) => c,
-        Err(summary) => return summary,
-    };
+    let mut signing_ctx =
+        match build_signing_context(rpc_url, governor_key, gas_multiplier, logger).await {
+            Ok(c) => c,
+            Err(summary) => return summary,
+        };
 
     let green = Style::new().green();
     logger.info(&format!(
@@ -58,67 +60,28 @@ pub async fn transfer_all_ownership(
         green.apply_to(new_owner)
     ));
 
+    let mut ctx = TransferContext {
+        governor: signing_ctx.governor_address,
+        new_owner,
+        chain_id: signing_ctx.chain_id,
+        nonce: &mut signing_ctx.nonce,
+        gas_price: signing_ctx.gas_price,
+        logger,
+    };
+
     let mut results = Vec::new();
 
     // 1. Transfer Governance
-    results.push(
-        transfer_governance(
-            &ctx.provider,
-            contracts,
-            ctx.governor_address,
-            new_owner,
-            ctx.chain_id,
-            &mut ctx.nonce,
-            ctx.gas_price,
-            logger,
-        )
-        .await,
-    );
+    results.push(transfer_governance(&signing_ctx.provider, contracts, &mut ctx).await);
 
     // 2. Transfer Ecosystem Chain Admin
-    results.push(
-        transfer_ecosystem_chain_admin(
-            &ctx.provider,
-            contracts,
-            ctx.governor_address,
-            new_owner,
-            ctx.chain_id,
-            &mut ctx.nonce,
-            ctx.gas_price,
-            logger,
-        )
-        .await,
-    );
+    results.push(transfer_ecosystem_chain_admin(&signing_ctx.provider, contracts, &mut ctx).await);
 
     // 3. Transfer Bridged Token Beacon (Ownable - immediate transfer)
-    results.push(
-        transfer_bridged_token_beacon(
-            &ctx.provider,
-            contracts,
-            ctx.governor_address,
-            new_owner,
-            ctx.chain_id,
-            &mut ctx.nonce,
-            ctx.gas_price,
-            logger,
-        )
-        .await,
-    );
+    results.push(transfer_bridged_token_beacon(&signing_ctx.provider, contracts, &mut ctx).await);
 
     // 4. Transfer Validator Timelock
-    results.push(
-        transfer_validator_timelock(
-            &ctx.provider,
-            contracts,
-            ctx.governor_address,
-            new_owner,
-            ctx.chain_id,
-            &mut ctx.nonce,
-            ctx.gas_price,
-            logger,
-        )
-        .await,
-    );
+    results.push(transfer_validator_timelock(&signing_ctx.provider, contracts, &mut ctx).await);
 
     OwnershipSummary::new(results)
 }
@@ -152,10 +115,11 @@ pub async fn transfer_chain_ownership(
     gas_multiplier: Option<u64>,
     logger: &dyn Logger,
 ) -> OwnershipSummary {
-    let mut ctx = match build_signing_context(rpc_url, governor_key, gas_multiplier, logger).await {
-        Ok(c) => c,
-        Err(summary) => return summary,
-    };
+    let mut signing_ctx =
+        match build_signing_context(rpc_url, governor_key, gas_multiplier, logger).await {
+            Ok(c) => c,
+            Err(summary) => return summary,
+        };
 
     let green = Style::new().green();
     logger.info(&format!(
@@ -163,37 +127,22 @@ pub async fn transfer_chain_ownership(
         green.apply_to(new_owner)
     ));
 
+    let mut ctx = TransferContext {
+        governor: signing_ctx.governor_address,
+        new_owner,
+        chain_id: signing_ctx.chain_id,
+        nonce: &mut signing_ctx.nonce,
+        gas_price: signing_ctx.gas_price,
+        logger,
+    };
+
     let mut results = Vec::new();
 
     // 1. Transfer Chain Governance
-    results.push(
-        transfer_chain_governance(
-            &ctx.provider,
-            contracts,
-            ctx.governor_address,
-            new_owner,
-            ctx.chain_id,
-            &mut ctx.nonce,
-            ctx.gas_price,
-            logger,
-        )
-        .await,
-    );
+    results.push(transfer_chain_governance(&signing_ctx.provider, contracts, &mut ctx).await);
 
     // 2. Transfer Chain Chain Admin
-    results.push(
-        transfer_chain_chain_admin(
-            &ctx.provider,
-            contracts,
-            ctx.governor_address,
-            new_owner,
-            ctx.chain_id,
-            &mut ctx.nonce,
-            ctx.gas_price,
-            logger,
-        )
-        .await,
-    );
+    results.push(transfer_chain_chain_admin(&signing_ctx.provider, contracts, &mut ctx).await);
 
     OwnershipSummary::new(results)
 }

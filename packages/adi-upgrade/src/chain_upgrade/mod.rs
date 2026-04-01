@@ -13,7 +13,7 @@ use alloy_provider::Provider;
 
 use crate::error::{Result, UpgradeError};
 use crate::onchain;
-use crate::simulation::ToolkitRunnerTrait;
+use crate::runner::ToolkitRunnerTrait;
 
 pub use parse::{extract_chain_calldatas, ChainCalldatas};
 pub use tx::version_to_protocol_uint;
@@ -178,26 +178,40 @@ where
 
     // Step 2: Extract calldatas from zkstack output (find latest zkstack log)
     let zkstack_log_dir = params.state_dir.join("logs");
-    let output_path = std::fs::read_dir(&zkstack_log_dir)
-        .map_err(|e| {
-            UpgradeError::Config(format!(
-                "Failed to read log dir {}: {e}",
-                zkstack_log_dir.display()
-            ))
-        })?
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_name().to_string_lossy().starts_with("zkstack_"))
-        .max_by_key(|e| e.metadata().and_then(|m| m.modified()).ok())
-        .map(|e| e.path())
-        .ok_or_else(|| {
-            UpgradeError::Config(format!(
-                "No zkstack log found in {}",
-                zkstack_log_dir.display()
-            ))
-        })?;
+    let mut entries = tokio::fs::read_dir(&zkstack_log_dir).await.map_err(|e| {
+        UpgradeError::Config(format!(
+            "Failed to read log dir {}: {e}",
+            zkstack_log_dir.display()
+        ))
+    })?;
+
+    let mut latest: Option<(std::path::PathBuf, std::time::SystemTime)> = None;
+    while let Some(entry) = entries
+        .next_entry()
+        .await
+        .map_err(|e| UpgradeError::Config(format!("Failed to read dir entry: {e}")))?
+    {
+        if !entry.file_name().to_string_lossy().starts_with("zkstack_") {
+            continue;
+        }
+        let modified = entry.metadata().await.ok().and_then(|m| m.modified().ok());
+        if let Some(mod_time) = modified {
+            match &latest {
+                Some((_, best)) if mod_time <= *best => {}
+                _ => latest = Some((entry.path(), mod_time)),
+            }
+        }
+    }
+
+    let output_path = latest.map(|(p, _)| p).ok_or_else(|| {
+        UpgradeError::Config(format!(
+            "No zkstack log found in {}",
+            zkstack_log_dir.display()
+        ))
+    })?;
 
     log::info!("Reading zkstack output from {}", output_path.display());
-    let output_content = std::fs::read_to_string(&output_path).map_err(|e| {
+    let output_content = tokio::fs::read_to_string(&output_path).await.map_err(|e| {
         UpgradeError::Config(format!(
             "Failed to read zkstack log at {}: {e}",
             output_path.display()

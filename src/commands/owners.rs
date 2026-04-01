@@ -83,7 +83,7 @@ pub async fn run(args: &OwnersArgs, context: &Context) -> Result<()> {
     ui::info(format!("RPC: {}", ui::green(&rpc_url)))?;
 
     // Create state manager
-    let state_manager = create_state_manager_with_context(&ecosystem_name, context);
+    let state_manager = create_state_manager_with_context(&ecosystem_name, context)?;
 
     // Check if ecosystem exists
     if !state_manager

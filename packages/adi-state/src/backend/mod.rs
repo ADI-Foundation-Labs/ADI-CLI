@@ -6,18 +6,36 @@ mod s3_sync;
 pub use filesystem::FilesystemBackend;
 pub use s3_sync::{S3SyncBackend, S3SyncControl};
 
-use crate::error::Result;
+use crate::error::{Result, StateError};
+use crate::paths;
 use adi_types::{
     Apps, ChainContracts, ChainMetadata, EcosystemContracts, EcosystemMetadata, Erc20Deployments,
     InitialDeployments, Logger, Operators, Wallets,
 };
 use async_trait::async_trait;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+/// Serialize a value to YAML string with path context for errors.
+fn serialize_yaml<T: Serialize>(value: &T, key: &str) -> Result<String> {
+    serde_yaml::to_string(value).map_err(|e| StateError::YamlSerializeFailed {
+        path: PathBuf::from(key),
+        source: e,
+    })
+}
+
+/// Deserialize a YAML string to a typed value with path context for errors.
+fn deserialize_yaml<T: DeserializeOwned>(content: &str, key: &str) -> Result<T> {
+    serde_yaml::from_str(content).map_err(|e| StateError::YamlParseFailed {
+        path: PathBuf::from(key),
+        source: e,
+    })
+}
+
 /// Backend type for state storage.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum BackendType {
     /// Filesystem-based storage (default).
@@ -139,112 +157,229 @@ pub trait StateBackend: Send + Sync {
     // ========== ECOSYSTEM METADATA ==========
 
     /// Read ecosystem metadata (ZkStack.yaml).
-    async fn read_ecosystem_metadata(&self) -> Result<EcosystemMetadata>;
+    async fn read_ecosystem_metadata(&self) -> Result<EcosystemMetadata> {
+        let content = self.read_raw(paths::ECOSYSTEM_METADATA).await?;
+        deserialize_yaml(&content, paths::ECOSYSTEM_METADATA)
+    }
 
     /// Write ecosystem metadata (ZkStack.yaml).
-    async fn write_ecosystem_metadata(&self, data: &EcosystemMetadata) -> Result<()>;
+    async fn write_ecosystem_metadata(&self, data: &EcosystemMetadata) -> Result<()> {
+        let yaml = serialize_yaml(data, paths::ECOSYSTEM_METADATA)?;
+        self.write_raw(paths::ECOSYSTEM_METADATA, &yaml).await
+    }
 
     /// Create ecosystem metadata (ZkStack.yaml).
-    async fn create_ecosystem_metadata(&self, data: &EcosystemMetadata) -> Result<()>;
+    async fn create_ecosystem_metadata(&self, data: &EcosystemMetadata) -> Result<()> {
+        let yaml = serialize_yaml(data, paths::ECOSYSTEM_METADATA)?;
+        self.create_raw(paths::ECOSYSTEM_METADATA, &yaml).await
+    }
 
     // ========== ECOSYSTEM WALLETS ==========
 
     /// Read ecosystem wallets (configs/wallets.yaml).
-    async fn read_ecosystem_wallets(&self) -> Result<Wallets>;
+    async fn read_ecosystem_wallets(&self) -> Result<Wallets> {
+        let key = paths::ecosystem_wallets_path();
+        let content = self.read_raw(&key).await?;
+        deserialize_yaml(&content, &key)
+    }
 
     /// Write ecosystem wallets (configs/wallets.yaml).
-    async fn write_ecosystem_wallets(&self, data: &Wallets) -> Result<()>;
+    async fn write_ecosystem_wallets(&self, data: &Wallets) -> Result<()> {
+        let key = paths::ecosystem_wallets_path();
+        let yaml = serialize_yaml(data, &key)?;
+        self.write_raw(&key, &yaml).await
+    }
 
     /// Create ecosystem wallets (configs/wallets.yaml).
-    async fn create_ecosystem_wallets(&self, data: &Wallets) -> Result<()>;
+    async fn create_ecosystem_wallets(&self, data: &Wallets) -> Result<()> {
+        let key = paths::ecosystem_wallets_path();
+        let yaml = serialize_yaml(data, &key)?;
+        self.create_raw(&key, &yaml).await
+    }
 
     // ========== ECOSYSTEM CONTRACTS ==========
 
     /// Read ecosystem contracts (configs/contracts.yaml).
-    async fn read_ecosystem_contracts(&self) -> Result<EcosystemContracts>;
+    async fn read_ecosystem_contracts(&self) -> Result<EcosystemContracts> {
+        let key = paths::ecosystem_contracts_path();
+        let content = self.read_raw(&key).await?;
+        deserialize_yaml(&content, &key)
+    }
 
     /// Write ecosystem contracts (configs/contracts.yaml).
-    async fn write_ecosystem_contracts(&self, data: &EcosystemContracts) -> Result<()>;
+    async fn write_ecosystem_contracts(&self, data: &EcosystemContracts) -> Result<()> {
+        let key = paths::ecosystem_contracts_path();
+        let yaml = serialize_yaml(data, &key)?;
+        self.write_raw(&key, &yaml).await
+    }
 
     /// Create ecosystem contracts (configs/contracts.yaml).
-    async fn create_ecosystem_contracts(&self, data: &EcosystemContracts) -> Result<()>;
+    async fn create_ecosystem_contracts(&self, data: &EcosystemContracts) -> Result<()> {
+        let key = paths::ecosystem_contracts_path();
+        let yaml = serialize_yaml(data, &key)?;
+        self.create_raw(&key, &yaml).await
+    }
 
     // ========== INITIAL DEPLOYMENTS ==========
 
     /// Read initial deployments (configs/initial_deployments.yaml).
-    async fn read_initial_deployments(&self) -> Result<InitialDeployments>;
+    async fn read_initial_deployments(&self) -> Result<InitialDeployments> {
+        let key = paths::initial_deployments_path();
+        let content = self.read_raw(&key).await?;
+        deserialize_yaml(&content, &key)
+    }
 
     /// Write initial deployments (configs/initial_deployments.yaml).
-    async fn write_initial_deployments(&self, data: &InitialDeployments) -> Result<()>;
+    async fn write_initial_deployments(&self, data: &InitialDeployments) -> Result<()> {
+        let key = paths::initial_deployments_path();
+        let yaml = serialize_yaml(data, &key)?;
+        self.write_raw(&key, &yaml).await
+    }
 
     /// Create initial deployments (configs/initial_deployments.yaml).
-    async fn create_initial_deployments(&self, data: &InitialDeployments) -> Result<()>;
+    async fn create_initial_deployments(&self, data: &InitialDeployments) -> Result<()> {
+        let key = paths::initial_deployments_path();
+        let yaml = serialize_yaml(data, &key)?;
+        self.create_raw(&key, &yaml).await
+    }
 
     // ========== ERC20 DEPLOYMENTS ==========
 
     /// Read ERC20 deployments (configs/erc20_deployments.yaml).
-    async fn read_erc20_deployments(&self) -> Result<Erc20Deployments>;
+    async fn read_erc20_deployments(&self) -> Result<Erc20Deployments> {
+        let key = paths::erc20_deployments_path();
+        let content = self.read_raw(&key).await?;
+        deserialize_yaml(&content, &key)
+    }
 
     /// Write ERC20 deployments (configs/erc20_deployments.yaml).
-    async fn write_erc20_deployments(&self, data: &Erc20Deployments) -> Result<()>;
+    async fn write_erc20_deployments(&self, data: &Erc20Deployments) -> Result<()> {
+        let key = paths::erc20_deployments_path();
+        let yaml = serialize_yaml(data, &key)?;
+        self.write_raw(&key, &yaml).await
+    }
 
     /// Create ERC20 deployments (configs/erc20_deployments.yaml).
-    async fn create_erc20_deployments(&self, data: &Erc20Deployments) -> Result<()>;
+    async fn create_erc20_deployments(&self, data: &Erc20Deployments) -> Result<()> {
+        let key = paths::erc20_deployments_path();
+        let yaml = serialize_yaml(data, &key)?;
+        self.create_raw(&key, &yaml).await
+    }
 
     // ========== APPS ==========
 
     /// Read apps config (configs/apps.yaml).
-    async fn read_apps(&self) -> Result<Apps>;
+    async fn read_apps(&self) -> Result<Apps> {
+        let key = paths::apps_path();
+        let content = self.read_raw(&key).await?;
+        deserialize_yaml(&content, &key)
+    }
 
     /// Write apps config (configs/apps.yaml).
-    async fn write_apps(&self, data: &Apps) -> Result<()>;
+    async fn write_apps(&self, data: &Apps) -> Result<()> {
+        let key = paths::apps_path();
+        let yaml = serialize_yaml(data, &key)?;
+        self.write_raw(&key, &yaml).await
+    }
 
     /// Create apps config (configs/apps.yaml).
-    async fn create_apps(&self, data: &Apps) -> Result<()>;
+    async fn create_apps(&self, data: &Apps) -> Result<()> {
+        let key = paths::apps_path();
+        let yaml = serialize_yaml(data, &key)?;
+        self.create_raw(&key, &yaml).await
+    }
 
     // ========== CHAIN METADATA ==========
 
     /// Read chain metadata (chains/{chain}/ZkStack.yaml).
-    async fn read_chain_metadata(&self, chain: &str) -> Result<ChainMetadata>;
+    async fn read_chain_metadata(&self, chain: &str) -> Result<ChainMetadata> {
+        let key = paths::chain_metadata_path(chain);
+        let content = self.read_raw(&key).await?;
+        deserialize_yaml(&content, &key)
+    }
 
     /// Write chain metadata (chains/{chain}/ZkStack.yaml).
-    async fn write_chain_metadata(&self, chain: &str, data: &ChainMetadata) -> Result<()>;
+    async fn write_chain_metadata(&self, chain: &str, data: &ChainMetadata) -> Result<()> {
+        let key = paths::chain_metadata_path(chain);
+        let yaml = serialize_yaml(data, &key)?;
+        self.write_raw(&key, &yaml).await
+    }
 
     /// Create chain metadata (chains/{chain}/ZkStack.yaml).
-    async fn create_chain_metadata(&self, chain: &str, data: &ChainMetadata) -> Result<()>;
+    async fn create_chain_metadata(&self, chain: &str, data: &ChainMetadata) -> Result<()> {
+        let key = paths::chain_metadata_path(chain);
+        let yaml = serialize_yaml(data, &key)?;
+        self.create_raw(&key, &yaml).await
+    }
 
     // ========== CHAIN WALLETS ==========
 
     /// Read chain wallets (chains/{chain}/configs/wallets.yaml).
-    async fn read_chain_wallets(&self, chain: &str) -> Result<Wallets>;
+    async fn read_chain_wallets(&self, chain: &str) -> Result<Wallets> {
+        let key = paths::chain_wallets_path(chain);
+        let content = self.read_raw(&key).await?;
+        deserialize_yaml(&content, &key)
+    }
 
     /// Write chain wallets (chains/{chain}/configs/wallets.yaml).
-    async fn write_chain_wallets(&self, chain: &str, data: &Wallets) -> Result<()>;
+    async fn write_chain_wallets(&self, chain: &str, data: &Wallets) -> Result<()> {
+        let key = paths::chain_wallets_path(chain);
+        let yaml = serialize_yaml(data, &key)?;
+        self.write_raw(&key, &yaml).await
+    }
 
     /// Create chain wallets (chains/{chain}/configs/wallets.yaml).
-    async fn create_chain_wallets(&self, chain: &str, data: &Wallets) -> Result<()>;
+    async fn create_chain_wallets(&self, chain: &str, data: &Wallets) -> Result<()> {
+        let key = paths::chain_wallets_path(chain);
+        let yaml = serialize_yaml(data, &key)?;
+        self.create_raw(&key, &yaml).await
+    }
 
     // ========== CHAIN CONTRACTS ==========
 
     /// Read chain contracts (chains/{chain}/configs/contracts.yaml).
-    async fn read_chain_contracts(&self, chain: &str) -> Result<ChainContracts>;
+    async fn read_chain_contracts(&self, chain: &str) -> Result<ChainContracts> {
+        let key = paths::chain_contracts_path(chain);
+        let content = self.read_raw(&key).await?;
+        deserialize_yaml(&content, &key)
+    }
 
     /// Write chain contracts (chains/{chain}/configs/contracts.yaml).
-    async fn write_chain_contracts(&self, chain: &str, data: &ChainContracts) -> Result<()>;
+    async fn write_chain_contracts(&self, chain: &str, data: &ChainContracts) -> Result<()> {
+        let key = paths::chain_contracts_path(chain);
+        let yaml = serialize_yaml(data, &key)?;
+        self.write_raw(&key, &yaml).await
+    }
 
     /// Create chain contracts (chains/{chain}/configs/contracts.yaml).
-    async fn create_chain_contracts(&self, chain: &str, data: &ChainContracts) -> Result<()>;
+    async fn create_chain_contracts(&self, chain: &str, data: &ChainContracts) -> Result<()> {
+        let key = paths::chain_contracts_path(chain);
+        let yaml = serialize_yaml(data, &key)?;
+        self.create_raw(&key, &yaml).await
+    }
 
     // ========== CHAIN OPERATORS ==========
 
     /// Read chain operators (chains/{chain}/configs/operators.yaml).
-    async fn read_chain_operators(&self, chain: &str) -> Result<Operators>;
+    async fn read_chain_operators(&self, chain: &str) -> Result<Operators> {
+        let key = paths::chain_operators_path(chain);
+        let content = self.read_raw(&key).await?;
+        deserialize_yaml(&content, &key)
+    }
 
     /// Write chain operators (chains/{chain}/configs/operators.yaml).
-    async fn write_chain_operators(&self, chain: &str, data: &Operators) -> Result<()>;
+    async fn write_chain_operators(&self, chain: &str, data: &Operators) -> Result<()> {
+        let key = paths::chain_operators_path(chain);
+        let yaml = serialize_yaml(data, &key)?;
+        self.write_raw(&key, &yaml).await
+    }
 
     /// Create chain operators (chains/{chain}/configs/operators.yaml).
-    async fn create_chain_operators(&self, chain: &str, data: &Operators) -> Result<()>;
+    async fn create_chain_operators(&self, chain: &str, data: &Operators) -> Result<()> {
+        let key = paths::chain_operators_path(chain);
+        let yaml = serialize_yaml(data, &key)?;
+        self.create_raw(&key, &yaml).await
+    }
 }
 
 /// Create a backend instance based on backend type.
@@ -255,22 +390,20 @@ pub trait StateBackend: Send + Sync {
 /// * `base_path` - Base path for the backend (interpretation depends on type).
 /// * `logger` - Logger for debug messages.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if `FilesystemWithS3Sync` is requested. Use `create_s3_sync_backend` instead.
-#[must_use]
+/// Returns `StateError::InvalidConfig` if `FilesystemWithS3Sync` is requested.
+/// Use `create_s3_sync_backend` instead for S3-synchronized backends.
 pub fn create_backend(
     backend_type: BackendType,
     base_path: &Path,
     logger: Arc<dyn Logger>,
-) -> Box<dyn StateBackend> {
+) -> Result<Box<dyn StateBackend>> {
     match backend_type {
-        BackendType::Filesystem => Box::new(FilesystemBackend::new(base_path, logger)),
-        BackendType::FilesystemWithS3Sync => {
-            // S3SyncBackend requires async initialization
-            // Use create_s3_sync_backend() instead
-            unreachable!("Use create_s3_sync_backend() for FilesystemWithS3Sync backend")
-        }
+        BackendType::Filesystem => Ok(Box::new(FilesystemBackend::new(base_path, logger))),
+        BackendType::FilesystemWithS3Sync => Err(StateError::InvalidConfig(
+            "Use create_s3_sync_backend() for FilesystemWithS3Sync backend".to_string(),
+        )),
     }
 }
 
