@@ -1,7 +1,6 @@
 //! Image pulling and management.
 
 use crate::error::{DockerError, Result};
-use adi_types::Logger;
 use bollard::image::CreateImageOptions;
 use bollard::models::CreateImageInfo;
 use bollard::Docker;
@@ -9,7 +8,6 @@ use cliclack::ProgressBar;
 use console::style;
 use futures_util::StreamExt;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 /// Extract a human-readable error reason from a bollard error.
 fn pull_error_reason(e: &bollard::errors::Error) -> String {
@@ -56,42 +54,19 @@ fn short_image_name(image_uri: &str) -> &str {
         .map_or(image_uri, |(_, name)| name)
 }
 
-/// Manages Docker images (pull, check existence).
+/// Manages Docker image operations.
 pub(crate) struct ImageManager {
     docker: Docker,
-    logger: Arc<dyn Logger>,
 }
 
 impl ImageManager {
     /// Create a new ImageManager.
-    pub fn new(docker: Docker, logger: Arc<dyn Logger>) -> Self {
-        Self { docker, logger }
+    pub fn new(docker: Docker) -> Self {
+        Self { docker }
     }
 
-    /// Check if an image exists locally.
-    pub async fn exists(&self, image_uri: &str) -> Result<bool> {
-        match self.docker.inspect_image(image_uri).await {
-            Ok(_) => Ok(true),
-            Err(bollard::errors::Error::DockerResponseServerError {
-                status_code: 404, ..
-            }) => Ok(false),
-            Err(e) => Err(DockerError::ConnectionFailed(e)),
-        }
-    }
-
-    /// Pull an image from registry if not available locally.
-    pub async fn pull_if_missing(&self, image_uri: &str) -> Result<()> {
-        if self.exists(image_uri).await? {
-            self.logger
-                .debug(&format!("Image {} already exists locally", image_uri));
-            return Ok(());
-        }
-
-        self.pull(image_uri).await
-    }
-
-    /// Pull an image from registry.
-    async fn pull(&self, image_uri: &str) -> Result<()> {
+    /// Pull an image from registry, ensuring the latest version is used.
+    pub async fn pull(&self, image_uri: &str) -> Result<()> {
         let options = CreateImageOptions {
             from_image: image_uri.to_string(),
             ..Default::default()
