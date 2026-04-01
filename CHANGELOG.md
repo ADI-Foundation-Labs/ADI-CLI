@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-04-01
+
+### Changed
+
+- Chain upgrade parameters grouped into `ChainUpgradeContext` struct, replacing long parameter lists in `run_chain_upgrades`
+- S3 event handler switched from `std::sync::Mutex` to `tokio::sync::Mutex` for proper async locking without potential deadlocks
+- File copy during chain upgrades uses async `tokio::fs::copy` instead of blocking `std::fs::copy`
+- Main function return type simplified from `Box<dyn std::error::Error>` to `eyre::Result<()>`
+- Large modules split into focused sub-modules: `chain_prompts`, `ecosystem`, `helpers`, `owners`, `transfer/ownership`, `config`, and `state`
+- Removed `#[allow(dead_code)]` and `#[allow(unused_variables)]` annotations from actively used code
+
+### Added
+
+- Unit tests for `lerp`, `center`, and `build_subtitle` in version command
+- Unit tests for `normalize_path` in state paths module
+- Unit tests for `indent_as_array_item`, `find_chains_insertion_point` in config writer
+- Shared S3 helpers module (`state/helpers.rs`) extracting `get_tenant_id`, `get_access_key_id`, and `get_secret_access_key`
+
 ## [0.2.0] - 2026-04-01
 
 ### Added
@@ -79,5 +97,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Interactive UI** with themed prompts, confirmations, and multi-select pickers via `dialoguer` and `console`
 - **Colored terminal output** and structured logging via `env_logger` with configurable log levels
 
+[0.2.1]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/ADI-Foundation-Labs/ADI-CLI/releases/tag/0.1.0

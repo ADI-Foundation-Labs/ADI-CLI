@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "adi-cli"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "adi-ecosystem",
  "adi-funding",
@@ -44,7 +44,7 @@ dependencies = [
 
 [[package]]
 name = "adi-docker"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "adi-types",
  "bollard",
@@ -61,7 +61,7 @@ dependencies = [
 
 [[package]]
 name = "adi-ecosystem"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "adi-types",
  "alloy-network",
@@ -88,7 +88,7 @@ dependencies = [
 
 [[package]]
 name = "adi-funding"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "adi-types",
  "alloy-contract",
@@ -113,7 +113,7 @@ dependencies = [
 
 [[package]]
 name = "adi-state"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "adi-types",
  "async-trait",
@@ -131,7 +131,7 @@ dependencies = [
 
 [[package]]
 name = "adi-toolkit"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "adi-docker",
  "adi-types",
@@ -146,7 +146,7 @@ dependencies = [
 
 [[package]]
 name = "adi-types"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "alloy-primitives",
  "clap",
@@ -159,7 +159,7 @@ dependencies = [
 
 [[package]]
 name = "adi-upgrade"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "adi-state",
  "adi-toolkit",
