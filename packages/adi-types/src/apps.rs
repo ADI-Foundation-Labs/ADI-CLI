@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Portal application configuration.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub struct PortalConfig {
     /// HTTP port for the portal.
     pub http_port: u16,
@@ -18,6 +19,7 @@ impl PortalConfig {
 
 /// Explorer application configuration.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub struct ExplorerConfig {
     /// HTTP port for the explorer.
     pub http_port: u16,
@@ -40,6 +42,7 @@ impl ExplorerConfig {
 ///   http_port: 3010
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub struct Apps {
     /// Portal configuration.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -57,6 +60,7 @@ impl Apps {
     }
 
     /// Creates apps with default ports (portal: 3030, explorer: 3010).
+    #[must_use]
     pub fn with_defaults() -> Self {
         Self {
             portal: Some(PortalConfig::new(3030)),

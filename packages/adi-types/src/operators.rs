@@ -18,7 +18,8 @@ use serde::{Deserialize, Serialize};
 /// prove_operator: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
 /// execute_operator: "0x9876543210987654321098765432109876543210"
 /// ```
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub struct Operators {
     /// Commit operator address - receives PRECOMMITTER, COMMITTER, REVERTER roles.
     #[serde(default, skip_serializing_if = "Option::is_none")]

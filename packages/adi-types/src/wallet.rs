@@ -94,6 +94,7 @@ impl<'de> Deserialize<'de> for Wallet {
 ///
 /// All fields are optional to support partial configurations.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct Wallets {
     /// Deployer wallet - deploys contracts.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -138,12 +139,14 @@ impl Wallets {
     }
 
     /// Sets the deployer wallet.
+    #[must_use]
     pub fn with_deployer(mut self, wallet: Wallet) -> Self {
         self.deployer = Some(wallet);
         self
     }
 
     /// Sets the governor wallet.
+    #[must_use]
     pub fn with_governor(mut self, wallet: Wallet) -> Self {
         self.governor = Some(wallet);
         self

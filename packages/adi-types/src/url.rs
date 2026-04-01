@@ -46,9 +46,12 @@ pub fn is_localhost_rpc(rpc_url: &str) -> bool {
 /// );
 /// ```
 pub fn normalize_rpc_url(rpc_url: &str) -> String {
-    rpc_url
-        .replace("host.docker.internal", "localhost")
-        .replace("HOST.DOCKER.INTERNAL", "localhost")
+    let lower = rpc_url.to_lowercase();
+    if lower.contains("host.docker.internal") {
+        lower.replace("host.docker.internal", "localhost")
+    } else {
+        rpc_url.to_string()
+    }
 }
 
 #[cfg(test)]
@@ -89,6 +92,11 @@ mod tests {
         );
         assert_eq!(
             normalize_rpc_url("http://HOST.DOCKER.INTERNAL:8545"),
+            "http://localhost:8545"
+        );
+        // Mixed case is also handled
+        assert_eq!(
+            normalize_rpc_url("http://Host.Docker.Internal:8545"),
             "http://localhost:8545"
         );
     }

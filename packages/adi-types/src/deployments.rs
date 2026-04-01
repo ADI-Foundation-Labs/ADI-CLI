@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 /// max_number_of_chains: 100
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct InitialDeployments {
     /// Create2 factory salt.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -79,6 +80,7 @@ pub struct InitialDeployments {
 ///   mint: "0x9000000000000000000000"
 /// ```
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub struct Erc20Token {
     /// Token name.
     pub name: String,
@@ -127,6 +129,7 @@ impl Erc20Token {
 ///     mint: "0x9000000000000000000000"
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct Erc20Deployments {
     /// List of tokens to deploy.
     #[serde(default)]
@@ -140,6 +143,7 @@ impl Erc20Deployments {
     }
 
     /// Adds a token to the deployments.
+    #[must_use]
     pub fn with_token(mut self, token: Erc20Token) -> Self {
         self.tokens.push(token);
         self
