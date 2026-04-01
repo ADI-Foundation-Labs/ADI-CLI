@@ -181,7 +181,7 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
                 config_writer::prompt_and_save_chain_config(
                     &chain_defaults,
                     context.config_path(),
-                    false,
+                    args.yes,
                 )?;
 
                 // Run chain creation
