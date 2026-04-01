@@ -6,7 +6,7 @@ use std::path::Path;
 
 use crate::config::{compute_gas_price, UpgradeConfig};
 use crate::error::{Result, UpgradeError};
-use crate::simulation::ToolkitRunnerTrait;
+use crate::runner::ToolkitRunnerTrait;
 use crate::versions::VersionHandler;
 
 /// Result of a broadcast run.

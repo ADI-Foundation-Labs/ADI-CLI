@@ -2,13 +2,12 @@
 //!
 //! Sends raw transactions and protocol-specific calls to chain contracts.
 
-use alloy_network::EthereumWallet;
 use alloy_primitives::{Address, Bytes, U256};
-use alloy_provider::{Provider, ProviderBuilder};
+use alloy_provider::Provider;
 use alloy_rpc_types::TransactionRequest;
 
 use crate::error::{Result, UpgradeError};
-use crate::signing::signer_from_secret;
+use crate::signing::build_signing_provider;
 
 /// Convert semver Version to protocol version uint256.
 ///
@@ -34,11 +33,7 @@ pub(crate) async fn send_chain_tx<P: Provider + Clone>(
     calldata: Bytes,
     label: &str,
 ) -> Result<alloy_primitives::B256> {
-    let signer = signer_from_secret(signer_key)?;
-    let wallet = EthereumWallet::from(signer);
-    let signing_provider = ProviderBuilder::new()
-        .wallet(wallet)
-        .connect_provider(provider.clone());
+    let signing_provider = build_signing_provider(provider, signer_key)?;
 
     log::info!("Sending {label} tx to {to}...");
 
@@ -76,7 +71,6 @@ pub(crate) async fn set_upgrade_timestamp<P: Provider + Clone>(
 
     let version_uint = version_to_protocol_uint(protocol_version);
 
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let timestamp = U256::from(
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

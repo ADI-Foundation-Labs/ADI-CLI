@@ -2,13 +2,12 @@
 //!
 //! Sends scheduleTransparent and execute transactions to the governance contract.
 
-use alloy_network::EthereumWallet;
 use alloy_primitives::{Address, Bytes, B256, U256};
-use alloy_provider::{Provider, ProviderBuilder};
+use alloy_provider::Provider;
 use alloy_rpc_types::TransactionRequest;
 
 use crate::error::{Result, UpgradeError};
-use crate::signing::signer_from_secret;
+use crate::signing::build_signing_provider;
 
 /// Result of governance execution.
 #[derive(Debug)]
@@ -35,14 +34,7 @@ pub async fn execute_governance<P: Provider + Clone>(
         governance_contract
     );
 
-    // Create signer from governor key
-    let signer = signer_from_secret(governor_key)?;
-    let wallet = EthereumWallet::from(signer);
-
-    // Create signing provider by wrapping the existing provider
-    let signing_provider = ProviderBuilder::new()
-        .wallet(wallet)
-        .connect_provider(provider.clone());
+    let signing_provider = build_signing_provider(provider, governor_key)?;
 
     // Send scheduleTransparent
     log::info!("Sending scheduleTransparent transaction...");

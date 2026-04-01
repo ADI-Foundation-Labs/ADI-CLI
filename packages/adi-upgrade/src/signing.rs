@@ -1,5 +1,7 @@
 //! Shared signing helpers for upgrade operations.
 
+use alloy_network::EthereumWallet;
+use alloy_provider::{Provider, ProviderBuilder};
 use alloy_signer_local::PrivateKeySigner;
 use secrecy::ExposeSecret;
 
@@ -23,4 +25,21 @@ pub(crate) fn signer_from_secret(key: &secrecy::SecretString) -> Result<PrivateK
 
     PrivateKeySigner::from_bytes(&key_bytes.into())
         .map_err(|e| UpgradeError::GovernanceFailed(format!("Invalid key: {e}")))
+}
+
+/// Build a signing provider by wrapping an existing provider with a wallet
+/// derived from the given secret key.
+///
+/// # Errors
+///
+/// Returns [`UpgradeError::GovernanceFailed`] if the key is invalid.
+pub(crate) fn build_signing_provider<P: Provider + Clone>(
+    provider: &P,
+    key: &secrecy::SecretString,
+) -> Result<impl Provider + Clone> {
+    let signer = signer_from_secret(key)?;
+    let wallet = EthereumWallet::from(signer);
+    Ok(ProviderBuilder::new()
+        .wallet(wallet)
+        .connect_provider(provider.clone()))
 }

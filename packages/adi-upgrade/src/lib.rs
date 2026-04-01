@@ -7,6 +7,7 @@
 #![deny(unsafe_code)]
 
 mod error;
+mod runner;
 mod signing;
 
 pub use error::{Result, UpgradeError};
@@ -21,7 +22,8 @@ pub use config::UpgradeConfig;
 
 mod simulation;
 
-pub use simulation::{run_simulation, SimulationResult, ToolkitRunnerTrait};
+pub use runner::ToolkitRunnerTrait;
+pub use simulation::{run_simulation, SimulationResult};
 
 mod broadcast;
 
@@ -33,7 +35,7 @@ pub use validation::{validate_upgrade_output, BytecodeManifest, ValidationReport
 
 mod orchestrator;
 
-pub use orchestrator::UpgradeOrchestrator;
+pub use orchestrator::{OrchestratorParams, UpgradeOrchestrator};
 
 pub mod onchain;
 
