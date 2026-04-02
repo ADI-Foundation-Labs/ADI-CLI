@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-04-02
+
+### Added
+
+- **`adi-vault` package** for HashiCorp Vault HTTP client with KV v2 health checks and secret writing
+- `--upload` flag on `adi server-params` to push generated parameters directly to HashiCorp Vault with interactive token prompt and path validation
+- `vault` configuration section in `~/.adi.yml` with configurable `api_url` for Vault base URL
+- `fee_collector_address` override in chain defaults, used as fee collector in server parameters when set
+- Chain genesis file reading with JSON compaction and base64 encoding for server parameter output
+- Prover mode-aware server parameters toggling fake SNARK/FRI provers based on `NoProofs` vs `Gpu`
+- L2 blob-mode server parameters with dedicated fee, gas, and blob gas overrides
+- Static server parameters for logging, RocksDB path, genesis input path, prover API, sequencer block settings, batcher config, and poll intervals
+- Unit tests for server parameter extraction (L2/L3 modes, prover modes, numeric types, static fields)
+- Unit tests for Vault path validation
+- `rustfmt.toml` with project formatting rules
+
+### Changed
+
+- `server_params` module split from single file into sub-modules (`constants`, `params`, `mod`)
+- Server parameter values use typed `serde_json::Value` (numbers and strings) instead of `Option<String>`
+- Error handling in `server-params` command consolidated into shared `handle_missing` helper
+- L3 calldata-mode parameters updated with explicit constants for gas, fee, and pubdata overrides
+
 ## [0.2.1] - 2026-04-01
 
 ### Changed
@@ -97,6 +120,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Interactive UI** with themed prompts, confirmations, and multi-select pickers via `dialoguer` and `console`
 - **Colored terminal output** and structured logging via `env_logger` with configurable log levels
 
+[0.2.2]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/ADI-Foundation-Labs/ADI-CLI/releases/tag/0.1.0

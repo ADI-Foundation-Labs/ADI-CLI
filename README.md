@@ -101,6 +101,7 @@ All fields have sensible defaults. See `adi config` to inspect the merged config
 | `ADI_CONFIG`              | Path to an alternative config file                           |
 | `ADI__PROTOCOL_VERSION`   | Default protocol version (e.g., `v0.30.1`)                   |
 | `ADI__TOOLKIT__IMAGE_TAG` | Override Docker image tag (e.g., `latest`)                   |
+| `ADI__VAULT__API_URL`     | Override HashiCorp Vault base URL                            |
 | `ADI_OPERATOR`            | Operator address (PRECOMMITTER, COMMITTER, REVERTER roles)   |
 | `ADI_PROVE_OPERATOR`      | Prove operator address (PROVER role)                         |
 | `ADI_EXECUTE_OPERATOR`    | Execute operator address (EXECUTOR role)                     |
@@ -204,6 +205,21 @@ adi owners --chain my-chain
 adi verify
 adi verify --chain my-chain
 ```
+
+### server-params — Generate server configuration
+
+```bash
+# Formatted output
+adi server-params --chain my-chain
+
+# JSON output (includes base64 genesis)
+adi server-params --chain my-chain --json
+
+# Upload to HashiCorp Vault
+adi server-params --chain my-chain --upload
+```
+
+Outputs Docker Compose environment variables (RPC URLs, operator keys, prover settings, fee overrides) for running a ZkSync server node. Use `--json` for machine-readable output. Use `--upload` to push parameters directly to HashiCorp Vault (prompts for token and path interactively, or pass `--vault-token` and `--vault-path`).
 
 ### add — Add a chain to an existing ecosystem
 

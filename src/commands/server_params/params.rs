@@ -298,7 +298,7 @@ pub(super) fn display_value(value: &Value) -> String {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use adi_types::{ChainContracts, ChainMetadata, ProverMode, Wallets};
