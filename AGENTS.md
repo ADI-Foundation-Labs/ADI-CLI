@@ -4,6 +4,10 @@ SDK-first Rust CLI (`adi-cli`) for managing ZkSync ecosystem smart contracts. Th
 
 **Requirement:** Docker must be installed and running on the host machine.
 
+## Rust
+
+Always invoke all `rust:*` skills before writing, reviewing, or modifying Rust code. For code reviews, use `rust:review` which loads all skills automatically.
+
 ## Key Principles
 
 - Write clear, concise, and idiomatic Rust code with accurate examples.
@@ -215,20 +219,3 @@ Sub-package Cargo.toml:
 alloy-primitives = { workspace = true }
 tokio = { workspace = true }
 ```
-
-## Rust
-
-Always invoke all `rust:*` skills before writing, reviewing, or modifying Rust code. This includes:
-
-- `rust:code-structure` — project layout, module organization, code style
-- `rust:naming-conventions` — naming rules for functions, types, modules, traits, constants
-- `rust:type-system` — newtypes, enums, generics, type safety
-- `rust:ownership` — borrowing, lifetimes, smart pointers
-- `rust:error-handling` — Result/?, thiserror, anyhow, error chains
-- `rust:async` — tokio runtime, concurrency, channels
-- `rust:serde` — serialization, derive patterns, enum representations
-- `rust:performance` — iterators, inlining, allocation profiling, release profiles
-- `rust:linting` — workspace lint config, clippy, rustfmt
-- `rust:testing` — unit/integration tests, mocking, property testing, snapshots
-
-For code reviews, use `rust:review` which loads all of the above automatically.
