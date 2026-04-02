@@ -177,6 +177,7 @@ adi-types = { path = "packages/adi-types" }
 adi-state = { path = "packages/adi-state" }
 adi-funding = { path = "packages/adi-funding" }
 adi-upgrade = { path = "packages/adi-upgrade" }
+adi-vault = { path = "packages/adi-vault" }
 
 [lints]
 workspace = true
@@ -204,6 +205,7 @@ adi-state = { workspace = true }
 adi-funding = { workspace = true }
 adi-types = { workspace = true }
 adi-upgrade = { workspace = true }
+adi-vault = { workspace = true }
 
 # EVM types
 alloy-primitives = { workspace = true }

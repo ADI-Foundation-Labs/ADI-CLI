@@ -235,6 +235,7 @@ impl Default for Config {
             ownership: crate::config::OwnershipDefaults::default(),
             verification: crate::config::VerificationDefaults::default(),
             gas_multiplier: 200,
+            vault: crate::config::VaultDefaults::default(),
             s3: crate::config::S3Config::default(),
             operators: crate::config::OperatorsConfig::default(),
         }

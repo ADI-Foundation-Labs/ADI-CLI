@@ -21,6 +21,7 @@ mod state;
 pub mod state_paths;
 mod transfer;
 mod upgrade;
+mod vault_upload;
 mod verify;
 mod version;
 

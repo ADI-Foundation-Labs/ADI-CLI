@@ -1,0 +1,17 @@
+[package]
+name = "adi-vault"
+version.workspace = true
+edition.workspace = true
+description = "HashiCorp Vault HTTP client for secret management"
+
+[lints]
+workspace = true
+
+[lib]
+name = "adi_vault"
+path = "src/lib.rs"
+
+[dependencies]
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+eyre = { workspace = true }

@@ -127,6 +127,19 @@ pub struct OperatorsConfig {
     pub execute_operator: Option<Address>,
 }
 
+/// Default Vault configuration values.
+///
+/// These can be overridden by environment variables.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub struct VaultDefaults {
+    /// Vault base URL (without trailing slash).
+    /// Default: `https://vault.dev.internal.adifoundation.ai`
+    /// Can be overridden with `ADI__VAULT__API_URL` env var.
+    #[serde(default)]
+    pub api_url: Option<Url>,
+}
+
 /// S3 synchronization configuration.
 ///
 /// Enables syncing ecosystem state to S3-compatible storage.

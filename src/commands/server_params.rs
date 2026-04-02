@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use adi_types::{ChainContracts, ChainMetadata, Wallets};
 use clap::Args;
+use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::helpers::{
@@ -31,6 +32,20 @@ pub struct ServerParamsArgs {
     /// Output as JSON instead of formatted text.
     #[arg(long)]
     pub json: bool,
+
+    /// Upload generated parameters to HashiCorp Vault.
+    #[arg(long)]
+    pub upload: bool,
+
+    /// Vault auth token (prompted interactively if omitted).
+    #[arg(long, requires = "upload")]
+    #[serde(skip)]
+    pub vault_token: Option<SecretString>,
+
+    /// Full Vault API path (e.g. /v1/Adi-chain/data/Adi-chain/adi/devnet1/server).
+    /// Prompted interactively if omitted.
+    #[arg(long, requires = "upload")]
+    pub vault_path: Option<String>,
 }
 
 /// Server parameter with its environment variable name and value.
@@ -146,7 +161,6 @@ pub async fn run(args: &ServerParamsArgs, context: &Context) -> Result<()> {
     );
 
     if args.json {
-        // Output as JSON
         let json_output: HashMap<&str, Option<String>> = params
             .iter()
             .map(|p| (p.env_name, p.value.clone()))
@@ -155,10 +169,17 @@ pub async fn run(args: &ServerParamsArgs, context: &Context) -> Result<()> {
             serde_json::to_string_pretty(&json_output).wrap_err("Failed to serialize to JSON")?;
         println!("{json_str}");
     } else {
-        // Output formatted text
         let output = format_params(&params);
         ui::note("Docker Compose Environment Variables", &output)?;
         ui::outro("")?;
+    }
+
+    if args.upload {
+        let json_output: HashMap<&str, Option<String>> = params
+            .iter()
+            .map(|p| (p.env_name, p.value.clone()))
+            .collect();
+        super::vault_upload::run(args, context, &json_output).await?;
     }
 
     Ok(())

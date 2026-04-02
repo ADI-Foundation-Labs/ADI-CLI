@@ -12,6 +12,7 @@ dependencies = [
  "adi-toolkit",
  "adi-types",
  "adi-upgrade",
+ "adi-vault",
  "alloy-primitives",
  "alloy-provider",
  "alloy-rpc-types",
@@ -184,6 +185,15 @@ dependencies = [
  "tokio",
  "toml",
  "url",
+]
+
+[[package]]
+name = "adi-vault"
+version = "0.2.1"
+dependencies = [
+ "eyre",
+ "reqwest",
+ "serde_json",
 ]
 
 [[package]]

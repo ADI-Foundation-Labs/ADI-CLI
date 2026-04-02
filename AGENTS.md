@@ -17,25 +17,6 @@ SDK-first Rust CLI (`adi-cli`) for managing ZkSync ecosystem smart contracts. Th
 - Test after every meaningful change
 - Don't give out high level answers, your job is to give a specific solution applicable to the project.
 
-## Error Handling and Safety
-
-- Strict Clippy lints are enforced (see `Cargo.toml`)
-- Run `cargo fmt` before commits
-- Run `cargo clippy -- -D warnings` — treat warnings as errors
-- No `unwrap()`, `expect()`, `panic!()` - use `eyre::Result` with `wrap_err()`
-- No indexing/slicing - use safe alternatives like `.get()`
-- Use `?` operator to propagate errors in functions.
-- Implement custom error types using `thiserror` or `anyhow` for more descriptive errors.
-- Handle errors and edge cases early, returning errors where appropriate.
-- No wildcard imports
-- Use exit codes: 0 = success, 1 = error, 2 = usage error
-- Validate all input data
-
-## Performance
-- Use `&str` over `String` when possible
-- Avoid unnecessary `.clone()` — prefer borrowing
-- Use iterators over explicit loops
-
 ## Git Conventions
 
 - Commit message format: feat|fix|refactor|docs|test|chore|ci|build|style: description
@@ -235,3 +216,19 @@ alloy-primitives = { workspace = true }
 tokio = { workspace = true }
 ```
 
+## Rust
+
+Always invoke all `rust:*` skills before writing, reviewing, or modifying Rust code. This includes:
+
+- `rust:code-structure` — project layout, module organization, code style
+- `rust:naming-conventions` — naming rules for functions, types, modules, traits, constants
+- `rust:type-system` — newtypes, enums, generics, type safety
+- `rust:ownership` — borrowing, lifetimes, smart pointers
+- `rust:error-handling` — Result/?, thiserror, anyhow, error chains
+- `rust:async` — tokio runtime, concurrency, channels
+- `rust:serde` — serialization, derive patterns, enum representations
+- `rust:performance` — iterators, inlining, allocation profiling, release profiles
+- `rust:linting` — workspace lint config, clippy, rustfmt
+- `rust:testing` — unit/integration tests, mocking, property testing, snapshots
+
+For code reviews, use `rust:review` which loads all of the above automatically.

@@ -1,7 +1,7 @@
 mod types;
 
 pub use types::{
-    FundingDefaults, OperatorsConfig, OwnershipDefaults, S3Config, ToolkitDefaults,
+    FundingDefaults, OperatorsConfig, OwnershipDefaults, S3Config, ToolkitDefaults, VaultDefaults,
     VerificationDefaults,
 };
 
@@ -87,6 +87,11 @@ pub struct Config {
     /// Can be overridden with --gas-multiplier flag.
     #[serde(default = "default_gas_multiplier")]
     pub gas_multiplier: u64,
+
+    /// Default Vault configuration values.
+    /// Used by the server-params --upload flow.
+    #[serde(default)]
+    pub vault: VaultDefaults,
 
     /// S3 synchronization configuration.
     /// Enables syncing ecosystem state to S3-compatible storage.
