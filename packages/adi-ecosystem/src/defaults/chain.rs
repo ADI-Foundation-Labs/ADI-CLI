@@ -104,6 +104,12 @@ pub struct ChainDefaults {
     #[serde(default)]
     pub blobs: bool,
 
+    /// Override fee collector address for server parameters.
+    ///
+    /// When set, overrides the wallet-derived `fee_account` address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fee_collector_address: Option<Address>,
+
     /// Predefined operator addresses.
     #[serde(default)]
     pub operators: OperatorsDefaults,
@@ -136,6 +142,7 @@ impl Default for ChainDefaults {
             base_token_price_denominator: 1,
             evm_emulator: false,
             blobs: false,
+            fee_collector_address: None,
             operators: OperatorsDefaults::default(),
             funding: ChainFundingDefaults::default(),
             ownership: ChainOwnershipDefaults::default(),
@@ -178,6 +185,9 @@ impl ChainDefaults {
         }
         if self.blobs != defaults.blobs {
             lines.push(format!("blobs: {}", self.blobs));
+        }
+        if let Some(addr) = &self.fee_collector_address {
+            lines.push(format!("fee_collector_address: \"{}\"", addr));
         }
         if self.operators != defaults.operators {
             lines.push("operators:".to_string());

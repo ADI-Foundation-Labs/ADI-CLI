@@ -53,6 +53,16 @@ pub enum StateError {
         source: serde_yaml::Error,
     },
 
+    /// Failed to parse JSON content.
+    #[error("Failed to parse JSON from '{}': {source}", .path.display())]
+    JsonParseFailed {
+        /// Path to file that failed parsing.
+        path: PathBuf,
+        /// Underlying JSON error.
+        #[source]
+        source: serde_json::Error,
+    },
+
     /// Requested resource was not found.
     #[error("State file not found: {}", .0.display())]
     NotFound(PathBuf),

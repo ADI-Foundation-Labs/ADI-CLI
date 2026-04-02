@@ -263,6 +263,7 @@ fn build_chain_defaults(
             .unwrap_or(false),
         // Use blobs setting from config or default to false (calldata/L3 mode)
         blobs: defaults.map(|c| c.blobs).unwrap_or(false),
+        fee_collector_address: defaults.and_then(|c| c.fee_collector_address),
         // Copy operators, funding, ownership from selected chain if exists
         operators: defaults.map(|c| c.operators.clone()).unwrap_or_default(),
         funding: defaults.map(|c| c.funding.clone()).unwrap_or_default(),

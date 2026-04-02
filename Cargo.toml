@@ -161,6 +161,9 @@ flate2 = { version = "1", default-features = false, features = [
   "rust_backend",
 ] }
 
+# Encoding
+base64 = { version = "0.22", default-features = false, features = ["std"] }
+
 # URL handling
 url = { version = "2", default-features = false, features = ["serde"] }
 

@@ -118,11 +118,13 @@ version = "0.2.1"
 dependencies = [
  "adi-types",
  "async-trait",
+ "base64 0.22.1",
  "console 0.15.11",
  "flate2",
  "log",
  "rust-s3",
  "serde",
+ "serde_json",
  "serde_yaml",
  "tar",
  "tempfile",

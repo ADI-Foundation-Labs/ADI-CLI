@@ -62,12 +62,14 @@ impl VaultClient {
     ///
     /// Sends `POST {base_url}{path}` with body `{"data": data}` and the
     /// provided token in the `X-Vault-Token` header.
+    ///
+    /// Returns the response body on success.
     pub async fn write_secret(
         &self,
         token: &str,
         path: &str,
         data: &serde_json::Value,
-    ) -> Result<()> {
+    ) -> Result<String> {
         let url = format!("{}{path}", self.base_url);
         let body = json!({ "data": data });
 
@@ -81,11 +83,11 @@ impl VaultClient {
             .map_err(|e| eyre!("Failed to connect to Vault: {e}"))?;
 
         let status = response.status();
-        if status.is_success() {
-            return Ok(());
-        }
-
         let body_text = response.text().await.unwrap_or_default();
+
+        if status.is_success() {
+            return Ok(body_text);
+        }
 
         match status {
             StatusCode::FORBIDDEN => Err(eyre!(

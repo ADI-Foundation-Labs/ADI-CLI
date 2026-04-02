@@ -70,8 +70,9 @@ pub use s3::{NoOpS3EventHandler, S3Config, S3SyncEvent, S3SyncEventHandler};
 
 // Path constants
 pub use paths::{
-    apps_path, chain_contracts_path, chain_dir, chain_metadata_path, chain_wallets_path,
-    ecosystem_contracts_path, ecosystem_wallets_path, erc20_deployments_path,
+    apps_path, chain_contracts_path, chain_dir, chain_genesis_path, chain_metadata_path,
+    chain_wallets_path, ecosystem_contracts_path, ecosystem_wallets_path, erc20_deployments_path,
     initial_deployments_path, APPS_FILE, CHAINS_DIR, CHAIN_METADATA, CONFIGS_DIR, CONTRACTS_FILE,
-    ECOSYSTEM_METADATA, ERC20_DEPLOYMENTS_FILE, INITIAL_DEPLOYMENTS_FILE, WALLETS_FILE,
+    ECOSYSTEM_METADATA, ERC20_DEPLOYMENTS_FILE, GENESIS_FILE, INITIAL_DEPLOYMENTS_FILE,
+    WALLETS_FILE,
 };

@@ -24,6 +24,9 @@ pub const APPS_FILE: &str = "apps.yaml";
 /// Operators config file name.
 pub const OPERATORS_FILE: &str = "operators.yaml";
 
+/// Genesis file name.
+pub const GENESIS_FILE: &str = "genesis.json";
+
 /// Chains directory name.
 pub const CHAINS_DIR: &str = "chains";
 
@@ -88,6 +91,12 @@ pub fn chain_contracts_path(chain_name: &str) -> String {
 #[must_use]
 pub fn chain_operators_path(chain_name: &str) -> String {
     format!("{CHAINS_DIR}/{chain_name}/{CONFIGS_DIR}/{OPERATORS_FILE}")
+}
+
+/// Relative path to chain genesis from ecosystem root.
+#[must_use]
+pub fn chain_genesis_path(chain_name: &str) -> String {
+    format!("{CHAINS_DIR}/{chain_name}/{CONFIGS_DIR}/{GENESIS_FILE}")
 }
 
 #[cfg(test)]

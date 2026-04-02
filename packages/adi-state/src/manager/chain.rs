@@ -5,6 +5,7 @@ use crate::error::{Result, StateError};
 use crate::manager::ecosystem::merge_wallets;
 use crate::paths;
 use adi_types::{ChainContracts, ChainMetadata, Logger, Operators, PartialChainMetadata, Wallets};
+use base64::{engine::general_purpose::STANDARD, Engine};
 use std::sync::Arc;
 
 /// Chain-level state operations.
@@ -69,6 +70,32 @@ impl ChainStateOps {
             self.chain_name
         ));
         Ok(())
+    }
+
+    // ========== GENESIS ==========
+
+    /// Read chain genesis file, compact the JSON and base64 encode it.
+    ///
+    /// Reads `chains/{name}/genesis.json`, minifies the JSON content,
+    /// and returns the base64-encoded string.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if file doesn't exist or JSON parsing fails.
+    pub async fn genesis_base64(&self) -> Result<String> {
+        let key = paths::chain_genesis_path(&self.chain_name);
+        let raw = self.backend.read_raw(&key).await?;
+        let value: serde_json::Value =
+            serde_json::from_str(&raw).map_err(|source| StateError::JsonParseFailed {
+                path: std::path::PathBuf::from(&key),
+                source,
+            })?;
+        let compact =
+            serde_json::to_string(&value).map_err(|source| StateError::JsonParseFailed {
+                path: std::path::PathBuf::from(&key),
+                source,
+            })?;
+        Ok(STANDARD.encode(compact.as_bytes()))
     }
 
     // ========== WALLETS ==========

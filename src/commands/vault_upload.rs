@@ -17,7 +17,7 @@ const DEFAULT_VAULT_URL: &str = "https://vault.dev.internal.adifoundation.ai";
 pub async fn run(
     args: &ServerParamsArgs,
     context: &Context,
-    json_output: &HashMap<&str, Option<String>>,
+    json_output: &HashMap<&str, Option<serde_json::Value>>,
 ) -> Result<()> {
     // Confirm upload
     let confirm = cliclack::confirm("Upload these parameters to Vault?")
@@ -72,17 +72,32 @@ pub async fn run(
                 .wrap_err("Failed to read vault token")
         })?;
 
-    // Write secret
-    let data =
-        serde_json::to_value(json_output).wrap_err("Failed to serialize parameters to JSON")?;
+    // Filter out None values and upload as JSON object
+    let clean: serde_json::Map<String, serde_json::Value> = json_output
+        .iter()
+        .filter_map(|(k, v)| v.as_ref().map(|val| ((*k).to_string(), val.clone())))
+        .collect();
+    let data = serde_json::Value::Object(clean);
+
+    context.logger().debug(&format!("Vault path: {vault_path}"));
+    context.logger().debug(&format!("Vault URL: {vault_url}"));
+    context
+        .logger()
+        .debug(&format!("Parameters to upload: {data}"));
 
     let spinner = cliclack::spinner();
     spinner.start("Uploading secret...");
-    client
+    let response = client
         .write_secret(&token, &vault_path, &data)
         .await
         .wrap_err("Failed to write secret to Vault")?;
     spinner.stop("Secret written successfully.");
+
+    context
+        .logger()
+        .debug(&format!("Vault response: {response}"));
+
+    ui::outro("Upload complete.")?;
 
     Ok(())
 }

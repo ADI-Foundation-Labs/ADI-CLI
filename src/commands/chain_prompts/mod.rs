@@ -91,6 +91,7 @@ pub fn prompt_chain_defaults(
         base_token_price_denominator: denominator,
         evm_emulator,
         blobs: false, // Default to calldata mode (L3)
+        fee_collector_address: None,
         operators,
         funding,
         ownership,

@@ -465,6 +465,7 @@ fn ecosystem_config_to_chain_defaults(config: &EcosystemConfig) -> ChainDefaults
         base_token_price_denominator: config.base_token_price_denominator,
         evm_emulator: config.evm_emulator,
         blobs: false, // Default to calldata mode (L3)
+        fee_collector_address: None,
         operators: Default::default(),
         funding: Default::default(),
         ownership: Default::default(),
