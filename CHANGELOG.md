@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-04-03
+
+### Added
+
+- **`adi refund` command** to drain ETH and ERC20 tokens from ecosystem and chain wallets back to a receiver address, replacing the external `return_funds_l1_sepolia.sh` script
+- `--receiver` flag with automatic fallback to funder address from config (`funding.funder_key` / `ADI_FUNDER_KEY`)
+- `--chain` flag to refund a specific chain only (default: all chains)
+- `--token-address` flag for explicit ERC20 token refund, with automatic detection of custom gas tokens from chain metadata (`base_token`)
+- Token symbol and decimals queried dynamically from on-chain ERC20 contracts
+- Gas estimation via RPC (`eth_estimateGas`) instead of hardcoded values, with conservative fallbacks
+- Continue-on-error execution so partial refunds succeed even if individual wallets fail
+- Per-wallet balance checking progress with cliclack spinner showing wallet role and address
+- Refund plan displayed as a boxed `cliclack::note` with green-styled addresses and amounts
+- `RefundConfig` struct grouping receiver, token address, and gas multiplier for clean API surface
+- `format_eth` and `format_with_decimals` made public in `adi-funding` for reuse across CLI commands
+- `RefundTransferFailed` error variant in `adi-funding` for continue-on-error wallet failures
+- **`adi-funding/refund` submodule** with `types.rs`, `plan.rs`, and `execute.rs` following SDK-first architecture
+
 ## [0.2.2] - 2026-04-02
 
 ### Added
@@ -120,6 +138,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Interactive UI** with themed prompts, confirmations, and multi-select pickers via `dialoguer` and `console`
 - **Colored terminal output** and structured logging via `env_logger` with configurable log levels
 
+[0.2.3]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.1.0...0.2.0

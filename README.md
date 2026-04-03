@@ -221,6 +221,21 @@ adi server-params --chain my-chain --upload
 
 Outputs Docker Compose environment variables (RPC URLs, operator keys, prover settings, fee overrides) for running a ZkSync server node. Use `--json` for machine-readable output. Use `--upload` to push parameters directly to HashiCorp Vault (prompts for token and path interactively, or pass `--vault-token` and `--vault-path`).
 
+### refund — Return funds from ecosystem wallets
+
+```bash
+# Refund all wallets to the funder address (from config)
+adi refund
+
+# Refund to a specific address
+adi refund --receiver 0x1234...abcd
+
+# Refund a specific chain only
+adi refund --chain my-chain --yes
+```
+
+Drains ETH and ERC20 tokens from all ecosystem and chain wallets back to a receiver address. Useful when redeploying after a failed run — reclaims testnet/mainnet ETH instead of wasting it. Custom gas tokens are auto-detected from chain metadata. Receiver defaults to the funder address from config (`ADI_FUNDER_KEY`).
+
 ### add — Add a chain to an existing ecosystem
 
 ```bash

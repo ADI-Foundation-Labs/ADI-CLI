@@ -74,6 +74,7 @@ cargo test               # Run tests
 - `adi deploy` - Deploy ecosystem contracts to settlement layer
 - `adi accept` - Accept pending ownership transfers for deployed contracts
 - `adi transfer` - Accept ownership and transfer to a new owner address
+- `adi refund` - Return ETH and ERC20 tokens from ecosystem/chain wallets to a receiver
 - `adi verify` - Check and submit contract verification to block explorers
 
 ## Architecture
