@@ -16,6 +16,7 @@ mod ecosystem;
 pub mod helpers;
 mod init;
 mod owners;
+mod refund;
 mod server_params;
 mod state;
 pub mod state_paths;
@@ -47,6 +48,8 @@ pub enum Commands {
     Transfer(transfer::TransferArgs),
     /// Display owners of deployed L1 contracts
     Owners(owners::OwnersArgs),
+    /// Refund ETH (and optional ERC20 tokens) from ecosystem/chain wallets to a receiver
+    Refund(refund::RefundArgs),
     /// Check and submit contract verification to block explorers
     Verify(verify::VerifyArgs),
     /// Display server parameters for Docker Compose configuration
@@ -72,6 +75,7 @@ impl Commands {
             Commands::Accept(args) => accept::run(args, context).await,
             Commands::Transfer(args) => transfer::run(args, context).await,
             Commands::Owners(args) => owners::run(&args, context).await,
+            Commands::Refund(args) => refund::run(args, context).await,
             Commands::Verify(args) => verify::run(args, context).await,
             Commands::ServerParams(args) => server_params::run(&args, context).await,
             Commands::State(args) => state::run(&args, context).await,

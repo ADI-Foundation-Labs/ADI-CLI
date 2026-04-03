@@ -90,6 +90,7 @@ mod events;
 mod executor;
 mod plan;
 mod provider;
+mod refund;
 mod signer;
 mod transfer;
 
@@ -112,5 +113,9 @@ pub use events::{
 pub use executor::{FundingExecutor, FundingResult};
 pub use plan::{build_funding_target_statuses, FundingPlan, FundingPlanBuilder};
 pub use provider::FundingProvider;
+pub use refund::{
+    build_refund_plan, execute_refund, RefundConfig, RefundEntry, RefundPlan, RefundResult,
+    RefundTarget,
+};
 pub use signer::{create_signer, signer_address};
-pub use transfer::{Transfer, TransferType};
+pub use transfer::{format_eth, format_with_decimals, Transfer, TransferType};

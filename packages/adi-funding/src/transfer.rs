@@ -215,7 +215,7 @@ const DISPLAY_DECIMALS: usize = 4;
 ///
 /// Converts from smallest units to human-readable form with up to
 /// [`DISPLAY_DECIMALS`] fractional digits.
-fn format_with_decimals(amount: U256, decimals: usize) -> String {
+pub fn format_with_decimals(amount: U256, decimals: usize) -> String {
     let base = U256::from(10);
     let unit = base.pow(U256::from(decimals));
     let display_dec = DISPLAY_DECIMALS.min(decimals);
@@ -233,7 +233,7 @@ fn format_with_decimals(amount: U256, decimals: usize) -> String {
 }
 
 /// Format ETH amount for display (converts from wei to ETH).
-fn format_eth(amount: U256) -> String {
+pub fn format_eth(amount: U256) -> String {
     format_with_decimals(amount, ETH_DECIMALS)
 }
 

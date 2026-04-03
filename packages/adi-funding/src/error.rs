@@ -85,6 +85,17 @@ pub enum FundingError {
     #[error("Gas estimation failed: {0}")]
     GasEstimationFailed(String),
 
+    /// A refund transfer failed for a specific wallet (continue-on-error mode).
+    #[error("Refund failed for {role} ({address}): {reason}")]
+    RefundTransferFailed {
+        /// Wallet role name.
+        role: String,
+        /// Wallet address.
+        address: Address,
+        /// Failure reason.
+        reason: String,
+    },
+
     /// No wallets require funding.
     #[error("No wallets require funding - all balances meet requirements")]
     NoFundingRequired,
