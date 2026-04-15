@@ -71,6 +71,51 @@ tasks:
     cmds:
       - cargo test --workspace --test '*'
 
+  _install_llvm_cov:
+    internal: true
+    status:
+      - cargo llvm-cov --version
+    cmds:
+      - rustup component add llvm-tools-preview
+      - cargo install cargo-llvm-cov --locked
+
+  coverage:
+    desc: Print workspace coverage summary to terminal
+    deps:
+      - _install_rust
+      - _install_llvm_cov
+    cmds:
+      - task: coverage:run
+        vars: { ARGS: "--summary-only" }
+
+  coverage:html:
+    desc: Generate HTML coverage report and open in browser
+    deps:
+      - _install_rust
+      - _install_llvm_cov
+    cmds:
+      - task: coverage:run
+        vars: { ARGS: "--html --open" }
+
+  coverage:lcov:
+    desc: Generate lcov.info (same format CI uploads to Codecov)
+    deps:
+      - _install_rust
+      - _install_llvm_cov
+    cmds:
+      - task: coverage:run
+        vars: { ARGS: "--lcov --output-path lcov.info" }
+
+  coverage:run:
+    desc: Run cargo-llvm-cov (assumes Rust + cargo-llvm-cov already installed — use in CI)
+    cmds:
+      - cargo llvm-cov --workspace --all-features {{.ARGS}}
+
+  coverage:clean:
+    desc: Remove cached coverage data
+    cmds:
+      - cargo llvm-cov clean --workspace
+
   lint:
     desc: Run clippy linter with strict rules
     deps:
