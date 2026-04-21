@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4] - 2026-04-21
+
+### Added
+
+- **`adi_dev_3` ecosystem configuration template** (`configs/.adi.dev_3_ecosystem.yml`) with Sepolia RPC placeholder, `adi_devnet_3` chain (chain_id `99982`), CGT base token address, blob-mode enabled, and per-operator ETH funding allocations
+- **Forced external price API parameters** in `adi server-params` output:
+  - `external_price_api_client_source` set to `Forced`
+  - `base_token_price_updater_enabled` set to `true`
+  - `external_price_api_client_forced_prices__json` — JSON map containing the ETH placeholder price (3000.0) and, when the chain has a custom base token, the CGT token address mapped to `1.0`
+- **Observability logging parameters** in server params: `observability_log_format` (`terminal`) and `observability_log_use_color` (`true`)
+- `base_token_address` field on `ServerParamsInput`, resolved from the chain config's `base_token_address`, so the forced-prices map can include custom gas tokens
+- Unit tests covering forced-prices JSON generation with and without a base token, and verifying the new observability / price-API parameters are emitted
+
+### Changed
+
+- L2 (blob) mode now explicitly emits `l1_sender_pubdata_mode = Blobs` as a server parameter (previously this key was omitted in L2 mode)
+
 ## [0.2.3] - 2026-04-03
 
 ### Added
@@ -138,6 +155,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Interactive UI** with themed prompts, confirmations, and multi-select pickers via `dialoguer` and `console`
 - **Colored terminal output** and structured logging via `env_logger` with configurable log levels
 
+[0.2.4]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.3...0.2.4
 [0.2.3]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.0...0.2.1

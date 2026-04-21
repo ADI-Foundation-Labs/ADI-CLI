@@ -134,6 +134,12 @@ pub async fn run(args: &ServerParamsArgs, context: &Context) -> Result<()> {
         .and_then(|c| c.fee_collector_address)
         .or_else(|| wallets.fee_account.as_ref().map(|w| w.address));
 
+    let base_token_address = context
+        .config()
+        .ecosystem
+        .get_chain(&chain_name)
+        .and_then(|c| c.base_token_address);
+
     let input = ServerParamsInput {
         contracts: &contracts,
         wallets: &wallets,
@@ -143,6 +149,7 @@ pub async fn run(args: &ServerParamsArgs, context: &Context) -> Result<()> {
         prover_mode,
         genesis_base64,
         fee_collector_address,
+        base_token_address,
     };
     let params_list = params::extract(&input);
 

@@ -75,3 +75,26 @@ pub const L3_NATIVE_PRICE_OVERRIDE: &str = "0x1";
 
 /// L3 sequencer pubdata price override.
 pub const L3_PUBDATA_PRICE_OVERRIDE: &str = "0x1";
+
+// ========== External price API (forced prices) ==========
+
+/// External price API client source mode.
+pub const EXTERNAL_PRICE_API_CLIENT_SOURCE: &str = "Forced";
+
+/// Base token price updater enabled flag.
+pub const BASE_TOKEN_PRICE_UPDATER_ENABLED: &str = "true";
+
+/// Observability log format.
+pub const OBSERVABILITY_LOG_FORMAT: &str = "terminal";
+
+/// Observability log use-color flag.
+pub const OBSERVABILITY_LOG_USE_COLOR: &str = "true";
+
+/// ETH placeholder address used in the forced-prices map.
+pub const ETH_FORCED_PRICE_ADDRESS: &str = "0x0000000000000000000000000000000000000001";
+
+/// Forced price for ETH in the external price API client map.
+pub const ETH_FORCED_PRICE: f64 = 3000.0;
+
+/// Forced price for the chain's base (CGT) token in the external price API client map.
+pub const BASE_TOKEN_FORCED_PRICE: f64 = 1.0;

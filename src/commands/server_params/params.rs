@@ -5,13 +5,15 @@ use alloy_primitives::Address;
 use serde_json::Value;
 
 use super::constants::{
-    APP_BIN_UNPACK_PATH, BATCH_TIMEOUT, BLOCKS_PER_BATCH_LIMIT, BLOCK_DUMP_PATH, BLOCK_TIME,
-    FUSAKA_UPGRADE_TIMESTAMP, GENESIS_INPUT_PATH, L2_BASE_FEE_OVERRIDE,
-    L2_MAX_FEE_PER_BLOB_GAS_GWEI, L2_MAX_FEE_PER_GAS_GWEI, L2_MAX_PRIORITY_FEE_GWEI,
-    L2_NATIVE_PRICE_OVERRIDE, L3_BASE_FEE_OVERRIDE, L3_MAX_FEE_PER_GAS_GWEI,
-    L3_MAX_PRIORITY_FEE_GWEI, L3_NATIVE_PRICE_OVERRIDE, L3_PUBDATA_PRICE_OVERRIDE,
-    MAX_IN_FLIGHT_BLOCKS, MAX_TXS_IN_BLOCK, OBJECT_STORE_BASE_PATH, POLL_INTERVAL, PROVER_API_ADDR,
-    ROCKS_DB_PATH, RUST_LOG_VALUE,
+    APP_BIN_UNPACK_PATH, BASE_TOKEN_FORCED_PRICE, BASE_TOKEN_PRICE_UPDATER_ENABLED, BATCH_TIMEOUT,
+    BLOCKS_PER_BATCH_LIMIT, BLOCK_DUMP_PATH, BLOCK_TIME, ETH_FORCED_PRICE,
+    ETH_FORCED_PRICE_ADDRESS, EXTERNAL_PRICE_API_CLIENT_SOURCE, FUSAKA_UPGRADE_TIMESTAMP,
+    GENESIS_INPUT_PATH, L2_BASE_FEE_OVERRIDE, L2_MAX_FEE_PER_BLOB_GAS_GWEI,
+    L2_MAX_FEE_PER_GAS_GWEI, L2_MAX_PRIORITY_FEE_GWEI, L2_NATIVE_PRICE_OVERRIDE,
+    L3_BASE_FEE_OVERRIDE, L3_MAX_FEE_PER_GAS_GWEI, L3_MAX_PRIORITY_FEE_GWEI,
+    L3_NATIVE_PRICE_OVERRIDE, L3_PUBDATA_PRICE_OVERRIDE, MAX_IN_FLIGHT_BLOCKS, MAX_TXS_IN_BLOCK,
+    OBJECT_STORE_BASE_PATH, OBSERVABILITY_LOG_FORMAT, OBSERVABILITY_LOG_USE_COLOR, POLL_INTERVAL,
+    PROVER_API_ADDR, ROCKS_DB_PATH, RUST_LOG_VALUE,
 };
 
 /// Server parameter with its environment variable name and value.
@@ -31,6 +33,25 @@ fn num_val(n: u64) -> Option<Value> {
     Some(serde_json::json!(n))
 }
 
+/// Build the JSON-stringified forced-prices map for the external price API client.
+///
+/// Always includes the ETH placeholder address. When a base (CGT) token address is
+/// provided, it is also included using a lowercase hex encoding.
+fn build_forced_prices_json(base_token_address: Option<Address>) -> String {
+    let mut prices = serde_json::Map::new();
+    prices.insert(
+        ETH_FORCED_PRICE_ADDRESS.to_string(),
+        serde_json::json!(ETH_FORCED_PRICE),
+    );
+    if let Some(addr) = base_token_address {
+        prices.insert(
+            format!("{addr:#x}"),
+            serde_json::json!(BASE_TOKEN_FORCED_PRICE),
+        );
+    }
+    serde_json::to_string(&Value::Object(prices)).unwrap_or_default()
+}
+
 /// Input data for extracting server parameters.
 pub(super) struct ServerParamsInput<'a> {
     pub contracts: &'a ChainContracts,
@@ -41,6 +62,7 @@ pub(super) struct ServerParamsInput<'a> {
     pub prover_mode: ProverMode,
     pub genesis_base64: Option<String>,
     pub fee_collector_address: Option<Address>,
+    pub base_token_address: Option<Address>,
 }
 
 /// Extract server parameters from the given input.
@@ -190,6 +212,33 @@ pub(super) fn extract(input: &ServerParamsInput<'_>) -> Vec<ServerParam> {
             value: num_val(BLOCKS_PER_BATCH_LIMIT),
             description: "Blocks per batch limit",
         },
+        ServerParam {
+            env_name: "external_price_api_client_source",
+            value: str_val(EXTERNAL_PRICE_API_CLIENT_SOURCE),
+            description: "External price API client source",
+        },
+        ServerParam {
+            env_name: "base_token_price_updater_enabled",
+            value: str_val(BASE_TOKEN_PRICE_UPDATER_ENABLED),
+            description: "Enable base token price updater",
+        },
+        ServerParam {
+            env_name: "observability_log_format",
+            value: str_val(OBSERVABILITY_LOG_FORMAT),
+            description: "Observability log format",
+        },
+        ServerParam {
+            env_name: "observability_log_use_color",
+            value: str_val(OBSERVABILITY_LOG_USE_COLOR),
+            description: "Use color in observability logs",
+        },
+        ServerParam {
+            env_name: "external_price_api_client_forced_prices__json",
+            value: Some(Value::String(build_forced_prices_json(
+                input.base_token_address,
+            ))),
+            description: "Forced prices JSON for external price API client",
+        },
     ];
 
     // Only include genesis when available (json/upload mode)
@@ -223,6 +272,11 @@ pub(super) fn extract(input: &ServerParamsInput<'_>) -> Vec<ServerParam> {
     if input.blobs {
         // L2 mode
         params.extend([
+            ServerParam {
+                env_name: "l1_sender_pubdata_mode",
+                value: str_val("Blobs"),
+                description: "Pubdata sending mode (Blobs for L2)",
+            },
             ServerParam {
                 env_name: "sequencer_base_fee_override",
                 value: str_val(L2_BASE_FEE_OVERRIDE),
@@ -333,6 +387,14 @@ default_configs_path: /defaults
     }
 
     fn make_input(blobs: bool, prover_mode: ProverMode) -> ServerParamsInput<'static> {
+        make_input_with_base_token(blobs, prover_mode, None)
+    }
+
+    fn make_input_with_base_token(
+        blobs: bool,
+        prover_mode: ProverMode,
+        base_token_address: Option<Address>,
+    ) -> ServerParamsInput<'static> {
         let contracts: &'static ChainContracts = Box::leak(Box::new(ChainContracts::default()));
         let wallets: &'static Wallets = Box::leak(Box::new(Wallets::default()));
         let metadata: &'static ChainMetadata = Box::leak(Box::new(default_metadata()));
@@ -346,6 +408,7 @@ default_configs_path: /defaults
             prover_mode,
             genesis_base64: Some("dGVzdA==".to_string()),
             fee_collector_address: Some(Address::ZERO),
+            base_token_address,
         }
     }
 
@@ -357,11 +420,12 @@ default_configs_path: /defaults
     }
 
     #[test]
-    fn l2_mode_includes_blob_gas_excludes_pubdata_mode() {
+    fn l2_mode_sets_pubdata_mode_to_blobs() {
         let input = make_input(true, ProverMode::NoProofs);
         let params = extract(&input);
         let map = to_map(&params);
 
+        assert_eq!(map["l1_sender_pubdata_mode"], str_val("Blobs"));
         assert_eq!(
             map["l1_sender_max_fee_per_blob_gas_gwei"],
             num_val(L2_MAX_FEE_PER_BLOB_GAS_GWEI)
@@ -374,7 +438,6 @@ default_configs_path: /defaults
             map["sequencer_native_price_override"],
             str_val(L2_NATIVE_PRICE_OVERRIDE)
         );
-        assert!(!map.contains_key("l1_sender_pubdata_mode"));
         assert!(!map.contains_key("sequencer_pubdata_price_override"));
     }
 
@@ -458,5 +521,64 @@ default_configs_path: /defaults
         assert_eq!(map["batcher_batch_timeout"], str_val(BATCH_TIMEOUT));
         assert_eq!(map["sequencer_block_time"], str_val(BLOCK_TIME));
         assert_eq!(map["l1_sender_poll_interval"], str_val(POLL_INTERVAL));
+        assert_eq!(
+            map["external_price_api_client_source"],
+            str_val(EXTERNAL_PRICE_API_CLIENT_SOURCE)
+        );
+        assert_eq!(
+            map["base_token_price_updater_enabled"],
+            str_val(BASE_TOKEN_PRICE_UPDATER_ENABLED)
+        );
+        assert_eq!(
+            map["observability_log_format"],
+            str_val(OBSERVABILITY_LOG_FORMAT)
+        );
+        assert_eq!(
+            map["observability_log_use_color"],
+            str_val(OBSERVABILITY_LOG_USE_COLOR)
+        );
+    }
+
+    #[test]
+    fn forced_prices_json_has_eth_only_when_no_base_token() {
+        let input = make_input_with_base_token(true, ProverMode::NoProofs, None);
+        let params = extract(&input);
+        let map = to_map(&params);
+
+        let raw = map["external_price_api_client_forced_prices__json"]
+            .as_ref()
+            .unwrap();
+        let json_str = raw.as_str().unwrap();
+        let parsed: serde_json::Map<String, Value> = serde_json::from_str(json_str).unwrap();
+
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(
+            parsed[ETH_FORCED_PRICE_ADDRESS].as_f64().unwrap(),
+            ETH_FORCED_PRICE
+        );
+    }
+
+    #[test]
+    fn forced_prices_json_includes_base_token_when_set() {
+        let cgt: Address = "0x2a98B46fe31BA8Be05ef1cE3D36e1f80Db04190D"
+            .parse()
+            .unwrap();
+        let input = make_input_with_base_token(true, ProverMode::NoProofs, Some(cgt));
+        let params = extract(&input);
+        let map = to_map(&params);
+
+        let raw = map["external_price_api_client_forced_prices__json"]
+            .as_ref()
+            .unwrap();
+        let json_str = raw.as_str().unwrap();
+        let parsed: serde_json::Map<String, Value> = serde_json::from_str(json_str).unwrap();
+
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(
+            parsed[ETH_FORCED_PRICE_ADDRESS].as_f64().unwrap(),
+            ETH_FORCED_PRICE
+        );
+        let cgt_key = "0x2a98b46fe31ba8be05ef1ce3d36e1f80db04190d";
+        assert_eq!(parsed[cgt_key].as_f64().unwrap(), BASE_TOKEN_FORCED_PRICE);
     }
 }
