@@ -73,6 +73,10 @@ pub struct ChainL1Contracts {
     /// Blobs ZkSync OS L1 DA validator address.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blobs_zksync_os_l1_da_validator_addr: Option<Address>,
+
+    /// FeeAdjusterConfig contract address (deployed on L1, owned by ChainAdmin).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fee_adjuster_config: Option<Address>,
 }
 
 /// Chain L2 contracts from chains/*/configs/contracts.yaml.
@@ -244,6 +248,11 @@ impl ChainContracts {
     /// Returns the governance address if available.
     pub fn governance_addr(&self) -> Option<Address> {
         self.l1.as_ref().and_then(|l| l.governance_addr)
+    }
+
+    /// Returns the FeeAdjusterConfig address if available.
+    pub fn fee_adjuster_config(&self) -> Option<Address> {
+        self.l1.as_ref().and_then(|l| l.fee_adjuster_config)
     }
 }
 

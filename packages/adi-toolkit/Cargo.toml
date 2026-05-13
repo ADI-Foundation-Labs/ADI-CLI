@@ -20,6 +20,7 @@ thiserror = { workspace = true }
 serde = { workspace = true }
 semver = { workspace = true }
 strum = { workspace = true }
+secrecy = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

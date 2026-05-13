@@ -157,6 +157,66 @@ impl ToolkitRunner {
         .await
     }
 
+    /// Execute a `forge script` invocation inside the toolkit container.
+    ///
+    /// The deployer private key must be supplied via the `DEPLOYER_PRIVATE_KEY`
+    /// environment variable (consumed by the script through `vm.envOr` or via
+    /// `--private-key $DEPLOYER_PRIVATE_KEY`). This avoids leaking the key onto
+    /// the container command line.
+    pub async fn run_forge_script(
+        &self,
+        params: &super::params::ForgeScriptParams<'_>,
+        deployer_private_key: &secrecy::SecretString,
+    ) -> Result<i64> {
+        use secrecy::ExposeSecret;
+
+        let container_rpc_url = transform_url_for_container(params.rpc_url, self.logger.as_ref());
+
+        // Build sig arguments string (positional, space-separated, escaped).
+        let mut sig_args_joined = String::new();
+        for arg in params.sig_args {
+            if !sig_args_joined.is_empty() {
+                sig_args_joined.push(' ');
+            }
+            sig_args_joined.push_str(&super::shell_escape(arg));
+        }
+
+        let gas_flag = params
+            .gas_price_wei
+            .map(|g| format!(" --with-gas-price {}", g))
+            .unwrap_or_default();
+
+        let shell_cmd = format!(
+            "cd {workdir} && forge script {script} \
+             --sig {sig} {sig_args} \
+             --rpc-url {rpc} \
+             --private-key \"$DEPLOYER_PRIVATE_KEY\" \
+             --broadcast \
+             --slow{gas}",
+            workdir = super::shell_escape(params.working_dir),
+            script = super::shell_escape(params.script_path),
+            sig = super::shell_escape(params.signature),
+            sig_args = sig_args_joined,
+            rpc = super::shell_escape(&container_rpc_url),
+            gas = gas_flag,
+        );
+
+        let command = vec!["sh", "-c", shell_cmd.as_str()];
+        let env_vars = [("DEPLOYER_PRIVATE_KEY", deployer_private_key.expose_secret())];
+
+        self.run_command_internal(RunCommandParams {
+            command: &command,
+            state_dir: params.state_dir,
+            log_dir: params.state_dir,
+            protocol_version: params.protocol_version,
+            env_vars: &env_vars,
+            log_command: params.log_command,
+            log_label: params.log_label,
+            quiet: false,
+        })
+        .await
+    }
+
     /// Execute `zkstack ecosystem init` with foundry.toml permission fix.
     pub async fn run_zkstack_ecosystem_init(
         &self,

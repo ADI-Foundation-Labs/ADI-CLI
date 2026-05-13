@@ -140,6 +140,30 @@ pub struct VaultDefaults {
     pub api_url: Option<Url>,
 }
 
+/// Fee adjuster post-deployment configuration.
+///
+/// Controls whether `FeeAdjusterConfig` is deployed on L1 (with ChainAdmin as
+/// owner) after the main ecosystem/chain deployment finishes.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct FeeAdjusterConfig {
+    /// Deploy `FeeAdjusterConfig` on L1 as part of `adi deploy`.
+    /// Default: `true` — set to `false` in `.adi.yml` to skip.
+    #[serde(default = "default_fee_adjuster_enabled")]
+    pub enabled: bool,
+}
+
+fn default_fee_adjuster_enabled() -> bool {
+    true
+}
+
+impl Default for FeeAdjusterConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_fee_adjuster_enabled(),
+        }
+    }
+}
+
 /// S3 synchronization configuration.
 ///
 /// Enables syncing ecosystem state to S3-compatible storage.
