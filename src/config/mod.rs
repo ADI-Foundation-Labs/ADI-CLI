@@ -1,8 +1,8 @@
 mod types;
 
 pub use types::{
-    FundingDefaults, OperatorsConfig, OwnershipDefaults, S3Config, ToolkitDefaults, VaultDefaults,
-    VerificationDefaults,
+    FeeAdjusterConfig, FundingDefaults, OperatorsConfig, OwnershipDefaults, S3Config,
+    ToolkitDefaults, VaultDefaults, VerificationDefaults,
 };
 
 use std::path::{Path, PathBuf};
@@ -102,6 +102,12 @@ pub struct Config {
     /// **Deprecated**: Use `ecosystem.chains[].operators` instead.
     #[serde(default)]
     pub operators: OperatorsConfig,
+
+    /// Fee adjuster post-deployment configuration.
+    /// `enabled` defaults to `true` — set `fee_adjuster.enabled: false` in
+    /// `.adi.yml` to skip `FeeAdjusterConfig` deployment.
+    #[serde(default)]
+    pub fee_adjuster: FeeAdjusterConfig,
 }
 
 impl Config {

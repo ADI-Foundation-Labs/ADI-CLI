@@ -8,11 +8,19 @@ ARG ZKSYNC_ERA_OS_INTEGRATION_COMMIT=""
 ARG CONTRACTS_COMMIT=""
 ARG ERA_CONTRACTS_TAG=""
 ARG GENESIS_COMMIT
+# Fee-adjuster contracts source. SSH URL is used so the host SSH agent forwarded
+# via `--ssh default` (BuildKit) provides credentials — no tokens are baked into
+# image layers. Override REF to pin a branch/tag/commit.
+ARG FEE_ADJUSTER_REPO="git@gitlab.sre.ideasoft.io:adi-foundation/adi-chain/fee-adjuster-contracts.git"
+ARG FEE_ADJUSTER_REF="feat/init"
+# Pin forge-std for reproducible script builds.
+ARG FORGE_STD_TAG="v1.9.4"
 
 # Build dependencies only
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && apt-get install -y \
     git \
+    openssh-client \
     clang \
     make \
     curl \
@@ -75,6 +83,43 @@ RUN curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/in
 ENV PATH="/root/.foundry/bin:${PATH}"
 RUN foundryup-zksync
 
+# Install Node.js (needed to fetch OpenZeppelin sources for fee-adjuster forge build).
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get update && apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
+# Clone fee-adjuster-contracts + forge-std, install OZ via npm, prebuild artefacts.
+#
+# Credentials are supplied EITHER via BuildKit secret `gitlab_token` (HTTPS+PAT,
+# preferred for CI) OR via forwarded SSH agent `--ssh default` (local dev). The
+# secret takes precedence when both are present.
+#
+# Usage examples:
+#   echo "<PAT>" | docker buildx build --secret id=gitlab_token,src=- ...
+#   docker buildx build --ssh default ...                        # uses SSH agent
+RUN --mount=type=ssh \
+    --mount=type=secret,id=gitlab_token,target=/run/secrets/gitlab_token,required=false \
+    set -eu; \
+    mkdir -p ~/.ssh && \
+    ssh-keyscan -t rsa,ed25519 gitlab.sre.ideasoft.io >> ~/.ssh/known_hosts 2>/dev/null || true; \
+    if [ -s /run/secrets/gitlab_token ]; then \
+        TOKEN="$(cat /run/secrets/gitlab_token)"; \
+        HTTPS_URL="$(echo "$FEE_ADJUSTER_REPO" | sed -E 's#^git@([^:]+):#https://\1/#')"; \
+        CLONE_URL="$(echo "$HTTPS_URL" | sed "s#https://#https://oauth2:${TOKEN}@#")"; \
+        echo "Cloning fee-adjuster-contracts via HTTPS+token"; \
+    else \
+        CLONE_URL="$FEE_ADJUSTER_REPO"; \
+        echo "Cloning fee-adjuster-contracts via SSH agent"; \
+    fi; \
+    git clone --depth 1 --branch ${FEE_ADJUSTER_REF} "$CLONE_URL" /build/fee-adjuster-contracts && \
+    cd /build/fee-adjuster-contracts && \
+    mkdir -p lib && \
+    git clone --depth 1 --branch ${FORGE_STD_TAG} \
+        https://github.com/foundry-rs/forge-std.git lib/forge-std && \
+    npm ci --no-audit --no-fund && \
+    forge build && \
+    rm -rf node_modules/.cache cache_forge
+
 # Remove .git to save ~542MB (fake git in runtime handles zkstack)
 RUN find /build -type d -name .git -prune -exec rm -rf '{}' + && \
     find /build -type f -name .git -delete
@@ -121,6 +166,14 @@ COPY --from=builder --chmod=a+w /build/zksync-era /deps/zksync-era
 
 # Copy era-contracts from builder (if it was cloned)
 COPY --from=builder --chmod=a+w /build/era-contracts /deps/era-contracts
+
+# Copy fee-adjuster-contracts (sources + prebuilt out/) from builder.
+# Forge needs to write broadcast/ + cache files at runtime as a non-root user,
+# so ensure every directory in the tree is world-rwx (mode 777) and files are
+# world-rw (mode 666).
+COPY --from=builder /build/fee-adjuster-contracts /deps/fee-adjuster-contracts
+RUN find /deps/fee-adjuster-contracts -type d -exec chmod 777 {} + && \
+    find /deps/fee-adjuster-contracts -type f -exec chmod 666 {} +
 
 # Set HOME for non-root users (forge/yarn cache)
 ENV HOME=/tmp

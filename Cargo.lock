@@ -139,6 +139,7 @@ dependencies = [
  "adi-docker",
  "adi-types",
  "console 0.15.11",
+ "secrecy",
  "semver 1.0.27",
  "serde",
  "strum 0.26.3",

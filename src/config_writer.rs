@@ -238,6 +238,7 @@ impl Default for Config {
             vault: crate::config::VaultDefaults::default(),
             s3: crate::config::S3Config::default(),
             operators: crate::config::OperatorsConfig::default(),
+            fee_adjuster: crate::config::FeeAdjusterConfig::default(),
         }
     }
 }

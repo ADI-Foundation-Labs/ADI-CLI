@@ -4,7 +4,7 @@ mod commands;
 mod params;
 
 pub(crate) use params::RunCommandParams;
-pub use params::{EcosystemInitParams, ForgeVerifyParams};
+pub use params::{EcosystemInitParams, ForgeScriptParams, ForgeVerifyParams};
 
 use crate::cleanup::cleanup_tmp_dir;
 use crate::config::ToolkitConfig;

@@ -47,6 +47,30 @@ pub struct ForgeVerifyParams<'a> {
     pub root_path: &'a str,
 }
 
+/// Parameters for `forge script` execution inside the toolkit container.
+pub struct ForgeScriptParams<'a> {
+    /// Working directory inside the container (e.g. `/deps/fee-adjuster-contracts`).
+    pub working_dir: &'a str,
+    /// Script path relative to `working_dir` (e.g. `script/Deploy.s.sol`).
+    pub script_path: &'a str,
+    /// Function signature (e.g. `"run(address)"`).
+    pub signature: &'a str,
+    /// Positional arguments for the function call.
+    pub sig_args: &'a [&'a str],
+    /// JSON-RPC URL to broadcast against (transformed for container reachability).
+    pub rpc_url: &'a str,
+    /// Optional gas price in wei (`-g` flag), applied when not on localhost.
+    pub gas_price_wei: Option<u128>,
+    /// State directory mounted at /workspace (used for log output, not script CWD).
+    pub state_dir: &'a Path,
+    /// Protocol version for toolkit image selection.
+    pub protocol_version: &'a Version,
+    /// Label for progress display.
+    pub log_label: &'a str,
+    /// Command name for log file naming.
+    pub log_command: &'a str,
+}
+
 /// Parameters for `zkstack ecosystem init`.
 pub struct EcosystemInitParams<'a> {
     /// Path to the ecosystem directory.

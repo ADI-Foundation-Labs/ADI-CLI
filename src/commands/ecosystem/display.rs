@@ -472,6 +472,10 @@ fn format_chain_l1(l1: &ChainL1Contracts) -> Vec<String> {
                 l1.blobs_zksync_os_l1_da_validator_addr
             )
         ),
+        format!(
+            "  {}",
+            format_addr("Fee Adjuster Config", l1.fee_adjuster_config)
+        ),
     ]
 }
 
