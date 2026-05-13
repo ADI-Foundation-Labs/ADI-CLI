@@ -795,27 +795,36 @@ async fn run_ecosystem_deployment(
 
     // Deploy FeeAdjusterConfig on L1 with ChainAdmin as owner.
     // Enabled by default; opt out via `fee_adjuster.enabled: false` in .adi.yml.
-    if context.config().fee_adjuster.enabled {
+    let fee_adjuster_address = if context.config().fee_adjuster.enabled {
         let fee_adjuster_gas_price = compute_fee_adjuster_gas_price(rpc_url, gas_multiplier)
             .await
             .wrap_err("Failed to estimate gas price for fee-adjuster deployment")?;
-        super::fee_adjuster::deploy_fee_adjuster(super::fee_adjuster::DeployFeeAdjusterParams {
-            context,
-            state_manager,
-            chain_name,
-            ecosystem_name,
-            rpc_url,
-            chain_wallets,
-            protocol_version: &protocol_version,
-            gas_price_wei: fee_adjuster_gas_price,
-        })
+        let addr = super::fee_adjuster::deploy_fee_adjuster(
+            super::fee_adjuster::DeployFeeAdjusterParams {
+                context,
+                state_manager,
+                chain_name,
+                ecosystem_name,
+                rpc_url,
+                protocol_version: &protocol_version,
+                gas_price_wei: fee_adjuster_gas_price,
+            },
+        )
         .await?;
+        Some(addr)
     } else {
         ui::info("Skipping FeeAdjusterConfig deployment (fee_adjuster.enabled = false)")?;
-    }
+        None
+    };
 
     // Display summary
-    display_deployment_summary(ecosystem_name, chain_name, &deployed, &ownership_result)?;
+    display_deployment_summary(
+        ecosystem_name,
+        chain_name,
+        &deployed,
+        &ownership_result,
+        fee_adjuster_address,
+    )?;
 
     Ok(())
 }
@@ -1140,16 +1149,18 @@ fn display_deployment_summary(
     chain_name: &str,
     deployed: &DeployedContracts,
     ownership_result: &OwnershipOperationResult,
+    fee_adjuster: Option<Address>,
 ) -> Result<()> {
-    ui::note(
-        "Deployment Summary",
-        format!(
-            "Ecosystem: {}\nChain: {}\nDiamond proxy: {}",
-            ui::green(ecosystem_name),
-            ui::green(chain_name),
-            ui::green(deployed.diamond_proxy)
-        ),
-    )?;
+    let mut body = format!(
+        "Ecosystem: {}\nChain: {}\nDiamond proxy: {}",
+        ui::green(ecosystem_name),
+        ui::green(chain_name),
+        ui::green(deployed.diamond_proxy)
+    );
+    if let Some(addr) = fee_adjuster {
+        body.push_str(&format!("\nFee Adjuster Config: {}", ui::green(addr)));
+    }
+    ui::note("Deployment Summary", body)?;
 
     let outro_msg = if ownership_result.new_owner_accepted {
         "Deployment complete with ownership transferred and accepted!"

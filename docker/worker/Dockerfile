@@ -168,7 +168,12 @@ COPY --from=builder --chmod=a+w /build/zksync-era /deps/zksync-era
 COPY --from=builder --chmod=a+w /build/era-contracts /deps/era-contracts
 
 # Copy fee-adjuster-contracts (sources + prebuilt out/) from builder.
-COPY --from=builder --chmod=a+w /build/fee-adjuster-contracts /deps/fee-adjuster-contracts
+# Forge needs to write broadcast/ + cache files at runtime as a non-root user,
+# so ensure every directory in the tree is world-rwx (mode 777) and files are
+# world-rw (mode 666).
+COPY --from=builder /build/fee-adjuster-contracts /deps/fee-adjuster-contracts
+RUN find /deps/fee-adjuster-contracts -type d -exec chmod 777 {} + && \
+    find /deps/fee-adjuster-contracts -type f -exec chmod 666 {} +
 
 # Set HOME for non-root users (forge/yarn cache)
 ENV HOME=/tmp

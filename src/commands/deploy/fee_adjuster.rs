@@ -14,7 +14,6 @@
 use adi_funding::is_localhost_rpc;
 use adi_state::StateManager;
 use adi_toolkit::{ForgeScriptParams, ProtocolVersion, ToolkitRunner};
-use adi_types::Wallets;
 use alloy_primitives::Address;
 use serde::Deserialize;
 use std::path::Path;
@@ -45,12 +44,10 @@ pub struct DeployFeeAdjusterParams<'a> {
     pub state_manager: &'a StateManager,
     /// Name of the chain whose ChainAdmin will own the deployed contract.
     pub chain_name: &'a str,
-    /// Ecosystem name (used to resolve the state directory mount).
+    /// Ecosystem name (used to resolve the state directory mount + read wallets).
     pub ecosystem_name: &'a str,
     /// Settlement-layer RPC URL.
     pub rpc_url: &'a Url,
-    /// Chain wallets — the `deployer` entry is used to pay for the deploy tx.
-    pub chain_wallets: &'a Wallets,
     /// Toolkit protocol version for image selection.
     pub protocol_version: &'a ProtocolVersion,
     /// Optional gas price in wei (None ⇒ let forge estimate, used on localhost).
@@ -69,7 +66,6 @@ pub async fn deploy_fee_adjuster(params: DeployFeeAdjusterParams<'_>) -> Result<
         chain_name,
         ecosystem_name,
         rpc_url,
-        chain_wallets,
         protocol_version,
         gas_price_wei,
     } = params;
@@ -96,10 +92,19 @@ pub async fn deploy_fee_adjuster(params: DeployFeeAdjusterParams<'_>) -> Result<
         )
     })?;
 
-    let deployer_key = chain_wallets
+    // Use the ecosystem-level deployer wallet — only that one is funded by the
+    // funding plan; the per-chain deployer wallet stays empty.
+    let ecosystem_wallets = state_manager
+        .ecosystem()
+        .wallets()
+        .await
+        .wrap_err("Failed to read ecosystem wallets for fee-adjuster deployment")?;
+    let deployer_key = ecosystem_wallets
         .deployer
         .as_ref()
-        .ok_or_else(|| eyre::eyre!("Chain deployer wallet required for fee-adjuster deployment"))?
+        .ok_or_else(|| {
+            eyre::eyre!("Ecosystem deployer wallet required for fee-adjuster deployment")
+        })?
         .private_key
         .clone();
 

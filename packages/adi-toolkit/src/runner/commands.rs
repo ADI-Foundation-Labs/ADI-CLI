@@ -187,7 +187,7 @@ impl ToolkitRunner {
             .unwrap_or_default();
 
         let shell_cmd = format!(
-            "cd {workdir} && forge script {script} \
+            "mkdir -p /workspace/.adi && cd {workdir} && forge script {script} \
              --sig {sig} {sig_args} \
              --rpc-url {rpc} \
              --private-key \"$DEPLOYER_PRIVATE_KEY\" \
