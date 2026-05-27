@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5] - 2026-05-27
+
+### Added
+
+- **`FeeAdjusterConfig` L1 deployment** as a post-step of `adi deploy` — runs `forge script` inside the toolkit container, initializes the contract with the chain's `ChainAdmin` as owner, and persists the address to `chains/<chain>/configs/contracts.yaml` under `l1.fee_adjuster_config`
+- `fee_adjuster.enabled` flag in `.adi.yml` (default `true`) to opt out of the post-deployment step
+- `Fee Adjuster Config` line in the `adi ecosystem` chain L1 contracts display
+- `fee_adjuster_config` field on `ChainL1Contracts` plus `ChainContracts::fee_adjuster_config()` accessor
+- `ForgeScriptParams` + `ToolkitRunner::run_forge_script` in `adi-toolkit` for executing arbitrary `forge script` invocations against a mounted source tree with container-aware RPC URL rewriting and a `DEPLOYER_PRIVATE_KEY` env injection
+- Idempotency in the fee-adjuster step: a chain that already has `fee_adjuster_config` set is skipped on re-run
+
+### Changed
+
+- Toolkit Docker image now clones `fee-adjuster-contracts` (pinned to `main`) and `forge-std` v1.9.4 into `/deps/fee-adjuster-contracts`, installs OpenZeppelin via `npm ci`, and pre-builds artefacts during image build. Credentials are accepted via BuildKit SSH agent forwarding **or** a `gitlab_token` secret (HTTPS+PAT, preferred in CI)
+- Toolkit image installs Node.js 20 and `openssh-client` to support the above
+- Build credential plumbing (`ssh = ["default"]`, `secret = [...]`) moved from CLI flags into `docker/docker-bake.hcl`, gated on the `ENABLE_SSH` / `GITLAB_TOKEN` env vars so the Taskfile can pick the right mode automatically
+
+### Fixed
+
+- Docker image builds in GitLab CI (dind) no longer abort with `invalid empty ssh agent socket` — credentials are now forwarded as a BuildKit secret sourced from `CI_JOB_READ_REPO_TOKEN` instead of requiring an SSH agent
+
 ## [0.2.4] - 2026-04-21
 
 ### Added
@@ -155,6 +176,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Interactive UI** with themed prompts, confirmations, and multi-select pickers via `dialoguer` and `console`
 - **Colored terminal output** and structured logging via `env_logger` with configurable log levels
 
+[0.2.5]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.4...0.2.5
 [0.2.4]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.3...0.2.4
 [0.2.3]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.2...0.2.3
 [0.2.2]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.1...0.2.2
