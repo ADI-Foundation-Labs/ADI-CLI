@@ -128,6 +128,7 @@ build-docker-amd64:
     # Initialize buildx
     - docker buildx create --name builder-amd64 --driver docker-container --use || true
     - docker buildx inspect --bootstrap
+    - export GITLAB_TOKEN="$CI_JOB_READ_REPO_TOKEN"
     - task build:docker:amd64 TARGETS="$[[ inputs.build_target ]]" LOAD=false PUSH=true
 
 # Build ARM64 image on native ARM64 runner
@@ -140,6 +141,7 @@ build-docker-arm64:
     # Initialize buildx
     - docker buildx create --name builder-arm64 --driver docker-container --use || true
     - docker buildx inspect --bootstrap
+    - export GITLAB_TOKEN="$CI_JOB_READ_REPO_TOKEN"
     - task build:docker:arm64 TARGETS="$[[ inputs.build_target ]]" LOAD=false PUSH=true
 
 # Create multiarch manifest from AMD64 and ARM64 images
