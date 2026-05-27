@@ -43,8 +43,8 @@ target "common" {
   tags = TAGS != null ? jsondecode(TAGS) : ["${REGISTRY}/adi-toolkit:${CI_COMMIT_REF_SLUG}"]
   cache-from = notequal("", NO_CACHE) ? [] : CACHE_FROM
   cache-to = notequal("", CACHE_TO_REF) ? ["type=registry,ref=${CACHE_TO_REF},mode=max"] : []
-  # Forward host SSH agent for cloning private repos (e.g. fee-adjuster-contracts).
-  ssh = ["default"]
+  # SSH agent / secret forwarding for cloning fee-adjuster-contracts is passed
+  # at the CLI level by the Taskfile (depends on SSH_AUTH_SOCK / GITLAB_TOKEN).
   # Disable provenance to avoid Harbor compatibility issues (blob upload invalid)
   attests = ["type=provenance,mode=disabled"]
 }
