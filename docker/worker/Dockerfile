@@ -12,7 +12,7 @@ ARG GENESIS_COMMIT
 # via `--ssh default` (BuildKit) provides credentials — no tokens are baked into
 # image layers. Override REF to pin a branch/tag/commit.
 ARG FEE_ADJUSTER_REPO="git@gitlab.sre.ideasoft.io:adi-foundation/adi-chain/fee-adjuster-contracts.git"
-ARG FEE_ADJUSTER_REF="feat/init"
+ARG FEE_ADJUSTER_REF="main"
 # Pin forge-std for reproducible script builds.
 ARG FORGE_STD_TAG="v1.9.4"
 
