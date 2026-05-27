@@ -121,19 +121,16 @@ tasks:
           TAG_SUFFIX="-{{.REF_SLUG}}-{{.ARCH_SLUG}}-{{.CI_COMMIT_SHORT_SHA}}"
         fi
 
-        # Forward credentials for cloning private fee-adjuster-contracts:
-        # - GITLAB_TOKEN (CI): HTTPS+PAT via BuildKit secret
-        # - SSH_AUTH_SOCK (local dev): forwarded SSH agent
-        SSH_ARGS=""
-        SECRET_ARGS=""
-        [ -n "${SSH_AUTH_SOCK:-}" ] && SSH_ARGS="--ssh default"
-        [ -n "${GITLAB_TOKEN:-}" ] && SECRET_ARGS="--secret id=gitlab_token,env=GITLAB_TOKEN"
+        # Credentials for cloning fee-adjuster-contracts are picked up by the
+        # bake HCL from env: GITLAB_TOKEN (CI, HTTPS+PAT) or ENABLE_SSH (local).
+        ENABLE_SSH=""
+        [ -n "${SSH_AUTH_SOCK:-}" ] && ENABLE_SSH=1
 
         PLATFORM={{.PLATFORM}} \
         CACHE_TO_REF={{.CACHE_TO_REF}} \
         TAG_SUFFIX="$TAG_SUFFIX" \
+        ENABLE_SSH="$ENABLE_SSH" \
         docker buildx bake -f docker/docker-bake.hcl \
-        $SSH_ARGS $SECRET_ARGS \
         {{if eq .LOAD "true"}}--load{{end}} \
         {{if eq .PUSH "true"}}--push{{end}} \
         {{.TARGETS}}
@@ -180,15 +177,13 @@ tasks:
     cmds:
       - |
         PLATFORM={{.PLATFORM}} \
-        SSH_ARGS=""
-        SECRET_ARGS=""
-        [ -n "${SSH_AUTH_SOCK:-}" ] && SSH_ARGS="--ssh default"
-        [ -n "${GITLAB_TOKEN:-}" ] && SECRET_ARGS="--secret id=gitlab_token,env=GITLAB_TOKEN"
+        ENABLE_SSH=""
+        [ -n "${SSH_AUTH_SOCK:-}" ] && ENABLE_SSH=1
 
         NO_CACHE={{.NO_CACHE}} \
         TAG_SUFFIX="" \
+        ENABLE_SSH="$ENABLE_SSH" \
         docker buildx bake -f docker/docker-bake.hcl \
-        $SSH_ARGS $SECRET_ARGS \
         {{if eq .NO_CACHE "1"}}--no-cache{{end}} \
         --load {{.TARGETS}}
 

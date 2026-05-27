@@ -37,14 +37,25 @@ variable "NO_CACHE" {
   default = ""  // Set to any non-empty value to disable remote cache
 }
 
+variable "GITLAB_TOKEN" {
+  default = ""  // When set, forwarded as BuildKit secret `gitlab_token`
+}
+
+variable "ENABLE_SSH" {
+  default = ""  // When set, forwards host SSH agent (requires SSH_AUTH_SOCK)
+}
+
 target "common" {
   dockerfile = "docker/worker/Dockerfile"
   platforms = PLATFORM != "" ? [PLATFORM] : PLATFORMS
   tags = TAGS != null ? jsondecode(TAGS) : ["${REGISTRY}/adi-toolkit:${CI_COMMIT_REF_SLUG}"]
   cache-from = notequal("", NO_CACHE) ? [] : CACHE_FROM
   cache-to = notequal("", CACHE_TO_REF) ? ["type=registry,ref=${CACHE_TO_REF},mode=max"] : []
-  # SSH agent / secret forwarding for cloning fee-adjuster-contracts is passed
-  # at the CLI level by the Taskfile (depends on SSH_AUTH_SOCK / GITLAB_TOKEN).
+  # Credentials for cloning private fee-adjuster-contracts:
+  # - CI: set GITLAB_TOKEN env -> HTTPS+PAT via BuildKit secret
+  # - Local dev: set ENABLE_SSH=1 (with SSH_AUTH_SOCK exported) -> SSH agent
+  ssh = notequal("", ENABLE_SSH) ? ["default"] : []
+  secret = notequal("", GITLAB_TOKEN) ? ["id=gitlab_token,env=GITLAB_TOKEN"] : []
   # Disable provenance to avoid Harbor compatibility issues (blob upload invalid)
   attests = ["type=provenance,mode=disabled"]
 }
