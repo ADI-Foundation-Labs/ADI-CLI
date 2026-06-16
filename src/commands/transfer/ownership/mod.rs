@@ -15,7 +15,8 @@ use url::Url;
 
 use crate::commands::helpers::{
     create_state_manager_with_context, resolve_chain_new_owner, resolve_ecosystem_name,
-    resolve_ecosystem_new_owner, resolve_rpc_url, select_chain_from_state, OwnershipScope,
+    resolve_ecosystem_new_owner, resolve_gas_multiplier, resolve_rpc_url, select_chain_from_state,
+    OwnershipScope,
 };
 use crate::context::Context;
 use crate::error::Result;
@@ -160,9 +161,10 @@ async fn resolve_config<'a>(
         None
     };
 
-    let gas_multiplier = args
-        .gas_multiplier
-        .or(Some(context.config().gas_multiplier));
+    let gas_multiplier = Some(resolve_gas_multiplier(
+        args.gas_multiplier,
+        context.config(),
+    ));
 
     Ok(TransferConfig {
         rpc_url,

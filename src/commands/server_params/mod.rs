@@ -11,9 +11,8 @@ use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::helpers::{
-    create_state_manager_with_context, resolve_chain_name, resolve_ecosystem_name,
+    create_state_manager_with_context, resolve_chain_name, resolve_ecosystem_name, resolve_rpc_url,
 };
-use crate::config::Config;
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
 use crate::ui;
@@ -110,7 +109,10 @@ pub async fn run(args: &ServerParamsArgs, context: &Context) -> Result<()> {
         .await
         .wrap_err("Failed to load chain metadata")?;
 
-    let rpc_url = resolve_rpc_url(context.config());
+    // RPC URL is optional for server params (only emitted when configured).
+    let rpc_url = resolve_rpc_url(None, context.config())
+        .ok()
+        .map(|url| url.to_string());
 
     let blobs = context
         .config()
@@ -186,16 +188,6 @@ fn handle_missing(json: bool, msg: &str) -> Result<()> {
     ui::warning(msg)?;
     ui::outro("")?;
     Ok(())
-}
-
-/// Resolve RPC URL from config with fallback.
-fn resolve_rpc_url(config: &Config) -> Option<String> {
-    config
-        .ecosystem
-        .rpc_url
-        .as_ref()
-        .or(config.funding.rpc_url.as_ref())
-        .map(|url| url.to_string())
 }
 
 /// Format parameters for display.

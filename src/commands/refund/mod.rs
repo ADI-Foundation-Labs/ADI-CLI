@@ -17,7 +17,8 @@ use url::Url;
 use self::display::{display_plan_summary, display_results, BalanceCheckHandler};
 use self::wallets::{collect_wallet_entries, count_wallets};
 use crate::commands::helpers::{
-    create_state_manager_with_s3, derive_address_from_key, resolve_ecosystem_name, resolve_rpc_url,
+    create_state_manager_with_s3, derive_address_from_key, resolve_ecosystem_name,
+    resolve_funder_key, resolve_gas_multiplier, resolve_rpc_url,
 };
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
@@ -61,9 +62,7 @@ pub async fn run(args: RefundArgs, context: &Context) -> Result<()> {
 
     let ecosystem_name = resolve_ecosystem_name(args.ecosystem_name.as_ref(), context.config())?;
     let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
-    let gas_multiplier = args
-        .gas_multiplier
-        .unwrap_or_else(|| context.config().gas_multiplier);
+    let gas_multiplier = resolve_gas_multiplier(args.gas_multiplier, context.config());
     let receiver = resolve_receiver(args.receiver, context)?;
 
     let logger = context.logger();
@@ -203,16 +202,11 @@ fn resolve_receiver(arg_value: Option<Address>, context: &Context) -> Result<Add
         return Ok(addr);
     }
 
-    let funder_key = context
-        .config()
-        .funding
-        .funder_key
-        .clone()
-        .ok_or_else(|| {
-            eyre::eyre!(
-                "Receiver required: use --receiver flag, or set funding.funder_key / ADI_FUNDER_KEY so the funder address is used"
-            )
-        })?;
+    let funder_key = resolve_funder_key(None, context.config()).map_err(|_| {
+        eyre::eyre!(
+            "Receiver required: use --receiver flag, or set funding.funder_key / ADI_FUNDER_KEY so the funder address is used"
+        )
+    })?;
 
     derive_address_from_key(&funder_key).wrap_err("Failed to derive funder address from key")
 }

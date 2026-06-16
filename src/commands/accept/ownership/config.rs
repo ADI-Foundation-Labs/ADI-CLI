@@ -7,7 +7,8 @@ use url::Url;
 
 use crate::commands::helpers::{
     create_state_manager_with_context, derive_address_from_key, resolve_ecosystem_name,
-    resolve_rpc_url, select_chain_from_state, OwnershipScope,
+    resolve_gas_multiplier, resolve_private_key, resolve_rpc_url, select_chain_from_state,
+    OwnershipScope,
 };
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
@@ -58,10 +59,11 @@ pub(super) async fn resolve_config<'a>(
     .await?;
     let chain_contracts = load_chain_contracts(chain_name.as_deref(), &state_manager).await?;
 
-    let resolved_key = resolve_private_key(args, &state_manager, context).await?;
-    let gas_multiplier = args
-        .gas_multiplier
-        .or(Some(context.config().gas_multiplier));
+    let resolved_key = resolve_accept_key(args, &state_manager, context).await?;
+    let gas_multiplier = Some(resolve_gas_multiplier(
+        args.gas_multiplier,
+        context.config(),
+    ));
 
     Ok(AcceptConfig {
         rpc_url,
@@ -95,35 +97,20 @@ pub(super) fn display_config(config: &AcceptConfig<'_>, args: &AcceptArgs) -> Re
 /// 2. Config `ownership.private_key` (new owner mode)
 /// 3. `--use-governor` flag (governor mode)
 /// 4. Interactive prompt
-async fn resolve_private_key(
+async fn resolve_accept_key(
     args: &AcceptArgs,
     state_manager: &adi_state::StateManager,
     context: &Context,
 ) -> Result<ResolvedKey> {
-    // Priority 1: CLI argument or env var
-    if let Some(ref key_hex) = args.private_key {
-        let secret = SecretString::from(key_hex.clone());
+    // Priorities 1 & 2: CLI arg / env var, then config `ownership.private_key`.
+    if let Some(secret) = resolve_private_key(args.private_key.as_deref(), context.config()) {
         let address = derive_address_from_key(&secret)?;
         ui::info(format!(
-            "Using provided private key (address: {})",
+            "Using configured private key (address: {})",
             ui::green(address)
         ))?;
         return Ok(ResolvedKey {
             private_key: secret,
-            address,
-            is_governor_mode: false,
-        });
-    }
-
-    // Priority 2: Config file
-    if let Some(ref config_key) = context.config().ownership.private_key {
-        let address = derive_address_from_key(config_key)?;
-        ui::info(format!(
-            "Using private key from config (address: {})",
-            ui::green(address)
-        ))?;
-        return Ok(ResolvedKey {
-            private_key: config_key.clone(),
             address,
             is_governor_mode: false,
         });

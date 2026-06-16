@@ -1,7 +1,7 @@
 //! Configuration resolution for the verify command.
 
 use adi_ecosystem::verification::{
-    ContractRegistry, ExplorerClient, ExplorerConfig, ExplorerType, VerificationTarget,
+    ContractRegistry, ExplorerClient, ExplorerConfig, VerificationTarget,
 };
 use alloy_provider::Provider;
 use std::sync::Arc;
@@ -9,6 +9,7 @@ use url::Url;
 
 use crate::commands::helpers::{
     create_state_manager_with_context, resolve_chain_name, resolve_ecosystem_name,
+    resolve_explorer_api_key, resolve_explorer_type, resolve_explorer_url, resolve_rpc_url,
 };
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
@@ -31,13 +32,11 @@ pub(super) async fn resolve_config<'a>(
     args: &VerifyArgs,
     context: &'a Context,
 ) -> Result<Option<VerifyConfig<'a>>> {
-    // Early check for local network
-    let rpc_url = args
-        .rpc_url
-        .as_ref()
-        .or(context.config().funding.rpc_url.as_ref());
+    // Resolve the RPC URL once (arg > ecosystem.rpc_url > funding.rpc_url).
+    let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config()).ok();
 
-    if let Some(url) = rpc_url {
+    // Early exit for local networks (verification is unsupported there).
+    if let Some(ref url) = rpc_url {
         if is_local_network_url(url) {
             ui::outro_cancel(
                 "Contract verification is not available for local networks (Anvil, Hardhat, etc.)",
@@ -65,8 +64,7 @@ pub(super) async fn resolve_config<'a>(
     )
     .await;
 
-    // RPC enhancement
-    let rpc_url = get_rpc_url(args, context);
+    // RPC enhancement (non-local networks only).
     if let Some(ref url) = rpc_url {
         if !is_local_network_url(url) {
             super::contracts::enhance_from_rpc(
@@ -81,9 +79,14 @@ pub(super) async fn resolve_config<'a>(
 
     // Resolve explorer configuration
     let chain_id = resolve_chain_id(args, context).await?;
-    let explorer_type = resolve_explorer_type(args, context);
-    let api_key = resolve_api_key(args, context);
-    let explorer_url = resolve_explorer_url(args, explorer_type, chain_id, context)?;
+    let explorer_type = resolve_explorer_type(args.explorer, context.config());
+    let api_key = resolve_explorer_api_key(args.api_key.as_deref(), context.config());
+    let explorer_url = resolve_explorer_url(
+        args.explorer_url.as_ref(),
+        explorer_type,
+        chain_id,
+        context.config(),
+    )?;
 
     // Build targets
     let targets = build_targets(args, &ecosystem_contracts, chain_contracts.as_ref())?;
@@ -137,38 +140,15 @@ fn is_local_network_url(url: &Url) -> bool {
         || host.starts_with("10.")
 }
 
-/// Get RPC URL from args or config.
-fn get_rpc_url(args: &VerifyArgs, context: &Context) -> Option<Url> {
-    args.rpc_url
-        .clone()
-        .or_else(|| context.config().ecosystem.rpc_url.clone())
-        .or_else(|| context.config().funding.rpc_url.clone())
-}
-
 /// Resolve chain ID from args or RPC.
 async fn resolve_chain_id(args: &VerifyArgs, context: &Context) -> Result<u64> {
     if let Some(chain_id) = args.chain_id {
         return Ok(chain_id);
     }
 
-    // Try CLI arg RPC
-    if let Some(ref rpc_url) = args.rpc_url {
-        return fetch_chain_id(rpc_url, "RPC", context).await;
-    }
-
-    // Try ecosystem config RPC
-    if let Some(ref rpc_url) = context.config().ecosystem.rpc_url {
-        return fetch_chain_id(rpc_url, "ecosystem config RPC", context).await;
-    }
-
-    // Try funding config RPC (backward compatibility)
-    if let Some(ref rpc_url) = context.config().funding.rpc_url {
-        return fetch_chain_id(rpc_url, "funding config RPC", context).await;
-    }
-
-    Err(eyre::eyre!(
-        "Chain ID required. Provide --chain-id or --rpc-url"
-    ))
+    let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())
+        .map_err(|_| eyre::eyre!("Chain ID required. Provide --chain-id or --rpc-url"))?;
+    fetch_chain_id(&rpc_url, "RPC", context).await
 }
 
 /// Fetch chain ID from a provider, logging the source.
@@ -183,90 +163,6 @@ async fn fetch_chain_id(rpc_url: &Url, source: &str, context: &Context) -> Resul
         .wrap_err(format!("Failed to get chain ID from {}", source))?;
     context.logger().debug(&format!("Chain ID: {}", chain_id));
     Ok(chain_id)
-}
-
-/// Resolve API key from args, env, or config.
-fn resolve_api_key(args: &VerifyArgs, context: &Context) -> Option<String> {
-    if let Some(ref key) = args.api_key {
-        return Some(key.clone());
-    }
-
-    if let Some(ref key) = context.config().verification.api_key {
-        use secrecy::ExposeSecret;
-        return Some(key.expose_secret().to_string());
-    }
-
-    None
-}
-
-/// Resolve explorer type from args or config.
-fn resolve_explorer_type(args: &VerifyArgs, context: &Context) -> ExplorerType {
-    if let Some(ref explorer_str) = context.config().verification.explorer {
-        if let Ok(explorer_type) = explorer_str.parse::<ExplorerType>() {
-            return explorer_type;
-        }
-    }
-    args.explorer
-}
-
-/// Resolve explorer URL from args, config, or defaults.
-fn resolve_explorer_url(
-    args: &VerifyArgs,
-    explorer_type: ExplorerType,
-    chain_id: u64,
-    context: &Context,
-) -> Result<Url> {
-    // CLI arg takes priority
-    if let Some(ref url) = args.explorer_url {
-        validate_blockscout_url(url, explorer_type)?;
-        return Ok(url.clone());
-    }
-
-    // Fall back to config
-    if let Some(ref url) = context.config().verification.explorer_url {
-        return Ok(url.clone());
-    }
-
-    // Default URL for known explorers
-    if let Some(url) = ExplorerConfig::default_api_url(explorer_type, chain_id) {
-        return Ok(url);
-    }
-
-    if explorer_type == ExplorerType::Custom {
-        return Err(eyre::eyre!(
-            "Explorer URL required for custom explorer. Provide --explorer-url"
-        ));
-    }
-
-    Err(eyre::eyre!(
-        "No default explorer URL for chain ID {}. Provide --explorer-url",
-        chain_id
-    ))
-}
-
-/// Validate Blockscout URLs to catch common mistakes.
-fn validate_blockscout_url(url: &Url, explorer_type: ExplorerType) -> Result<()> {
-    if explorer_type != ExplorerType::Blockscout {
-        return Ok(());
-    }
-
-    let url_str = url.as_str();
-    if url_str.contains("/api/eth-rpc") {
-        return Err(eyre::eyre!(
-            "Invalid Blockscout URL: '/api/eth-rpc' is the JSON-RPC endpoint.\n\
-             For contract verification, use the REST API endpoint instead.\n\
-             Example: https://eth-sepolia.blockscout.com/api"
-        ));
-    }
-    if url_str.contains("/api/v2") {
-        return Err(eyre::eyre!(
-            "Invalid Blockscout URL: '/api/v2' is the native REST API.\n\
-             For contract verification, use the Etherscan-compatible endpoint.\n\
-             Example: https://eth-sepolia.blockscout.com/api"
-        ));
-    }
-
-    Ok(())
 }
 
 /// Build verification targets based on command flags.
