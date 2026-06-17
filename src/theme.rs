@@ -25,6 +25,18 @@ impl Theme for AdiTheme {
         }
     }
 
+    /// Text style for prompt/note body content.
+    ///
+    /// The upstream default dims `Submit` content, which washes out note bodies
+    /// (labels and values render gray/dark green). Render `Submit` at full
+    /// brightness; cancelled input keeps the dim + strikethrough treatment.
+    fn input_style(&self, state: &ThemeState) -> Style {
+        match state {
+            ThemeState::Cancel => Style::new().dim().strikethrough(),
+            _ => Style::new(),
+        }
+    }
+
     /// State symbol color.
     fn state_symbol_color(&self, state: &ThemeState) -> Style {
         match state {
