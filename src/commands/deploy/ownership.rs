@@ -8,8 +8,8 @@
 //! 3. **New Owner Accept**: Runs if `ownership.private_key` is also configured
 
 use adi_ecosystem::{
-    accept_all_ownership, accept_chain_ownership, transfer_all_ownership, transfer_chain_ownership,
-    OwnershipSummary,
+    accept_all_ownership, accept_chain_ownership, reclaim_l1_nullifier_to_governor,
+    transfer_all_ownership, transfer_chain_ownership, OwnershipSummary,
 };
 use adi_state::StateManager;
 use alloy_primitives::Address;
@@ -82,6 +82,29 @@ pub async fn run_post_deploy_ownership(
 
     let governor_key = governor.private_key.clone();
 
+    // Chain contracts (Chain Governance, Chain Admin) are owned by the chain's
+    // own governor wallet, not the ecosystem governor. Load it separately so
+    // chain-level accept/transfer is signed by the actual owner.
+    let chain_wallets = state_manager
+        .chain(chain_name)
+        .wallets()
+        .await
+        .wrap_err("Failed to load chain wallets")?;
+
+    let chain_governor_key = chain_wallets
+        .governor
+        .ok_or_else(|| eyre::eyre!("Chain governor wallet not found in state"))?
+        .private_key;
+
+    // The deployer retains ownership of the L1 Nullifier after zkstack deploy,
+    // so its key is needed to hand that contract over to the governor.
+    let deployer_key = wallets
+        .deployer
+        .as_ref()
+        .ok_or_else(|| eyre::eyre!("Deployer wallet not found in state"))?
+        .private_key
+        .clone();
+
     // Resolve ownership config
     let ecosystem_new_owner = config.ecosystem.ownership.new_owner;
     let chain_new_owner = config
@@ -101,6 +124,20 @@ pub async fn run_post_deploy_ownership(
     // Step 1: Accept ownership as governor
     ui::section("Accepting ownership as governor")?;
 
+    // zkstack leaves the L1 Nullifier owned by the deployer rather than the
+    // governor. Reclaim it (deployer → governor) before accepting the remaining
+    // pending transfers so the governor ends up owning every ecosystem contract.
+    let l1_nullifier_reclaim = reclaim_l1_nullifier_to_governor(
+        rpc_url,
+        &ecosystem_contracts,
+        &deployer_key,
+        &governor_key,
+        gas_multiplier,
+        logger.as_ref(),
+    )
+    .await;
+    display_accept_results("L1 Nullifier (deployer → governor)", &l1_nullifier_reclaim)?;
+
     let eco_accept = accept_all_ownership(
         rpc_url,
         &ecosystem_contracts,
@@ -113,7 +150,7 @@ pub async fn run_post_deploy_ownership(
     let chain_accept = accept_chain_ownership(
         rpc_url,
         &chain_contracts,
-        &governor_key,
+        &chain_governor_key,
         gas_multiplier,
         logger.as_ref(),
     )
@@ -145,7 +182,7 @@ pub async fn run_post_deploy_ownership(
             let result = transfer_chain_ownership(
                 rpc_url,
                 &chain_contracts,
-                &governor_key,
+                &chain_governor_key,
                 new_owner,
                 gas_multiplier,
                 logger.as_ref(),

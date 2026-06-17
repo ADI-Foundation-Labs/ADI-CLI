@@ -356,6 +356,11 @@ impl EcosystemContracts {
             .as_ref()
             .and_then(|c| c.native_token_vault_addr)
     }
+
+    /// Returns the L1 Nullifier proxy address if available.
+    pub fn l1_nullifier_addr(&self) -> Option<Address> {
+        self.bridges.as_ref().and_then(|b| b.l1_nullifier_addr)
+    }
 }
 
 #[cfg(test)]

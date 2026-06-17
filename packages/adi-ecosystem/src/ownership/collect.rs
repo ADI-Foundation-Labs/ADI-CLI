@@ -101,7 +101,37 @@ pub async fn collect_all_ownership_calldata(
         }
     }
 
-    // 4. Governance (direct)
+    // 4. Native Token Vault (direct)
+    if let Some(vault) = contracts.native_token_vault_addr() {
+        let state =
+            check_ownership_state(&provider, vault, governor, "Native Token Vault", logger).await;
+        if state == OwnershipState::Pending {
+            let calldata = build_accept_ownership_calldata();
+            output.push(CalldataEntry::new(
+                "Native Token Vault",
+                vault,
+                calldata,
+                "acceptOwnership()".to_string(),
+            ));
+        }
+    }
+
+    // 5. L1 Nullifier (direct)
+    if let Some(nullifier) = contracts.l1_nullifier_addr() {
+        let state =
+            check_ownership_state(&provider, nullifier, governor, "L1 Nullifier", logger).await;
+        if state == OwnershipState::Pending {
+            let calldata = build_accept_ownership_calldata();
+            output.push(CalldataEntry::new(
+                "L1 Nullifier",
+                nullifier,
+                calldata,
+                "acceptOwnership()".to_string(),
+            ));
+        }
+    }
+
+    // 6. Governance (direct)
     if let Some(governance) = contracts.governance_addr() {
         let state =
             check_ownership_state(&provider, governance, governor, "Governance", logger).await;
@@ -116,7 +146,7 @@ pub async fn collect_all_ownership_calldata(
         }
     }
 
-    // 5. Ecosystem Chain Admin (direct)
+    // 7. Ecosystem Chain Admin (direct)
     if let Some(chain_admin_addr) = contracts.chain_admin_addr() {
         let state = check_ownership_state(
             &provider,
@@ -137,7 +167,7 @@ pub async fn collect_all_ownership_calldata(
         }
     }
 
-    // 6. Rollup DA Manager (via governance timelock - 2 transactions)
+    // 8. Rollup DA Manager (via governance timelock - 2 transactions)
     if let (Some(da_manager), Some(governance)) = (
         contracts.l1_rollup_da_manager_addr(),
         contracts.governance_addr(),

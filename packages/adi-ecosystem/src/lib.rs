@@ -75,9 +75,9 @@ pub use ownership::{
     build_governance_schedule_calldata, build_transfer_ownership_calldata,
     check_chain_ownership_status, check_ecosystem_ownership_status,
     check_ecosystem_ownership_status_for_new_owner, collect_all_ownership_calldata,
-    collect_chain_ownership_calldata, transfer_all_ownership, transfer_chain_ownership,
-    CalldataEntry, CalldataOutput, OwnershipContract, OwnershipMethod, OwnershipResult,
-    OwnershipState, OwnershipStatus, OwnershipStatusSummary, OwnershipSummary,
+    collect_chain_ownership_calldata, reclaim_l1_nullifier_to_governor, transfer_all_ownership,
+    transfer_chain_ownership, CalldataEntry, CalldataOutput, OwnershipContract, OwnershipMethod,
+    OwnershipResult, OwnershipState, OwnershipStatus, OwnershipStatusSummary, OwnershipSummary,
 };
 pub use types::{L1Network, ProverMode};
 pub use validator::{

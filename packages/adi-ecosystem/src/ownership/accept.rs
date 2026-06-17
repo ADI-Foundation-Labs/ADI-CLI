@@ -7,10 +7,7 @@ use adi_types::{ChainContracts, EcosystemContracts, Logger};
 use secrecy::SecretString;
 
 use super::context::build_signing_context;
-use super::contracts::{
-    accept_chain_admin, accept_chain_governance, accept_ecosystem_chain_admin, accept_governance,
-    accept_rollup_da_manager, accept_server_notifier, accept_validator_timelock, accept_verifier,
-};
+use super::contracts::{accept_ownable2step, accept_rollup_da_manager, accept_server_notifier};
 use super::types::OwnershipSummary;
 
 /// Accept ownership for all pending ecosystem contracts.
@@ -19,6 +16,7 @@ use super::types::OwnershipSummary;
 /// - Server Notifier (via multicall)
 /// - Validator Timelock (direct)
 /// - Verifier (direct)
+/// - Native Token Vault (direct)
 /// - Governance (direct)
 /// - Ecosystem Chain Admin (direct)
 /// - Rollup DA Manager (via governance timelock)
@@ -48,89 +46,64 @@ pub async fn accept_all_ownership(
 
     let mut results = Vec::new();
 
-    // 1. Server Notifier (via multicall)
+    // 1. Server Notifier (via multicall through ChainAdmin)
+    results.push(accept_server_notifier(&mut ctx, contracts, logger).await);
+
+    // 2. Validator Timelock
     results.push(
-        accept_server_notifier(
-            &ctx.provider,
-            contracts,
-            ctx.governor_address,
-            ctx.chain_id,
-            &mut ctx.nonce,
-            ctx.gas_price,
+        accept_ownable2step(
+            &mut ctx,
+            contracts.validator_timelock_addr(),
+            "Validator Timelock",
             logger,
         )
         .await,
     );
 
-    // 2. Validator Timelock (direct)
+    // 3. Verifier
+    results
+        .push(accept_ownable2step(&mut ctx, contracts.verifier_addr(), "Verifier", logger).await);
+
+    // 4. Native Token Vault
     results.push(
-        accept_validator_timelock(
-            &ctx.provider,
-            contracts,
-            ctx.governor_address,
-            ctx.chain_id,
-            &mut ctx.nonce,
-            ctx.gas_price,
+        accept_ownable2step(
+            &mut ctx,
+            contracts.native_token_vault_addr(),
+            "Native Token Vault",
             logger,
         )
         .await,
     );
 
-    // 3. Verifier (direct)
+    // 5. Governance
     results.push(
-        accept_verifier(
-            &ctx.provider,
-            contracts,
-            ctx.governor_address,
-            ctx.chain_id,
-            &mut ctx.nonce,
-            ctx.gas_price,
+        accept_ownable2step(&mut ctx, contracts.governance_addr(), "Governance", logger).await,
+    );
+
+    // 6. Ecosystem Chain Admin
+    results.push(
+        accept_ownable2step(
+            &mut ctx,
+            contracts.chain_admin_addr(),
+            "Ecosystem Chain Admin",
             logger,
         )
         .await,
     );
 
-    // 4. Governance (direct)
+    // 7. L1 Nullifier
     results.push(
-        accept_governance(
-            &ctx.provider,
-            contracts,
-            ctx.governor_address,
-            ctx.chain_id,
-            &mut ctx.nonce,
-            ctx.gas_price,
+        accept_ownable2step(
+            &mut ctx,
+            contracts.l1_nullifier_addr(),
+            "L1 Nullifier",
             logger,
         )
         .await,
     );
 
-    // 5. Ecosystem Chain Admin (direct)
-    results.push(
-        accept_ecosystem_chain_admin(
-            &ctx.provider,
-            contracts,
-            ctx.governor_address,
-            ctx.chain_id,
-            &mut ctx.nonce,
-            ctx.gas_price,
-            logger,
-        )
-        .await,
-    );
-
-    // 6. Rollup DA Manager (via governance acceptOwner)
-    results.push(
-        accept_rollup_da_manager(
-            &ctx.provider,
-            contracts,
-            ctx.governor_address,
-            ctx.chain_id,
-            &mut ctx.nonce,
-            ctx.gas_price,
-            logger,
-        )
-        .await,
-    );
+    // 8. Rollup DA Manager (via Governance timelock)
+    results.push(accept_rollup_da_manager(&mut ctx, contracts, logger).await);
 
     OwnershipSummary::new(results)
 }
@@ -166,29 +139,23 @@ pub async fn accept_chain_ownership(
 
     let mut results = Vec::new();
 
-    // 1. Chain Governance (direct)
+    // 1. Chain Governance
     results.push(
-        accept_chain_governance(
-            &ctx.provider,
-            contracts,
-            ctx.governor_address,
-            ctx.chain_id,
-            &mut ctx.nonce,
-            ctx.gas_price,
+        accept_ownable2step(
+            &mut ctx,
+            contracts.governance_addr(),
+            "Chain Governance",
             logger,
         )
         .await,
     );
 
-    // 2. Chain Admin (direct)
+    // 2. Chain Admin
     results.push(
-        accept_chain_admin(
-            &ctx.provider,
-            contracts,
-            ctx.governor_address,
-            ctx.chain_id,
-            &mut ctx.nonce,
-            ctx.gas_price,
+        accept_ownable2step(
+            &mut ctx,
+            contracts.chain_admin_addr(),
+            "Chain Admin",
             logger,
         )
         .await,
