@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-06-17
+
+### Added
+
+- **snake_case name enforcement** for ecosystems and chains (`validate_snake_case_name`) — rejects names that would diverge from zkstack's stored form and suggests a corrected snake_case form
+- **Unified config home** at `~/.adi_cli/.adi.yml` (preferred), with the legacy `~/.adi.yml` location kept as a deprecated fallback
+- Startup warnings for misplaced or unrecognized top-level config keys, surfaced via a new `LoadedConfig` carrying non-fatal load warnings
+- Ownership handoff extended to the **Verifier, Native Token Vault, and L1 Nullifier** across the deploy, accept, and transfer flows — the nullifier is reclaimed from the deployer to the governor before any transfer to a configured new owner
+- Bridged Token Beacon and L1 Nullifier now shown in `adi owners` output
+- Centralized `resolve_*` config helpers (gas multiplier, funder/private keys, explorer type/API key/URL) with full unit-test coverage
+
+### Changed
+
+- `adi accept --calldata` no longer requires a signing key — it resolves the expected pending owner from the configured `new_owner` (per ecosystem and per chain), falling back to the governor address
+- `adi accept` execute path reads canonical ecosystem and per-chain owner keys instead of the deprecated top-level `ownership.private_key`; the chain signer no longer reuses the ecosystem key
+- `adi ecosystem` groups contracts by semantic role, so CTM-derived chain contracts display under the selected chain instead of the ecosystem panel
+- `adi owners` queries owners and pending owners concurrently (preserving display order), relabels the ecosystem Chain Admin, and drops the L2 ConsensusRegistry that has no L1 owner
+- Per-contract accept/transfer logic consolidated into generic `Ownable2Step` helpers to remove duplication
+
+### Removed
+
+- **BREAKING:** top-level `ownership` and `funding.rpc_url` config keys are no longer read — use `ecosystem.ownership` (or `ecosystem.chains[].ownership`) and `ecosystem.rpc_url` instead. A stray top-level `ownership:` key now warns with a pointer to the replacement
+
+### Fixed
+
+- `adi accept --calldata` printed nothing after a transfer to a configured `new_owner`, because it checked pending transfers against a derived signing-key address
+- Chain `ProxyAdmin` address persisted to `contracts.yaml` is now the actually-deployed address — zkstack's `RegisterZKChain` script computed a phantom address from a wrong CREATE2 init-code hash, which is now patched in-container to read back `Create2AndTransfer.deployedAddress()`
+- Config values resolve consistently across every command, eliminating dead fields (e.g. `funding.rpc_url: null`) from `adi config`
+- Note and prompt body content renders at full brightness instead of the upstream dimmed `Submit` style that washed out labels and values
+
 ## [0.2.5] - 2026-05-27
 
 ### Added
@@ -176,6 +206,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Interactive UI** with themed prompts, confirmations, and multi-select pickers via `dialoguer` and `console`
 - **Colored terminal output** and structured logging via `env_logger` with configurable log levels
 
+[0.3.0]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.5...0.3.0
 [0.2.5]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.4...0.2.5
 [0.2.4]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.3...0.2.4
 [0.2.3]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.2...0.2.3
