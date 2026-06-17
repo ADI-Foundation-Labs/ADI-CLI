@@ -1,14 +1,15 @@
 //! Transfer ownership handlers for contracts.
 //!
-//! This module contains the transfer logic for each contract type.
-//! These functions are used after accepting ownership to transfer
-//! it to a final owner address.
+//! Standard `Ownable2Step` contracts share a single generic handler
+//! ([`transfer_ownable2step`]). The Bridged Token Beacon keeps a dedicated
+//! handler because it uses plain `Ownable` (single-step) and its address must
+//! be queried from the Native Token Vault.
 
 use super::calldata::build_transfer_ownership_calldata;
 use super::status::{check_ownership_state, check_ownership_state_for_ownable};
 use super::transaction::send_ownership_tx;
 use super::types::{bridgedTokenBeaconCall, OwnershipResult, OwnershipState};
-use adi_types::{ChainContracts, EcosystemContracts, Logger};
+use adi_types::{EcosystemContracts, Logger};
 use alloy_primitives::Address;
 use alloy_provider::Provider;
 use alloy_rpc_types::TransactionRequest;
@@ -53,10 +54,16 @@ where
     }
 }
 
-/// Transfer ownership for Governance contract.
-pub(crate) async fn transfer_governance<P>(
+/// Transfer ownership of a standard `Ownable2Step` contract to `ctx.new_owner`,
+/// signed by the current governor.
+///
+/// `name` labels logs/results and `address` is the target contract (a `None`
+/// yields a skipped result). Skipped when the governor is not the current owner
+/// (transfer not possible) or a transfer is still pending acceptance.
+pub(crate) async fn transfer_ownable2step<P>(
     provider: &P,
-    contracts: &EcosystemContracts,
+    address: Option<Address>,
+    name: &str,
     ctx: &mut TransferContext<'_>,
 ) -> OwnershipResult
 where
@@ -64,33 +71,29 @@ where
 {
     let green = Style::new().green();
 
-    let Some(governance) = contracts.governance_addr() else {
-        return OwnershipResult::skipped("Governance", "governance_addr not configured");
+    let Some(addr) = address else {
+        return OwnershipResult::skipped(name, "address not configured");
     };
 
     // Verify governor is current owner before transferring
-    match check_ownership_state(provider, governance, ctx.governor, "Governance", ctx.logger).await
-    {
+    match check_ownership_state(provider, addr, ctx.governor, name, ctx.logger).await {
         OwnershipState::Accepted => {} // Good - we can transfer
         OwnershipState::Pending => {
-            return OwnershipResult::skipped(
-                "Governance",
-                "ownership not yet accepted, accept first",
-            );
+            return OwnershipResult::skipped(name, "ownership not yet accepted, accept first");
         }
         OwnershipState::NotTransferred => {
-            return OwnershipResult::skipped("Governance", "governor is not the current owner");
+            return OwnershipResult::skipped(name, "governor is not the current owner");
         }
     }
 
     let spinner = cliclack::spinner();
-    spinner.start("Governance");
+    spinner.start(name.to_string());
 
     let calldata = build_transfer_ownership_calldata(ctx.new_owner);
 
     match send_ownership_tx(
         provider,
-        governance,
+        addr,
         calldata,
         ctx.governor,
         ctx.chain_id,
@@ -101,163 +104,16 @@ where
     {
         Ok(result) => {
             spinner.stop(format!(
-                "Governance → Transferred (block {})",
+                "{} → Transferred (block {})",
+                name,
                 green.apply_to(result.block_number)
             ));
             *ctx.nonce += 1;
-            OwnershipResult::success("Governance", result.tx_hash)
+            OwnershipResult::success(name, result.tx_hash)
         }
         Err(e) => {
-            spinner.error(format!("Governance transfer failed: {}", e));
-            OwnershipResult::failure("Governance", e.to_string())
-        }
-    }
-}
-
-/// Transfer ownership for ecosystem Chain Admin contract.
-pub(crate) async fn transfer_ecosystem_chain_admin<P>(
-    provider: &P,
-    contracts: &EcosystemContracts,
-    ctx: &mut TransferContext<'_>,
-) -> OwnershipResult
-where
-    P: Provider + Clone,
-{
-    let green = Style::new().green();
-
-    let Some(chain_admin) = contracts.chain_admin_addr() else {
-        return OwnershipResult::skipped(
-            "Ecosystem Chain Admin",
-            "chain_admin_addr not configured",
-        );
-    };
-
-    // Verify governor is current owner before transferring
-    match check_ownership_state(
-        provider,
-        chain_admin,
-        ctx.governor,
-        "Ecosystem Chain Admin",
-        ctx.logger,
-    )
-    .await
-    {
-        OwnershipState::Accepted => {} // Good - we can transfer
-        OwnershipState::Pending => {
-            return OwnershipResult::skipped(
-                "Ecosystem Chain Admin",
-                "ownership not yet accepted, accept first",
-            );
-        }
-        OwnershipState::NotTransferred => {
-            return OwnershipResult::skipped(
-                "Ecosystem Chain Admin",
-                "governor is not the current owner",
-            );
-        }
-    }
-
-    let spinner = cliclack::spinner();
-    spinner.start("Ecosystem Chain Admin");
-
-    let calldata = build_transfer_ownership_calldata(ctx.new_owner);
-
-    match send_ownership_tx(
-        provider,
-        chain_admin,
-        calldata,
-        ctx.governor,
-        ctx.chain_id,
-        *ctx.nonce,
-        ctx.gas_price,
-    )
-    .await
-    {
-        Ok(result) => {
-            spinner.stop(format!(
-                "Ecosystem Chain Admin → Transferred (block {})",
-                green.apply_to(result.block_number)
-            ));
-            *ctx.nonce += 1;
-            OwnershipResult::success("Ecosystem Chain Admin", result.tx_hash)
-        }
-        Err(e) => {
-            spinner.error(format!("Ecosystem Chain Admin transfer failed: {}", e));
-            OwnershipResult::failure("Ecosystem Chain Admin", e.to_string())
-        }
-    }
-}
-
-/// Transfer ownership for Validator Timelock contract.
-pub(crate) async fn transfer_validator_timelock<P>(
-    provider: &P,
-    contracts: &EcosystemContracts,
-    ctx: &mut TransferContext<'_>,
-) -> OwnershipResult
-where
-    P: Provider + Clone,
-{
-    let green = Style::new().green();
-
-    let Some(timelock) = contracts.validator_timelock_addr() else {
-        return OwnershipResult::skipped(
-            "Validator Timelock",
-            "validator_timelock_addr not configured",
-        );
-    };
-
-    // Verify governor is current owner before transferring
-    match check_ownership_state(
-        provider,
-        timelock,
-        ctx.governor,
-        "Validator Timelock",
-        ctx.logger,
-    )
-    .await
-    {
-        OwnershipState::Accepted => {} // Good - we can transfer
-        OwnershipState::Pending => {
-            return OwnershipResult::skipped(
-                "Validator Timelock",
-                "ownership not yet accepted, accept first",
-            );
-        }
-        OwnershipState::NotTransferred => {
-            return OwnershipResult::skipped(
-                "Validator Timelock",
-                "governor is not the current owner",
-            );
-        }
-    }
-
-    let spinner = cliclack::spinner();
-    spinner.start("Validator Timelock");
-
-    let calldata = build_transfer_ownership_calldata(ctx.new_owner);
-
-    match send_ownership_tx(
-        provider,
-        timelock,
-        calldata,
-        ctx.governor,
-        ctx.chain_id,
-        *ctx.nonce,
-        ctx.gas_price,
-    )
-    .await
-    {
-        Ok(result) => {
-            spinner.stop(format!(
-                "Validator Timelock → Transferred (block {})",
-                green.apply_to(result.block_number)
-            ));
-            *ctx.nonce += 1;
-            OwnershipResult::success("Validator Timelock", result.tx_hash)
-        }
-        Err(e) => {
-            spinner.error(format!("Validator Timelock transfer failed: {}", e));
-            OwnershipResult::failure("Validator Timelock", e.to_string())
+            spinner.error(format!("{} transfer failed: {}", name, e));
+            OwnershipResult::failure(name, e.to_string())
         }
     }
 }
@@ -265,7 +121,8 @@ where
 /// Transfer ownership for Bridged Token Beacon contract.
 ///
 /// Note: This contract uses Ownable (not Ownable2Step), so ownership
-/// transfers immediately without requiring an accept step.
+/// transfers immediately without requiring an accept step. Its address is
+/// queried from the Native Token Vault rather than configured directly.
 pub(crate) async fn transfer_bridged_token_beacon<P>(
     provider: &P,
     contracts: &EcosystemContracts,
@@ -340,148 +197,6 @@ where
         Err(e) => {
             spinner.error(format!("Bridged Token Beacon transfer failed: {}", e));
             OwnershipResult::failure("Bridged Token Beacon", e.to_string())
-        }
-    }
-}
-
-/// Transfer ownership for chain Governance contract.
-pub(crate) async fn transfer_chain_governance<P>(
-    provider: &P,
-    contracts: &ChainContracts,
-    ctx: &mut TransferContext<'_>,
-) -> OwnershipResult
-where
-    P: Provider + Clone,
-{
-    let green = Style::new().green();
-
-    let Some(governance) = contracts.governance_addr() else {
-        return OwnershipResult::skipped("Chain Governance", "governance_addr not configured");
-    };
-
-    // Verify governor is current owner before transferring
-    match check_ownership_state(
-        provider,
-        governance,
-        ctx.governor,
-        "Chain Governance",
-        ctx.logger,
-    )
-    .await
-    {
-        OwnershipState::Accepted => {} // Good - we can transfer
-        OwnershipState::Pending => {
-            return OwnershipResult::skipped(
-                "Chain Governance",
-                "ownership not yet accepted, accept first",
-            );
-        }
-        OwnershipState::NotTransferred => {
-            return OwnershipResult::skipped(
-                "Chain Governance",
-                "governor is not the current owner",
-            );
-        }
-    }
-
-    let spinner = cliclack::spinner();
-    spinner.start("Chain Governance");
-
-    let calldata = build_transfer_ownership_calldata(ctx.new_owner);
-
-    match send_ownership_tx(
-        provider,
-        governance,
-        calldata,
-        ctx.governor,
-        ctx.chain_id,
-        *ctx.nonce,
-        ctx.gas_price,
-    )
-    .await
-    {
-        Ok(result) => {
-            spinner.stop(format!(
-                "Chain Governance → Transferred (block {})",
-                green.apply_to(result.block_number)
-            ));
-            *ctx.nonce += 1;
-            OwnershipResult::success("Chain Governance", result.tx_hash)
-        }
-        Err(e) => {
-            spinner.error(format!("Chain Governance transfer failed: {}", e));
-            OwnershipResult::failure("Chain Governance", e.to_string())
-        }
-    }
-}
-
-/// Transfer ownership for chain Chain Admin contract.
-pub(crate) async fn transfer_chain_chain_admin<P>(
-    provider: &P,
-    contracts: &ChainContracts,
-    ctx: &mut TransferContext<'_>,
-) -> OwnershipResult
-where
-    P: Provider + Clone,
-{
-    let green = Style::new().green();
-
-    let Some(chain_admin) = contracts.chain_admin_addr() else {
-        return OwnershipResult::skipped("Chain Chain Admin", "chain_admin_addr not configured");
-    };
-
-    // Verify governor is current owner before transferring
-    match check_ownership_state(
-        provider,
-        chain_admin,
-        ctx.governor,
-        "Chain Chain Admin",
-        ctx.logger,
-    )
-    .await
-    {
-        OwnershipState::Accepted => {} // Good - we can transfer
-        OwnershipState::Pending => {
-            return OwnershipResult::skipped(
-                "Chain Chain Admin",
-                "ownership not yet accepted, accept first",
-            );
-        }
-        OwnershipState::NotTransferred => {
-            return OwnershipResult::skipped(
-                "Chain Chain Admin",
-                "governor is not the current owner",
-            );
-        }
-    }
-
-    let spinner = cliclack::spinner();
-    spinner.start("Chain Chain Admin");
-
-    let calldata = build_transfer_ownership_calldata(ctx.new_owner);
-
-    match send_ownership_tx(
-        provider,
-        chain_admin,
-        calldata,
-        ctx.governor,
-        ctx.chain_id,
-        *ctx.nonce,
-        ctx.gas_price,
-    )
-    .await
-    {
-        Ok(result) => {
-            spinner.stop(format!(
-                "Chain Chain Admin → Transferred (block {})",
-                green.apply_to(result.block_number)
-            ));
-            *ctx.nonce += 1;
-            OwnershipResult::success("Chain Chain Admin", result.tx_hash)
-        }
-        Err(e) => {
-            spinner.error(format!("Chain Chain Admin transfer failed: {}", e));
-            OwnershipResult::failure("Chain Chain Admin", e.to_string())
         }
     }
 }

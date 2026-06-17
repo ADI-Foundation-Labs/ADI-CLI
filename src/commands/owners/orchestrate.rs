@@ -4,9 +4,11 @@ use adi_types::{ChainContracts, EcosystemContracts};
 use alloy_primitives::Address;
 use alloy_provider::Provider;
 use cliclack::ProgressBar;
+use futures_util::future::join_all;
 
 use super::queries::{
-    query_admin, query_owner, query_pending_admin, query_pending_owner, query_proxy_admin,
+    query_admin, query_bridged_token_beacon, query_owner, query_pending_admin, query_pending_owner,
+    query_proxy_admin,
 };
 use super::{ContractOwnership, OwnerQueryResult};
 
@@ -16,11 +18,12 @@ pub(super) async fn query_ecosystem_owners<P: Provider + Clone>(
     contracts: &EcosystemContracts,
     pb: &ProgressBar,
 ) -> Vec<ContractOwnership> {
-    let mut results = Vec::new();
+    // Resolve the Bridged Token Beacon address from the Native Token Vault
+    // (it is not stored in config and must be read on-chain).
+    let bridged_token_beacon_addr =
+        query_bridged_token_beacon(provider, contracts.native_token_vault_addr()).await;
 
     // Extract addresses from nested structures
-    let l1_nullifier_addr = contracts.bridges.as_ref().and_then(|b| b.l1_nullifier_addr);
-
     let state_transition_addr = contracts
         .zksync_os_ctm
         .as_ref()
@@ -61,7 +64,7 @@ pub(super) async fn query_ecosystem_owners<P: Provider + Clone>(
     let contract_list: Vec<(&'static str, Option<Address>)> = vec![
         // Governance contracts
         ("Governance", contracts.governance_addr()),
-        ("Chain Admin", contracts.chain_admin_addr()),
+        ("Ecosystem Chain Admin", contracts.chain_admin_addr()),
         ("Validator Timelock", contracts.validator_timelock_addr()),
         // Core infrastructure
         ("State Transition (CTM)", state_transition_addr),
@@ -76,29 +79,34 @@ pub(super) async fn query_ecosystem_owners<P: Provider + Clone>(
             l1_wrapped_base_token_store_addr,
         ),
         // Bridge contracts
-        ("L1 Nullifier", l1_nullifier_addr),
+        ("L1 Nullifier", contracts.l1_nullifier_addr()),
         ("Shared Bridge", shared_bridge_addr),
+        ("Bridged Token Beacon", bridged_token_beacon_addr),
         // Admin contracts
         ("Transparent Proxy Admin", transparent_proxy_admin_addr),
         ("STM Deployment Tracker", stm_tracker_addr),
     ];
 
-    for (name, address) in contract_list {
-        results.push(query_ownable(provider, name, address).await);
+    // Query all contracts concurrently. Message Root Proxy uses the EIP-1967
+    // admin slot rather than owner(), so it runs alongside in the same batch.
+    let ownable_queries = join_all(contract_list.into_iter().map(|(name, address)| async move {
+        let result = query_ownable(provider, name, address).await;
         pb.inc(1);
-    }
-
-    // Message Root Proxy uses EIP-1967 Transparent Proxy pattern (admin in storage slot)
-    results.push(
-        query_proxy(
+        result
+    }));
+    let message_root_query = async {
+        let result = query_proxy(
             provider,
             "Message Root Proxy (Admin)",
             message_root_proxy_addr,
         )
-        .await,
-    );
-    pb.inc(1);
+        .await;
+        pb.inc(1);
+        result
+    };
 
+    let (mut results, message_root) = tokio::join!(ownable_queries, message_root_query);
+    results.push(message_root);
     results
 }
 
@@ -111,8 +119,6 @@ pub(super) async fn query_chain_owners<P: Provider + Clone>(
     contracts: &ChainContracts,
     pb: &ProgressBar,
 ) -> Vec<ContractOwnership> {
-    let mut results = Vec::new();
-
     let chain_proxy_admin_addr = contracts.l1.as_ref().and_then(|l| l.chain_proxy_admin_addr);
     let chain_verifier_addr = contracts.l1.as_ref().and_then(|l| l.verifier_addr);
     let chain_validator_timelock_addr = contracts
@@ -129,27 +135,24 @@ pub(super) async fn query_chain_owners<P: Provider + Clone>(
         ("Chain Validator Timelock", chain_validator_timelock_addr),
     ];
 
-    for (name, address) in ownable_contracts {
-        results.push(query_ownable(provider, name, address).await);
-        pb.inc(1);
-    }
-
-    // Diamond Proxy uses getAdmin()/getPendingAdmin() instead of owner()/pendingOwner()
+    // Query all chain contracts concurrently. Diamond Proxy uses the custom
+    // getAdmin()/getPendingAdmin() pair, so it runs alongside the Ownable batch.
+    let ownable_queries = join_all(ownable_contracts.into_iter().map(
+        |(name, address)| async move {
+            let result = query_ownable(provider, name, address).await;
+            pb.inc(1);
+            result
+        },
+    ));
     let diamond_proxy_addr = contracts.diamond_proxy_addr();
-    results.push(query_admin_pair(provider, "Diamond Proxy (Admin)", diamond_proxy_addr).await);
-    pb.inc(1);
-
-    // L2 ConsensusRegistry - placeholder (requires L2 RPC URL)
-    let consensus_addr = contracts.l2.as_ref().and_then(|l2| l2.consensus_registry);
-    if consensus_addr.is_some() {
-        results.push(ContractOwnership {
-            name: "ConsensusRegistry (L2)",
-            address: consensus_addr,
-            owner: OwnerQueryResult::Err("L2 contract - requires --l2-rpc-url".to_string()),
-            pending_owner: OwnerQueryResult::Err("L2 contract".to_string()),
-        });
+    let diamond_query = async {
+        let result = query_admin_pair(provider, "Diamond Proxy (Admin)", diamond_proxy_addr).await;
         pb.inc(1);
-    }
+        result
+    };
+
+    let (mut results, diamond) = tokio::join!(ownable_queries, diamond_query);
+    results.push(diamond);
 
     results
 }
@@ -167,11 +170,15 @@ async fn query_ownable<P: Provider + Clone>(
     let Some(addr) = address else {
         return ContractOwnership::not_configured(name);
     };
+    let (owner, pending_owner) = tokio::join!(
+        query_owner(provider, addr, name),
+        query_pending_owner(provider, addr, name),
+    );
     ContractOwnership {
         name,
         address: Some(addr),
-        owner: query_owner(provider, addr, name).await,
-        pending_owner: query_pending_owner(provider, addr, name).await,
+        owner,
+        pending_owner,
     }
 }
 
@@ -184,11 +191,15 @@ async fn query_admin_pair<P: Provider + Clone>(
     let Some(addr) = address else {
         return ContractOwnership::not_configured(name);
     };
+    let (owner, pending_owner) = tokio::join!(
+        query_admin(provider, addr, name),
+        query_pending_admin(provider, addr, name),
+    );
     ContractOwnership {
         name,
         address: Some(addr),
-        owner: query_admin(provider, addr, name).await,
-        pending_owner: query_pending_admin(provider, addr, name).await,
+        owner,
+        pending_owner,
     }
 }
 

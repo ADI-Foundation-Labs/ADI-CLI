@@ -96,6 +96,39 @@ pub async fn check_ecosystem_ownership_status(
         state,
     });
 
+    // Check Native Token Vault
+    let native_token_vault_addr = contracts.native_token_vault_addr();
+    let state = if let Some(addr) = native_token_vault_addr {
+        check_ownership_state(
+            &provider,
+            addr,
+            governor_address,
+            "Native Token Vault",
+            logger,
+        )
+        .await
+    } else {
+        OwnershipState::NotTransferred
+    };
+    statuses.push(OwnershipStatus {
+        name: "Native Token Vault",
+        address: native_token_vault_addr,
+        state,
+    });
+
+    // Check L1 Nullifier
+    let l1_nullifier_addr = contracts.l1_nullifier_addr();
+    let state = if let Some(addr) = l1_nullifier_addr {
+        check_ownership_state(&provider, addr, governor_address, "L1 Nullifier", logger).await
+    } else {
+        OwnershipState::NotTransferred
+    };
+    statuses.push(OwnershipStatus {
+        name: "L1 Nullifier",
+        address: l1_nullifier_addr,
+        state,
+    });
+
     // Check Governance
     let governance_addr = contracts.governance_addr();
     let state = if let Some(addr) = governance_addr {
@@ -317,11 +350,13 @@ where
 /// - Governance (Ownable2Step - new owner must accept)
 /// - Validator Timelock (Ownable2Step - new owner must accept)
 /// - Ecosystem Chain Admin (Ownable2Step - new owner must accept)
+/// - Verifier (Ownable2Step - new owner must accept)
+/// - Native Token Vault (Ownable2Step - new owner must accept)
+/// - L1 Nullifier (Ownable2Step - new owner must accept)
 ///
 /// Contracts NOT checked (proxy-owned):
 /// - Server Notifier (owned by ChainAdmin contract)
 /// - Rollup DA Manager (owned by Governance contract)
-/// - Verifier (not transferred to new owner)
 ///
 /// # Arguments
 ///
@@ -406,10 +441,55 @@ pub async fn check_ecosystem_ownership_status_for_new_owner(
         state,
     });
 
+    // Check Verifier (directly transferred to new owner)
+    let verifier_addr = contracts.verifier_addr();
+    let state = if let Some(addr) = verifier_addr {
+        check_ownership_state(&provider, addr, new_owner_address, "Verifier", logger).await
+    } else {
+        OwnershipState::NotTransferred
+    };
+    statuses.push(OwnershipStatus {
+        name: "Verifier",
+        address: verifier_addr,
+        state,
+    });
+
+    // Check Native Token Vault (directly transferred to new owner)
+    let native_token_vault_addr = contracts.native_token_vault_addr();
+    let state = if let Some(addr) = native_token_vault_addr {
+        check_ownership_state(
+            &provider,
+            addr,
+            new_owner_address,
+            "Native Token Vault",
+            logger,
+        )
+        .await
+    } else {
+        OwnershipState::NotTransferred
+    };
+    statuses.push(OwnershipStatus {
+        name: "Native Token Vault",
+        address: native_token_vault_addr,
+        state,
+    });
+
+    // Check L1 Nullifier (directly transferred to new owner)
+    let l1_nullifier_addr = contracts.l1_nullifier_addr();
+    let state = if let Some(addr) = l1_nullifier_addr {
+        check_ownership_state(&provider, addr, new_owner_address, "L1 Nullifier", logger).await
+    } else {
+        OwnershipState::NotTransferred
+    };
+    statuses.push(OwnershipStatus {
+        name: "L1 Nullifier",
+        address: l1_nullifier_addr,
+        state,
+    });
+
     // NOTE: The following contracts are NOT checked because they are proxy-owned:
     // - Server Notifier: owned by ChainAdmin contract, not directly by new owner
     // - Rollup DA Manager: owned by Governance contract, not directly by new owner
-    // - Verifier: not transferred to new owner per documentation
     // - Bridged Token Beacon: uses Ownable (not Ownable2Step), no accept needed
 
     Ok(OwnershipStatusSummary { statuses })

@@ -19,7 +19,7 @@ pub(super) fn build_known_address_map(
         map.insert(addr, "Governance");
     }
     if let Some(addr) = contracts.chain_admin_addr() {
-        map.insert(addr, "Chain Admin");
+        map.insert(addr, "Ecosystem Chain Admin");
     }
     if let Some(addr) = contracts.validator_timelock_addr() {
         map.insert(addr, "Validator Timelock");
@@ -60,10 +60,10 @@ pub(super) fn build_known_address_map(
             map.insert(addr, "Message Root Proxy");
         }
     }
+    if let Some(addr) = contracts.l1_nullifier_addr() {
+        map.insert(addr, "L1 Nullifier");
+    }
     if let Some(ref bridges) = contracts.bridges {
-        if let Some(addr) = bridges.l1_nullifier_addr {
-            map.insert(addr, "L1 Nullifier");
-        }
         if let Some(ref erc20) = bridges.erc20 {
             if let Some(addr) = erc20.l1_address {
                 map.insert(addr, "ERC20 Bridge");
@@ -107,6 +107,20 @@ pub(super) fn add_wallet_addresses(map: &mut HashMap<Address, &'static str>, wal
     }
 }
 
+/// Add a configured new-owner target address (from config) to the map.
+///
+/// Uses `or_insert` so an existing, more specific label (e.g. `governor`) is
+/// preserved when the new owner coincides with a known wallet/contract.
+pub(super) fn add_new_owner_address(
+    map: &mut HashMap<Address, &'static str>,
+    new_owner: Option<Address>,
+    label: &'static str,
+) {
+    if let Some(addr) = new_owner {
+        map.entry(addr).or_insert(label);
+    }
+}
+
 /// Add operator override addresses to the map (from CLI/config).
 pub(super) fn add_operator_addresses(
     map: &mut HashMap<Address, &'static str>,
@@ -146,12 +160,6 @@ pub(super) fn add_chain_contract_addresses(
         }
         if let Some(addr) = l1.validator_timelock_addr {
             map.insert(addr, "Chain Validator Timelock");
-        }
-    }
-    // L2 contracts
-    if let Some(ref l2) = contracts.l2 {
-        if let Some(addr) = l2.consensus_registry {
-            map.insert(addr, "ConsensusRegistry");
         }
     }
 }

@@ -20,7 +20,9 @@ mod types;
 pub use accept::{accept_all_ownership, accept_chain_ownership};
 
 // Public re-exports: transfer orchestrators
-pub use transfer_all::{transfer_all_ownership, transfer_chain_ownership};
+pub use transfer_all::{
+    reclaim_l1_nullifier_to_governor, transfer_all_ownership, transfer_chain_ownership,
+};
 
 // Public re-exports: calldata collection
 pub use collect::{collect_all_ownership_calldata, collect_chain_ownership_calldata};

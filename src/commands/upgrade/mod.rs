@@ -15,7 +15,8 @@ use crate::error::Result;
 /// Execute the upgrade command.
 pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
     use crate::commands::helpers::{
-        create_state_manager_with_s3, resolve_ecosystem_name, resolve_rpc_url,
+        create_state_manager_with_s3, resolve_ecosystem_name, resolve_gas_multiplier,
+        resolve_rpc_url,
     };
     use crate::error::WrapErr;
     use crate::ui;
@@ -99,7 +100,7 @@ pub async fn run(args: UpgradeArgs, context: &Context) -> Result<()> {
     let gas_multiplier = if adi_types::is_localhost_rpc(rpc_url.as_str()) {
         None
     } else {
-        Some(context.config().gas_multiplier)
+        Some(resolve_gas_multiplier(None, context.config()))
     };
 
     let upgrade_config = UpgradeConfig::from_state(

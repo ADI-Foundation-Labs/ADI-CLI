@@ -31,8 +31,8 @@ use url::Url;
 
 use super::ownership::{run_post_deploy_ownership, OwnershipOperationResult};
 use crate::commands::helpers::{
-    create_state_manager_with_s3, resolve_protocol_version, resolve_rpc_url,
-    select_chain_from_state,
+    create_state_manager_with_s3, resolve_funder_key, resolve_gas_multiplier,
+    resolve_protocol_version, resolve_rpc_url, select_chain_from_state,
 };
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
@@ -189,7 +189,7 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
         return Ok(());
     }
 
-    // 5. Resolve RPC URL (args > ecosystem.rpc_url > funding.rpc_url)
+    // 5. Resolve RPC URL (args > ecosystem.rpc_url)
     let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
 
     // 6. Validate chain ID doesn't conflict with settlement layer
@@ -246,7 +246,7 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     }
 
     // 8. Get funder key (args > config) - required for production mode
-    let funder_key = resolve_funder_key(&args, context)?;
+    let funder_key = resolve_funder_key(args.funder_key.as_deref(), context.config())?;
     context.logger().debug("Funder key resolved");
 
     // 8. Load wallets from state
@@ -870,7 +870,7 @@ async fn run_zkstack_init(
     let ecosystem_path = context.config().state_dir.join(ecosystem_name);
 
     // Resolve gas multiplier from args or config
-    let gas_multiplier = resolve_gas_multiplier(args, context);
+    let gas_multiplier = resolve_gas_multiplier(args.gas_multiplier, context.config());
 
     // Compute gas price: skip for localhost, estimate + apply multiplier for testnets
     let gas_price_wei = if is_localhost_rpc(rpc_url.as_str()) {
@@ -1295,33 +1295,6 @@ async fn validate_ecosystem_exists(
     Ok(())
 }
 
-/// Resolve funder private key from args or config.
-fn resolve_funder_key(args: &DeployArgs, context: &Context) -> Result<SecretString> {
-    // Try args first
-    if let Some(key) = &args.funder_key {
-        if !key.is_empty() {
-            return Ok(SecretString::from(key.clone()));
-        }
-    }
-
-    // Try config (which includes env var overrides via ADI__FUNDING__FUNDER_KEY)
-    if let Some(key) = &context.config().funding.funder_key {
-        return Ok(key.clone());
-    }
-
-    Err(eyre::eyre!(
-        "Funder key required: use --funder-key, ADI_FUNDER_KEY env var, or set funding.funder_key in config"
-    ))
-}
-
-/// Resolve gas multiplier from args or config.
-///
-/// Priority: CLI arg > top-level config > funding config (backward compat) > default (120)
-fn resolve_gas_multiplier(args: &DeployArgs, context: &Context) -> u64 {
-    args.gas_multiplier
-        .unwrap_or_else(|| context.config().gas_multiplier)
-}
-
 /// Resolve blobs mode from args or chain config.
 ///
 /// Priority: CLI arg > chain config > default (false = calldata)
@@ -1408,9 +1381,7 @@ async fn build_funding_config(
     let mut config = FundingConfig::new(rpc_url.as_str());
 
     // Set gas multiplier (args > config > default)
-    let multiplier = args
-        .gas_multiplier
-        .unwrap_or(context.config().gas_multiplier);
+    let multiplier = resolve_gas_multiplier(args.gas_multiplier, context.config());
     config = config.with_gas_multiplier(multiplier);
     context
         .logger()

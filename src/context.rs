@@ -7,7 +7,7 @@ use adi_types::Logger;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::config::{Config, CONFIG_ENV_VAR, DEFAULT_CONFIG_FILE_NAME};
+use crate::config::Config;
 use crate::error::{Result, WrapErr};
 use crate::ui;
 
@@ -32,28 +32,23 @@ impl Context {
     ///
     /// Returns an error if configuration loading fails.
     pub fn new_from_options(options: &super::Opts) -> Result<Self> {
-        let cfg = Config::new(options.config.as_deref()).wrap_err("Failed to load config")?;
+        let loaded =
+            crate::config::load(options.config.as_deref()).wrap_err("Failed to load config")?;
 
-        // Determine effective config path (same priority as Config::new)
-        // 1. CLI --config flag (highest)
-        // 2. ADI_CONFIG env var
-        // 3. ~/.adi.yml (default)
-        let config_path = options
-            .config
-            .clone()
-            .or_else(|| std::env::var(CONFIG_ENV_VAR).ok().map(PathBuf::from))
-            .unwrap_or_else(|| {
-                PathBuf::from(crate::config::path_with_home_dir(DEFAULT_CONFIG_FILE_NAME))
-            });
+        // CLI flag takes precedence over config file for debug mode.
+        let debug_enabled = options.debug || loaded.config.debug;
+        let logger = ui::cli_logger_with_debug(debug_enabled);
 
-        // CLI flag takes precedence over config file for debug mode
-        let debug_enabled = options.debug || cfg.debug;
+        // Surface non-fatal load warnings (misplaced keys, legacy location).
+        for warning in &loaded.warnings {
+            logger.warning(warning);
+        }
 
         Ok(Self {
-            cfg,
-            config_path,
+            cfg: loaded.config,
+            config_path: loaded.path,
             image_tag_override: options.image_tag.clone(),
-            logger: ui::cli_logger_with_debug(debug_enabled),
+            logger,
         })
     }
 

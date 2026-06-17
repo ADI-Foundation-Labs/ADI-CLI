@@ -23,8 +23,8 @@ use crate::error::{Result, WrapErr};
 use crate::ui;
 
 use address_map::{
-    add_chain_contract_addresses, add_operator_addresses, add_wallet_addresses,
-    build_known_address_map,
+    add_chain_contract_addresses, add_new_owner_address, add_operator_addresses,
+    add_wallet_addresses, build_known_address_map,
 };
 use display::display_ownership_results;
 use orchestrate::{query_chain_owners, query_ecosystem_owners};
@@ -43,6 +43,10 @@ sol! {
 
     #[allow(missing_docs)]
     function getPendingAdmin() external view returns (address);
+
+    // Native Token Vault getter for the Bridged Token Beacon address.
+    #[allow(missing_docs)]
+    function bridgedTokenBeacon() external view returns (address);
 }
 
 /// Arguments for `owners` command.
@@ -154,7 +158,15 @@ pub async fn run(args: &OwnersArgs, context: &Context) -> Result<()> {
         .wrap_err("Failed to load ecosystem contracts")?;
 
     // Build combined known address map (wallets + contracts)
-    let known_map = build_known_address_map(&wallets, &contracts);
+    let mut known_map = build_known_address_map(&wallets, &contracts);
+
+    // Label the configured ecosystem ownership target so a completed transfer
+    // is recognizable rather than shown as a bare address.
+    add_new_owner_address(
+        &mut known_map,
+        context.config().ecosystem.ownership.new_owner,
+        "ecosystem new owner",
+    );
 
     // Create provider
     let normalized_url = normalize_rpc_url(rpc_url.as_str());
@@ -177,10 +189,10 @@ pub async fn run(args: &OwnersArgs, context: &Context) -> Result<()> {
     };
 
     // Calculate total contracts to query
-    // Ecosystem: 14 standard contracts + 1 Message Root Proxy = 15
-    // Chain: 5 ownable + 1 Diamond Proxy + 1 ConsensusRegistry (if configured) = 6-7
-    let ecosystem_count = 15u64;
-    let chain_count = if chain_contracts_exist { 7u64 } else { 0u64 };
+    // Ecosystem: 15 standard contracts (incl. Bridged Token Beacon) + 1 Message Root Proxy = 16
+    // Chain: 5 ownable + 1 Diamond Proxy = 6
+    let ecosystem_count = 16u64;
+    let chain_count = if chain_contracts_exist { 6u64 } else { 0u64 };
     let pb = progress_bar(ecosystem_count + chain_count);
     pb.start("Querying contract owners...");
 
@@ -205,6 +217,15 @@ pub async fn run(args: &OwnersArgs, context: &Context) -> Result<()> {
             add_operator_addresses(&mut combined_map, ops);
         }
         add_chain_contract_addresses(&mut combined_map, &chain_contracts);
+        add_new_owner_address(
+            &mut combined_map,
+            context
+                .config()
+                .ecosystem
+                .get_chain(chain_to_display)
+                .and_then(|c| c.ownership.new_owner),
+            "chain new owner",
+        );
 
         let chain_ownerships = query_chain_owners(&provider, &chain_contracts, &pb).await;
         Some((chain_ownerships, combined_map))

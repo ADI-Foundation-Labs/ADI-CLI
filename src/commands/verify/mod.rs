@@ -56,13 +56,13 @@ pub struct VerifyArgs {
     pub dry_run: bool,
 
     /// Block explorer type.
+    /// Falls back to `verification.explorer` in config, then etherscan.
     #[arg(
         long,
         value_enum,
-        default_value = "etherscan",
-        help = "Block explorer type (etherscan, blockscout, custom)"
+        help = "Block explorer type (etherscan, blockscout, custom); default etherscan"
     )]
-    pub explorer: ExplorerType,
+    pub explorer: Option<ExplorerType>,
 
     /// Block explorer API URL.
     /// For Etherscan: auto-detected (uses V2 API).

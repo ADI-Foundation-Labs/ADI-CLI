@@ -83,6 +83,72 @@ pub fn validate_chain_id_unique(
     Ok(())
 }
 
+/// Validate that a name follows strict snake_case (matches zkstack's stored form).
+///
+/// `zkstack` normalizes names to snake_case when it writes state, so any other
+/// form would diverge from what is stored on disk. Rules: non-empty; lowercase
+/// ASCII letters, digits, and underscores only; must start with a letter; no
+/// leading, trailing, or consecutive underscores.
+///
+/// # Arguments
+///
+/// * `name` - The ecosystem or chain name to validate.
+///
+/// # Returns
+///
+/// `Ok(())` if the name is valid snake_case, `Err` with a descriptive message
+/// (including a suggested snake_case form) otherwise.
+///
+/// # Example
+///
+/// ```rust
+/// use adi_ecosystem::validate_snake_case_name;
+///
+/// assert!(validate_snake_case_name("my_chain").is_ok());
+/// assert!(validate_snake_case_name("my-chain").is_err());
+/// assert!(validate_snake_case_name("MyChain").is_err());
+/// ```
+pub fn validate_snake_case_name(name: &str) -> Result<(), String> {
+    let invalid = |reason: &str| {
+        let suggestion = name.replace('-', "_").to_lowercase();
+        Err(format!(
+            "Invalid name '{name}': {reason}. Names must be snake_case \
+             (lowercase letters, digits, and single underscores; starting with a \
+             letter). Try '{suggestion}'."
+        ))
+    };
+
+    let mut chars = name.chars();
+    match chars.next() {
+        None => return invalid("it is empty"),
+        Some(first) if !first.is_ascii_lowercase() => {
+            return invalid("it must start with a lowercase letter");
+        }
+        Some(_) => {}
+    }
+
+    if name.ends_with('_') {
+        return invalid("it must not end with an underscore");
+    }
+
+    let mut prev_underscore = false;
+    for ch in chars {
+        if ch == '_' {
+            if prev_underscore {
+                return invalid("it must not contain consecutive underscores");
+            }
+            prev_underscore = true;
+            continue;
+        }
+        if !ch.is_ascii_lowercase() && !ch.is_ascii_digit() {
+            return invalid("it may only contain lowercase letters, digits, and underscores");
+        }
+        prev_underscore = false;
+    }
+
+    Ok(())
+}
+
 /// Configuration for ecosystem creation.
 ///
 /// This configuration is used to build zkstack ecosystem create command arguments.
@@ -517,5 +583,37 @@ mod tests {
         ];
         assert!(validate_chain_id_unique(300, &existing).is_ok());
         assert!(validate_chain_id_unique(100, &[]).is_ok());
+    }
+
+    #[test]
+    fn test_validate_snake_case_name_valid() {
+        assert!(validate_snake_case_name("my_chain").is_ok());
+        assert!(validate_snake_case_name("adi_ecosystem").is_ok());
+        assert!(validate_snake_case_name("chain2").is_ok());
+        assert!(validate_snake_case_name("a").is_ok());
+    }
+
+    #[test]
+    fn test_validate_snake_case_name_invalid() {
+        for name in [
+            "my-chain",
+            "MyChain",
+            "1chain",
+            "my__chain",
+            "",
+            "my_chain_",
+            "_chain",
+        ] {
+            assert!(
+                validate_snake_case_name(name).is_err(),
+                "expected '{name}' to be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_snake_case_name_suggests_fix() {
+        let err = validate_snake_case_name("My-Chain").unwrap_err();
+        assert!(err.contains("my_chain"));
     }
 }

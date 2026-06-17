@@ -13,7 +13,7 @@ use crate::commands::helpers::{
 use crate::error::{Result, WrapErr};
 use crate::ui;
 
-use super::config::AcceptConfig;
+use super::config::{AcceptBase, AcceptConfig};
 
 /// Check ecosystem and chain ownership statuses. Returns pending counts.
 pub(super) async fn check_statuses(
@@ -78,7 +78,7 @@ async fn check_chain_status(config: &AcceptConfig<'_>) -> Result<Option<Ownershi
     let status = check_chain_ownership_status(
         config.rpc_url.as_str(),
         contracts,
-        config.key_address,
+        config.chain_key_address,
         config.context.logger().as_ref(),
     )
     .await
@@ -89,34 +89,46 @@ async fn check_chain_status(config: &AcceptConfig<'_>) -> Result<Option<Ownershi
 }
 
 /// Collect and display calldata for ecosystem and chain contracts.
-pub(super) async fn collect_calldata(config: &AcceptConfig<'_>) -> Result<()> {
+///
+/// Needs no signing key: pending transfers are detected against the configured
+/// `new_owner` (or governor) address resolved from the base config.
+pub(super) async fn collect_calldata(base: &AcceptBase<'_>) -> Result<()> {
     ui::info("Collecting calldata for pending contracts...")?;
 
-    if let Some(ref contracts) = config.ecosystem_contracts {
+    let (ecosystem_owner, chain_owner) = super::config::resolve_expected_owners(base).await?;
+    let mut total_entries = 0usize;
+
+    if let (Some(contracts), Some(owner)) = (base.ecosystem_contracts.as_ref(), ecosystem_owner) {
         let calldata = collect_all_ownership_calldata(
-            config.rpc_url.as_str(),
+            base.rpc_url.as_str(),
             contracts,
-            config.key_address,
-            config.context.logger().as_ref(),
+            owner,
+            base.context.logger().as_ref(),
         )
         .await
         .wrap_err("Failed to collect ecosystem calldata")?;
+        total_entries += calldata.entries.len();
         display_calldata_output("Ecosystem Calldata", &calldata)?;
     }
 
-    if let Some(ref contracts) = config.chain_contracts {
+    if let (Some(contracts), Some(owner)) = (base.chain_contracts.as_ref(), chain_owner) {
         let calldata = collect_chain_ownership_calldata(
-            config.rpc_url.as_str(),
+            base.rpc_url.as_str(),
             contracts,
-            config.key_address,
-            config.context.logger().as_ref(),
+            owner,
+            base.context.logger().as_ref(),
         )
         .await
         .wrap_err("Failed to collect chain calldata")?;
+        total_entries += calldata.entries.len();
         display_calldata_output("Chain Calldata", &calldata)?;
     }
 
-    ui::outro("Calldata collection complete")?;
+    if total_entries == 0 {
+        ui::outro("No contracts have pending ownership transfers.")?;
+    } else {
+        ui::outro("Calldata collection complete")?;
+    }
     Ok(())
 }
 
@@ -145,7 +157,7 @@ pub(super) async fn execute_acceptance(
         let summary = accept_chain_ownership(
             config.rpc_url.as_str(),
             contracts,
-            &config.private_key,
+            &config.chain_private_key,
             config.gas_multiplier,
             config.context.logger().as_ref(),
         )

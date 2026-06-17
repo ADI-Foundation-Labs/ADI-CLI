@@ -231,6 +231,14 @@ impl ToolkitRunner {
 
         let foundry_fix = r#"sed -i.bak 's/{ access = "read", path = "\.\.\/l1-contracts\/script-out\/" }/{ access = "read-write", path = "..\/l1-contracts\/script-out\/" }/' /deps/zksync-era/contracts/l1-contracts/foundry.toml"#;
 
+        // zkstack's RegisterZKChain script records the chain ProxyAdmin via a
+        // CREATE2 address computed with the wrong init-code hash, yielding a
+        // phantom address that is never deployed. The Create2AndTransfer wrapper
+        // already exposes the real address; rewrite the line to read it back so
+        // the toolkit serializes the correct `chain_proxy_admin_addr`. The sed is
+        // a no-op (and harmless) on images where this is already fixed upstream.
+        let proxy_admin_fix = r#"sed -i.bak 's/vm\.computeCreate2Address(config\.create2Salt, keccak256(encoded), create2AndTransfer)/Create2AndTransfer(create2AndTransfer).deployedAddress()/' /deps/zksync-era/contracts/l1-contracts/deploy-scripts/RegisterZKChain.s.sol"#;
+
         let escaped_chain_name = super::shell_escape(params.chain_name);
         let mut zkstack_args = format!(
             "zkstack ecosystem init \
@@ -262,7 +270,7 @@ impl ToolkitRunner {
         zkstack_args.push_str(&format!(" --l1-rpc-url {}", escaped_rpc_url));
 
         let shell_cmd = format!(
-            r#"{foundry_fix} && \
+            r#"{foundry_fix} && {proxy_admin_fix} && \
 stdbuf -oL expect -c 'set timeout 3600
 log_user 1
 spawn {zkstack}
@@ -276,6 +284,7 @@ while 1 {{
 catch wait result
 exit [lindex $result 3]'"#,
             foundry_fix = foundry_fix,
+            proxy_admin_fix = proxy_admin_fix,
             zkstack = zkstack_args
         );
 
@@ -285,7 +294,7 @@ exit [lindex $result 3]'"#,
             "deploying chain contracts only"
         };
         self.logger.debug(&format!(
-            "Fixing foundry.toml permissions and {}",
+            "Fixing foundry.toml permissions, patching chain ProxyAdmin address, and {}",
             deploy_msg
         ));
 

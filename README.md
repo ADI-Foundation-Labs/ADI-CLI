@@ -169,8 +169,8 @@ Standalone command for cases where acceptance wasn't done during deploy (e.g., n
 export ADI_PRIVATE_KEY="0x..."
 adi accept --chain my-chain --yes
 
-# Export calldata for multisig submission
-adi accept --calldata --use-governor
+# Export calldata for multisig submission (no key needed; targets the configured new owner)
+adi accept --calldata
 ```
 
 Use `--dry-run` to preview, `--chain <name>` to include chain-level contracts.

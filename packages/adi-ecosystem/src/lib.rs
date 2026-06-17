@@ -59,8 +59,9 @@ pub mod verification;
 // Public re-exports
 pub use commands::{build_chain_create_args, build_ecosystem_create_args, ERA_CONTRACTS_PATH};
 pub use config::{
-    validate_chain_id, validate_chain_id_unique, validate_chain_name_unique, ChainConfig,
-    ChainConfigBuilder, EcosystemConfig, EcosystemConfigBuilder,
+    validate_chain_id, validate_chain_id_unique, validate_chain_name_unique,
+    validate_snake_case_name, ChainConfig, ChainConfigBuilder, EcosystemConfig,
+    EcosystemConfigBuilder,
 };
 pub use da::{configure_l3_da, PubdataSource};
 pub use defaults::{
@@ -75,9 +76,9 @@ pub use ownership::{
     build_governance_schedule_calldata, build_transfer_ownership_calldata,
     check_chain_ownership_status, check_ecosystem_ownership_status,
     check_ecosystem_ownership_status_for_new_owner, collect_all_ownership_calldata,
-    collect_chain_ownership_calldata, transfer_all_ownership, transfer_chain_ownership,
-    CalldataEntry, CalldataOutput, OwnershipContract, OwnershipMethod, OwnershipResult,
-    OwnershipState, OwnershipStatus, OwnershipStatusSummary, OwnershipSummary,
+    collect_chain_ownership_calldata, reclaim_l1_nullifier_to_governor, transfer_all_ownership,
+    transfer_chain_ownership, CalldataEntry, CalldataOutput, OwnershipContract, OwnershipMethod,
+    OwnershipResult, OwnershipState, OwnershipStatus, OwnershipStatusSummary, OwnershipSummary,
 };
 pub use types::{L1Network, ProverMode};
 pub use validator::{
