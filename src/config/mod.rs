@@ -248,7 +248,7 @@ fn unknown_key_warning(key: &str) -> String {
     let hint = match key {
         "rpc_url" => " — did you mean 'ecosystem.rpc_url'?",
         "new_owner" => " — did you mean 'ecosystem.ownership.new_owner'?",
-        "private_key" => " — did you mean 'ownership.private_key'?",
+        "private_key" => " — did you mean 'ecosystem.ownership.private_key'?",
         "funder_key" => " — did you mean 'funding.funder_key'?",
         "explorer" | "explorer_url" | "api_key" => {
             " — did you mean to nest it under 'verification'?"

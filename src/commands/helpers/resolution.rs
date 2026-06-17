@@ -123,12 +123,25 @@ pub fn resolve_funder_key(arg_value: Option<&str>, config: &Config) -> Result<Se
 
 /// Resolve the new-owner private key from optional arg or config.
 ///
-/// Priority: CLI arg / `ADI_PRIVATE_KEY` env > `ownership.private_key`. Returns
-/// `None` so callers can fall back to governor/interactive modes; never prompts.
+/// Priority: CLI arg / `ADI_PRIVATE_KEY` env, then `ecosystem.ownership.private_key`,
+/// then `ownership.private_key` (deprecated). Returns `None` so callers can fall
+/// back to governor/interactive modes; never prompts.
 pub fn resolve_private_key(arg_value: Option<&str>, config: &Config) -> Option<SecretString> {
     arg_value
         .map(|key| SecretString::from(key.to_owned()))
-        .or_else(|| config.ownership.private_key.clone())
+        .or_else(|| config.ecosystem.ownership.private_key.clone())
+        .or_else(|| config.ownership.private_key.clone()) // backward compatibility
+}
+
+/// Resolve a chain's new-owner private key from config.
+///
+/// Priority: `ecosystem.chains[].ownership.private_key`. Returns `None` when the
+/// chain has no configured key so callers can fall back appropriately.
+pub fn resolve_chain_private_key(config: &Config, chain_name: &str) -> Option<SecretString> {
+    config
+        .ecosystem
+        .get_chain(chain_name)
+        .and_then(|c| c.ownership.private_key.clone())
 }
 
 /// Resolve block explorer type from optional arg or config.

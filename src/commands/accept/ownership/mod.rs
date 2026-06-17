@@ -91,8 +91,17 @@ pub struct AcceptArgs {
 pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
     ui::intro("ADI Accept Ownership")?;
 
-    let cfg = config::resolve_config(&args, context).await?;
-    config::display_config(&cfg, &args)?;
+    let base = config::resolve_base(&args, context).await?;
+    config::display_config(&base, &args)?;
+
+    // Calldata mode prints acceptOwnership() calldata for external/multisig
+    // submission. It needs no signing key: the expected pending owner is read
+    // from the configured `new_owner` (or governor) rather than a held key.
+    if args.calldata {
+        return execute::collect_calldata(&base).await;
+    }
+
+    let cfg = config::resolve_signing(base, &args).await?;
 
     let (eco_status, chain_status) = execute::check_statuses(&cfg).await?;
 
@@ -113,10 +122,6 @@ pub async fn run(args: AcceptArgs, context: &Context) -> Result<()> {
     if args.dry_run {
         ui::outro("Dry-run mode: no transactions will be executed")?;
         return Ok(());
-    }
-
-    if args.calldata {
-        return execute::collect_calldata(&cfg).await;
     }
 
     if !args.yes {
