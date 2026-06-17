@@ -32,7 +32,7 @@ pub(super) async fn resolve_config<'a>(
     args: &VerifyArgs,
     context: &'a Context,
 ) -> Result<Option<VerifyConfig<'a>>> {
-    // Resolve the RPC URL once (arg > ecosystem.rpc_url > funding.rpc_url).
+    // Resolve the RPC URL once (arg > ecosystem.rpc_url).
     let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config()).ok();
 
     // Early exit for local networks (verification is unsupported there).

@@ -21,11 +21,6 @@ pub struct ToolkitDefaults {
 /// Note: Token address is read from ecosystem metadata, not configured here.
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct FundingDefaults {
-    /// RPC URL for settlement layer.
-    /// Can be overridden with --rpc-url or ADI_RPC_URL env var.
-    #[serde(default)]
-    pub rpc_url: Option<Url>,
-
     /// Funder wallet private key.
     /// Prefer ADI_FUNDER_KEY env var for security.
     /// Note: This field is never serialized (skipped) for security.
@@ -66,23 +61,6 @@ fn default_s3_bucket() -> Option<String> {
 
 fn default_s3_region() -> Option<String> {
     Some("us-east-1".to_string())
-}
-
-/// Default ownership transfer configuration values.
-///
-/// These can be overridden by CLI flags.
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
-pub struct OwnershipDefaults {
-    /// Address to transfer ownership to.
-    /// Can be overridden with --new-owner flag.
-    #[serde(default)]
-    pub new_owner: Option<Address>,
-
-    /// Private key for accepting ownership (new owner mode).
-    /// Can be overridden with --private-key or ADI_PRIVATE_KEY env var.
-    /// Note: This field is never serialized (skipped) for security.
-    #[serde(default, skip_serializing)]
-    pub private_key: Option<SecretString>,
 }
 
 /// Default verification configuration values.

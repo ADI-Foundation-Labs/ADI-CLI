@@ -38,12 +38,11 @@ pub fn resolve_chain_name(arg_value: Option<&String>, config: &Config) -> Result
 
 /// Resolve RPC URL from optional arg or config.
 ///
-/// Priority: CLI arg > ecosystem.rpc_url > funding.rpc_url (backward compat)
+/// Priority: CLI arg > ecosystem.rpc_url
 pub fn resolve_rpc_url(arg_value: Option<&Url>, config: &Config) -> Result<Url> {
     arg_value
         .cloned()
         .or_else(|| config.ecosystem.rpc_url.clone())
-        .or_else(|| config.funding.rpc_url.clone()) // backward compatibility
         .ok_or_else(|| {
             eyre::eyre!("RPC URL required: use --rpc-url or set ecosystem.rpc_url in config")
         })
@@ -51,11 +50,10 @@ pub fn resolve_rpc_url(arg_value: Option<&Url>, config: &Config) -> Result<Url> 
 
 /// Resolve ecosystem new owner from config.
 ///
-/// Priority: CLI arg > ecosystem.ownership.new_owner > ownership.new_owner (deprecated)
+/// Priority: CLI arg > ecosystem.ownership.new_owner
 pub fn resolve_ecosystem_new_owner(arg_value: Option<Address>, config: &Config) -> Result<Address> {
     arg_value
         .or(config.ecosystem.ownership.new_owner)
-        .or(config.ownership.new_owner) // backward compatibility
         .ok_or_else(|| {
             eyre::eyre!(
                 "Ecosystem new owner required: use --new-owner or set ecosystem.ownership.new_owner in config"
@@ -65,7 +63,7 @@ pub fn resolve_ecosystem_new_owner(arg_value: Option<Address>, config: &Config) 
 
 /// Resolve chain new owner from config.
 ///
-/// Priority: CLI arg > chains[name].ownership.new_owner > ownership.new_owner (deprecated)
+/// Priority: CLI arg > chains[name].ownership.new_owner
 pub fn resolve_chain_new_owner(
     arg_value: Option<Address>,
     chain_name: &str,
@@ -78,7 +76,6 @@ pub fn resolve_chain_new_owner(
                 .get_chain(chain_name)
                 .and_then(|c| c.ownership.new_owner)
         })
-        .or(config.ownership.new_owner) // backward compatibility
         .ok_or_else(|| {
             eyre::eyre!(
                 "Chain new owner required: use --new-owner or set ecosystem.chains[{}].ownership.new_owner in config",
@@ -123,14 +120,13 @@ pub fn resolve_funder_key(arg_value: Option<&str>, config: &Config) -> Result<Se
 
 /// Resolve the new-owner private key from optional arg or config.
 ///
-/// Priority: CLI arg / `ADI_PRIVATE_KEY` env, then `ecosystem.ownership.private_key`,
-/// then `ownership.private_key` (deprecated). Returns `None` so callers can fall
-/// back to governor/interactive modes; never prompts.
+/// Priority: CLI arg / `ADI_PRIVATE_KEY` env, then `ecosystem.ownership.private_key`.
+/// Returns `None` so callers can fall back to governor/interactive modes; never
+/// prompts.
 pub fn resolve_private_key(arg_value: Option<&str>, config: &Config) -> Option<SecretString> {
     arg_value
         .map(|key| SecretString::from(key.to_owned()))
         .or_else(|| config.ecosystem.ownership.private_key.clone())
-        .or_else(|| config.ownership.private_key.clone()) // backward compatibility
 }
 
 /// Resolve a chain's new-owner private key from config.
@@ -308,14 +304,6 @@ mod tests {
     }
 
     #[test]
-    fn resolve_rpc_url_from_funding_config_backcompat() {
-        let mut config = default_config();
-        config.funding.rpc_url = Some("https://funding.example.com".parse().unwrap());
-        let result = resolve_rpc_url(None, &config).unwrap();
-        assert_eq!(result.as_str(), "https://funding.example.com/");
-    }
-
-    #[test]
     fn resolve_gas_multiplier_prefers_arg() {
         let config = default_config();
         assert_eq!(resolve_gas_multiplier(Some(150), &config), 150);
@@ -359,7 +347,7 @@ mod tests {
     #[test]
     fn resolve_private_key_falls_back_to_config() {
         let mut config = default_config();
-        config.ownership.private_key = Some(SecretString::from("0x222".to_string()));
+        config.ecosystem.ownership.private_key = Some(SecretString::from("0x222".to_string()));
         let key = resolve_private_key(None, &config).unwrap();
         assert_eq!(key.expose_secret(), "0x222");
     }
@@ -466,11 +454,6 @@ mod tests {
                 resolves: |c| resolve_rpc_url(None, c).is_ok(),
             },
             Case {
-                name: "rpc_url via funding",
-                set: |c| c.funding.rpc_url = Some("https://f.example.com".parse().unwrap()),
-                resolves: |c| resolve_rpc_url(None, c).is_ok(),
-            },
-            Case {
                 name: "ecosystem_name",
                 set: |c| c.ecosystem.name = "eco".to_string(),
                 resolves: |c| resolve_ecosystem_name(None, c).is_ok(),
@@ -503,7 +486,10 @@ mod tests {
             },
             Case {
                 name: "private_key",
-                set: |c| c.ownership.private_key = Some(SecretString::from("0xdef".to_string())),
+                set: |c| {
+                    c.ecosystem.ownership.private_key =
+                        Some(SecretString::from("0xdef".to_string()))
+                },
                 resolves: |c| resolve_private_key(None, c).is_some(),
             },
             Case {

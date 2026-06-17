@@ -189,7 +189,7 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
         return Ok(());
     }
 
-    // 5. Resolve RPC URL (args > ecosystem.rpc_url > funding.rpc_url)
+    // 5. Resolve RPC URL (args > ecosystem.rpc_url)
     let rpc_url = resolve_rpc_url(args.rpc_url.as_ref(), context.config())?;
 
     // 6. Validate chain ID doesn't conflict with settlement layer

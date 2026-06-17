@@ -232,7 +232,6 @@ impl Default for Config {
             state_backend: adi_state::BackendType::default(),
             funding: crate::config::FundingDefaults::default(),
             toolkit: crate::config::ToolkitDefaults::default(),
-            ownership: crate::config::OwnershipDefaults::default(),
             verification: crate::config::VerificationDefaults::default(),
             gas_multiplier: 200,
             vault: crate::config::VaultDefaults::default(),

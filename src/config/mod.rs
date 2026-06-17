@@ -1,8 +1,8 @@
 mod types;
 
 pub use types::{
-    FeeAdjusterConfig, FundingDefaults, OperatorsConfig, OwnershipDefaults, S3Config,
-    ToolkitDefaults, VaultDefaults, VerificationDefaults,
+    FeeAdjusterConfig, FundingDefaults, OperatorsConfig, S3Config, ToolkitDefaults, VaultDefaults,
+    VerificationDefaults,
 };
 
 use std::path::{Path, PathBuf};
@@ -29,7 +29,6 @@ const KNOWN_TOP_LEVEL_KEYS: &[&str] = &[
     "state_backend",
     "funding",
     "toolkit",
-    "ownership",
     "verification",
     "gas_multiplier",
     "vault",
@@ -91,12 +90,6 @@ pub struct Config {
     /// These can be overridden by CLI flags.
     #[serde(default)]
     pub toolkit: ToolkitDefaults,
-
-    /// Default ownership transfer configuration values.
-    /// **Deprecated**: Use `ecosystem.ownership` for ecosystem-level
-    /// and `ecosystem.chains[].ownership` for chain-level ownership.
-    #[serde(default)]
-    pub ownership: OwnershipDefaults,
 
     /// Default verification configuration values.
     /// These can be overridden by CLI flags.
@@ -247,6 +240,7 @@ fn detect_unknown_keys(content: &str) -> Vec<String> {
 fn unknown_key_warning(key: &str) -> String {
     let hint = match key {
         "rpc_url" => " — did you mean 'ecosystem.rpc_url'?",
+        "ownership" => " — did you mean 'ecosystem.ownership'?",
         "new_owner" => " — did you mean 'ecosystem.ownership.new_owner'?",
         "private_key" => " — did you mean 'ecosystem.ownership.private_key'?",
         "funder_key" => " — did you mean 'funding.funder_key'?",
