@@ -7,14 +7,17 @@ use adi_state::StateManager;
 use clap::Args;
 use serde::{Deserialize, Serialize};
 
-use crate::commands::helpers::{create_state_manager_with_context, resolve_ecosystem_name};
+use crate::commands::helpers::{
+    create_state_manager_with_context, resolve_ecosystem_name, select_chain_from_state,
+};
 use crate::context::Context;
 use crate::error::{Result, WrapErr};
 use crate::ui;
+use adi_types::EcosystemContracts;
 
-use counting::{count_chain_contracts, count_ecosystem_contracts};
+use counting::{count_chain_contracts_with_ctm, count_ecosystem_contracts};
 use display::{
-    format_chain_contracts, format_chain_metadata, format_ecosystem_contracts,
+    format_chain_contracts_with_ctm, format_chain_metadata, format_ecosystem_contracts,
     format_ecosystem_metadata,
 };
 
@@ -63,7 +66,7 @@ pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
     )?;
 
     // Load and display ecosystem contracts if they exist
-    let contract_count = if contracts_exist(&state_manager).await? {
+    let ecosystem_contracts = if contracts_exist(&state_manager).await? {
         let ecosystem_contracts = state_manager
             .ecosystem()
             .contracts()
@@ -72,17 +75,34 @@ pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
 
         let count = count_ecosystem_contracts(&ecosystem_contracts);
         let contracts_display = format_ecosystem_contracts(&ecosystem_contracts);
-        ui::note("Contracts", contracts_display)?;
-        Some(count)
+        ui::note("Ecosystem Contracts (L1)", contracts_display)?;
+        Some((ecosystem_contracts, count))
     } else {
         ui::info("No contracts deployed yet. Run 'adi deploy' to deploy.")?;
         None
     };
+    let contract_count = ecosystem_contracts.as_ref().map(|(_, count)| *count);
 
-    // Load and display chain information
-    // Use --chain if provided, otherwise use default_chain from ecosystem metadata
-    let chain_to_display = args.chain.as_ref().unwrap_or(&eco_metadata.default_chain);
-    let chain_contract_count = display_chain_info(&state_manager, chain_to_display).await?;
+    // Load and display chain information.
+    // Use --chain if provided; auto-select when a single chain exists;
+    // otherwise prompt the user to pick one.
+    let chains = state_manager
+        .list_chains()
+        .await
+        .wrap_err("Failed to list chains")?;
+    let chain_contract_count = if chains.is_empty() {
+        ui::info("No chains found. Run 'adi add' to add a chain.")?;
+        None
+    } else {
+        let chain_to_display =
+            select_chain_from_state(args.chain.as_ref(), &state_manager, &ecosystem_name).await?;
+        display_chain_info(
+            &state_manager,
+            &chain_to_display,
+            ecosystem_contracts.as_ref().map(|(contracts, _)| contracts),
+        )
+        .await?
+    };
 
     // Display summary (ecosystem + chain contracts)
     let summary = match (contract_count, chain_contract_count) {
@@ -107,6 +127,7 @@ pub async fn run(args: &EcosystemArgs, context: &Context) -> Result<()> {
 async fn display_chain_info(
     state_manager: &StateManager,
     chain_name: &str,
+    ecosystem_contracts: Option<&EcosystemContracts>,
 ) -> Result<Option<usize>> {
     let chain_ops = state_manager.chain(chain_name);
 
@@ -132,8 +153,9 @@ async fn display_chain_info(
             .await
             .wrap_err("Failed to load chain contracts")?;
 
-        let count = count_chain_contracts(&chain_contracts);
-        let contracts_display = format_chain_contracts(&chain_contracts);
+        let ctm = ecosystem_contracts.and_then(|contracts| contracts.zksync_os_ctm.as_ref());
+        let count = count_chain_contracts_with_ctm(&chain_contracts, ctm);
+        let contracts_display = format_chain_contracts_with_ctm(&chain_contracts, ctm);
         ui::note(
             format!("Chain '{}' Contracts", chain_name),
             contracts_display,
