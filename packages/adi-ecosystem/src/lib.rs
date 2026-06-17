@@ -59,8 +59,9 @@ pub mod verification;
 // Public re-exports
 pub use commands::{build_chain_create_args, build_ecosystem_create_args, ERA_CONTRACTS_PATH};
 pub use config::{
-    validate_chain_id, validate_chain_id_unique, validate_chain_name_unique, ChainConfig,
-    ChainConfigBuilder, EcosystemConfig, EcosystemConfigBuilder,
+    validate_chain_id, validate_chain_id_unique, validate_chain_name_unique,
+    validate_snake_case_name, ChainConfig, ChainConfigBuilder, EcosystemConfig,
+    EcosystemConfigBuilder,
 };
 pub use da::{configure_l3_da, PubdataSource};
 pub use defaults::{

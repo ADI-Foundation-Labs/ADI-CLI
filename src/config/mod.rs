@@ -179,6 +179,9 @@ pub fn load(cli_path: Option<&Path>) -> Result<LoadedConfig> {
     // Expand ~ in state_dir to user's home directory.
     config.state_dir = expand_tilde(&config.state_dir);
 
+    // Reject non-snake_case names so adi-cli state matches zkstack's stored form.
+    validate_names(&config)?;
+
     Ok(LoadedConfig {
         config,
         path,
@@ -218,6 +221,23 @@ pub fn resolve_config_path(cli_path: Option<&Path>, warnings: &mut Vec<String>) 
 
     // Neither exists yet: default to the unified location.
     unified
+}
+
+/// Validate that the ecosystem name and every chain name are snake_case.
+///
+/// `zkstack` stores state under snake_case names, so a divergent (e.g. kebab-case)
+/// name in config would break later path lookups. Fail fast with the underlying
+/// descriptive message.
+fn validate_names(config: &Config) -> Result<()> {
+    adi_ecosystem::validate_snake_case_name(&config.ecosystem.name)
+        .map_err(|e| eyre::eyre!("Invalid ecosystem.name: {e}"))?;
+
+    for chain in &config.ecosystem.chains {
+        adi_ecosystem::validate_snake_case_name(&chain.name)
+            .map_err(|e| eyre::eyre!("Invalid chain name: {e}"))?;
+    }
+
+    Ok(())
 }
 
 /// Detect top-level YAML keys that `Config` does not recognize.

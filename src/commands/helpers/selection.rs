@@ -110,6 +110,7 @@ pub fn select_chain_from_config(
             return Ok(ChainSelection::Existing(chain_name.clone()));
         }
         // CLI user specified a name not in config - treat as new
+        adi_ecosystem::validate_snake_case_name(chain_name).map_err(|e| eyre::eyre!("{e}"))?;
         return Ok(ChainSelection::New(chain_name.clone()));
     }
 
@@ -121,15 +122,7 @@ pub fn select_chain_from_config(
 
         // No chains but can create new - prompt for name
         (0, true) => {
-            let name: String = ui::input("Enter chain name")
-                .placeholder("my_chain")
-                .interact()
-                .wrap_err("Failed to read chain name")?;
-
-            if name.is_empty() {
-                return Err(eyre::eyre!("Chain name cannot be empty"));
-            }
-
+            let name = prompt_new_chain_name()?;
             Ok(ChainSelection::New(name))
         }
 
@@ -173,19 +166,31 @@ pub fn select_chain_from_config(
                 .wrap_err("Chain selection cancelled")?;
 
             if selected == CREATE_NEW_VALUE {
-                let name: String = ui::input("Enter chain name")
-                    .placeholder("my_chain")
-                    .interact()
-                    .wrap_err("Failed to read chain name")?;
-
-                if name.is_empty() {
-                    return Err(eyre::eyre!("Chain name cannot be empty"));
-                }
-
+                let name = prompt_new_chain_name()?;
                 return Ok(ChainSelection::New(name));
             }
 
             Ok(ChainSelection::Existing(selected))
         }
     }
+}
+
+/// Prompt for a new chain name, re-prompting inline on invalid input.
+///
+/// Validates non-empty and snake_case via the prompt's `validate` callback so a
+/// bad name does not abort the whole selection flow.
+fn prompt_new_chain_name() -> Result<String> {
+    let name: String = ui::input("Enter chain name")
+        .placeholder("my_chain")
+        .validate(|input: &String| {
+            let trimmed = input.trim();
+            if trimmed.is_empty() {
+                return Err("Chain name is required".to_string());
+            }
+            adi_ecosystem::validate_snake_case_name(trimmed)
+        })
+        .interact()
+        .wrap_err("Failed to read chain name")?;
+
+    Ok(name.trim().to_string())
 }

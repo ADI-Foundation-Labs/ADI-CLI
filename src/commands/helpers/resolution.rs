@@ -15,25 +15,34 @@ use crate::config::Config;
 use crate::error::Result;
 
 /// Resolve ecosystem name from optional arg or config.
+///
+/// The resolved name is validated as snake_case so CLI args that bypass config
+/// loading (e.g. `--ecosystem-name my-eco`) are rejected consistently.
 pub fn resolve_ecosystem_name(arg_value: Option<&String>, config: &Config) -> Result<String> {
-    arg_value
+    let name = arg_value
         .cloned()
         .or_else(|| Some(config.ecosystem.name.clone()))
         .filter(|s| !s.is_empty())
         .ok_or_else(|| {
             eyre::eyre!("Ecosystem name required: use --ecosystem-name or set in config")
-        })
+        })?;
+    adi_ecosystem::validate_snake_case_name(&name).map_err(|e| eyre::eyre!("{e}"))?;
+    Ok(name)
 }
 
 /// Resolve chain name from optional arg or config.
 ///
-/// Falls back to the first chain in `ecosystem.chains[]` if available.
+/// Falls back to the first chain in `ecosystem.chains[]` if available. The
+/// resolved name is validated as snake_case so CLI args that bypass config
+/// loading (e.g. `--chain my-chain`) are rejected consistently.
 pub fn resolve_chain_name(arg_value: Option<&String>, config: &Config) -> Result<String> {
-    arg_value
+    let name = arg_value
         .cloned()
         .or_else(|| config.ecosystem.default_chain().map(|c| c.name.clone()))
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| eyre::eyre!("Chain name required: use --chain or set in config"))
+        .ok_or_else(|| eyre::eyre!("Chain name required: use --chain or set in config"))?;
+    adi_ecosystem::validate_snake_case_name(&name).map_err(|e| eyre::eyre!("{e}"))?;
+    Ok(name)
 }
 
 /// Resolve RPC URL from optional arg or config.
@@ -488,7 +497,7 @@ mod tests {
                 name: "private_key",
                 set: |c| {
                     c.ecosystem.ownership.private_key =
-                        Some(SecretString::from("0xdef".to_string()))
+                        Some(SecretString::from("0xdef".to_string()));
                 },
                 resolves: |c| resolve_private_key(None, c).is_some(),
             },

@@ -104,6 +104,7 @@ pub(crate) fn prompt_chain_name(
                 trimmed
             ));
         }
+        adi_ecosystem::validate_snake_case_name(trimmed).map_err(|e| eyre::eyre!("{e}"))?;
         return Ok(trimmed.to_string());
     }
 
@@ -112,12 +113,12 @@ pub(crate) fn prompt_chain_name(
         .validate(move |input: &String| {
             let trimmed = input.trim();
             if trimmed.is_empty() {
-                return Err("Chain name is required");
+                return Err("Chain name is required".to_string());
             }
             if existing_names.iter().any(|n| n == trimmed) {
-                return Err("Chain name already exists in this ecosystem");
+                return Err("Chain name already exists in this ecosystem".to_string());
             }
-            Ok(())
+            adi_ecosystem::validate_snake_case_name(trimmed)
         })
         .interact()
         .wrap_err("Failed to read chain name")?;
