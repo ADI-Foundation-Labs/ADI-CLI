@@ -6,7 +6,10 @@ use alloy_provider::Provider;
 use alloy_rpc_types::TransactionRequest;
 use alloy_sol_types::SolCall;
 
-use super::{getAdminCall, getPendingAdminCall, ownerCall, pendingOwnerCall, OwnerQueryResult};
+use super::{
+    bridgedTokenBeaconCall, getAdminCall, getPendingAdminCall, ownerCall, pendingOwnerCall,
+    OwnerQueryResult,
+};
 
 const ERR_NOT_DEPLOYED: &str = "contract not deployed";
 
@@ -108,6 +111,30 @@ pub(super) async fn query_pending_admin<P: Provider + Clone>(
         "getPendingAdmin",
     )
     .await
+}
+
+/// Resolve the Bridged Token Beacon address from the Native Token Vault.
+///
+/// The beacon address is not stored in config — it must be read from the vault
+/// via `bridgedTokenBeacon()`. Returns `None` if the vault is unset or the call
+/// fails.
+pub(super) async fn query_bridged_token_beacon<P: Provider + Clone>(
+    provider: &P,
+    native_token_vault: Option<Address>,
+) -> Option<Address> {
+    let vault = native_token_vault?;
+    match query_address_field(
+        provider,
+        vault,
+        "Native Token Vault",
+        bridgedTokenBeaconCall {}.abi_encode(),
+        "bridgedTokenBeacon",
+    )
+    .await
+    {
+        OwnerQueryResult::Ok(addr) => Some(addr),
+        _ => None,
+    }
 }
 
 /// Query admin from EIP-1967 transparent proxy storage slot.
