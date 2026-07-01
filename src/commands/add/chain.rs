@@ -166,13 +166,14 @@ pub async fn run(args: &AddArgs, context: &Context) -> Result<()> {
     ui::note(
         format!("Protocol version: {}", ui::green(&version)),
         format!(
-            "Ecosystem: {}\nChain: {} (ID: {})\nProver mode: {}\nBase token: {}\nEVM emulator: {}",
+            "Ecosystem: {}\nChain: {} (ID: {})\nProver mode: {}\nBase token: {}\nEVM emulator: {}\nValidium: {}",
             ui::green(&ecosystem_name),
             ui::green(&chain_defaults.name),
             ui::green(chain_defaults.chain_id),
             ui::green(&chain_defaults.prover_mode),
             ui::green(&base_token_display),
-            ui::green(chain_defaults.evm_emulator)
+            ui::green(chain_defaults.evm_emulator),
+            ui::green(chain_defaults.validium)
         ),
     )?;
 
@@ -260,6 +261,10 @@ fn build_chain_defaults(
         evm_emulator: args
             .evm_emulator
             .or_else(|| defaults.map(|c| c.evm_emulator))
+            .unwrap_or(false),
+        validium: args
+            .validium
+            .or_else(|| defaults.map(|c| c.validium))
             .unwrap_or(false),
         // Use blobs setting from config or default to false (calldata/L3 mode)
         blobs: defaults.map(|c| c.blobs).unwrap_or(false),

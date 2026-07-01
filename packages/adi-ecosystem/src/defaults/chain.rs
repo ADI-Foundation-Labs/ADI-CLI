@@ -104,6 +104,11 @@ pub struct ChainDefaults {
     #[serde(default)]
     pub blobs: bool,
 
+    /// Enable Validium mode (no DA).
+    /// Default: `false`
+    #[serde(default)]
+    pub validium: bool,
+
     /// Override fee collector address for server parameters.
     ///
     /// When set, overrides the wallet-derived `fee_account` address.
@@ -142,6 +147,7 @@ impl Default for ChainDefaults {
             base_token_price_denominator: 1,
             evm_emulator: false,
             blobs: false,
+            validium: false,
             fee_collector_address: None,
             operators: OperatorsDefaults::default(),
             funding: ChainFundingDefaults::default(),
@@ -185,6 +191,9 @@ impl ChainDefaults {
         }
         if self.blobs != defaults.blobs {
             lines.push(format!("blobs: {}", self.blobs));
+        }
+        if self.validium != defaults.validium {
+            lines.push(format!("validium: {}", self.validium));
         }
         if let Some(addr) = &self.fee_collector_address {
             lines.push(format!("fee_collector_address: \"{}\"", addr));

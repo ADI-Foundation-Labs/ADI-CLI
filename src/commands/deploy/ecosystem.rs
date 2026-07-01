@@ -11,7 +11,7 @@ use adi_ecosystem::verification::{
 };
 use adi_ecosystem::{
     add_validator_roles, configure_l3_da, remove_validator_roles, validate_chain_id,
-    ChainFundingDefaults, DeployedContracts,
+    ChainFundingDefaults, DeployedContracts, PubdataSource,
 };
 use adi_funding::{
     build_funding_target_statuses, is_localhost_rpc, normalize_rpc_url, AnvilFunder,
@@ -154,6 +154,10 @@ pub struct DeployArgs {
         help = "Use blob-based pubdata (true=blobs for L2, false=calldata for L3)"
     )]
     pub blobs: Option<bool>,
+
+    /// Enable Validium mode (no DA). Overrides chain config if specified.
+    #[arg(long, help = "Enable Validium mode (no DA)")]
+    pub validium: Option<bool>,
 }
 
 /// Execute the ecosystem deploy command.
@@ -218,8 +222,12 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     ))?;
 
     // Display deployment info
-    let use_blobs = resolve_blobs_mode(&args, context, &chain_name);
-    let chain_type = if use_blobs { "L2" } else { "L3" };
+    let da_mode = resolve_da_mode(&args, context, &chain_name);
+    let chain_type = match da_mode {
+        DAMode::Blobs => "L2 (Blobs)",
+        DAMode::Calldata => "L3 (Calldata)",
+        DAMode::Validium => "L3 (Validium)",
+    };
     ui::note(
         "Deployment target",
         format!(
@@ -769,18 +777,36 @@ async fn run_ecosystem_deployment(
     )
     .await?;
 
-    // Configure calldata DA mode if blobs are disabled (L3 chains settling on L2)
-    if !resolve_blobs_mode(args, context, chain_name) {
-        configure_calldata_da(
-            context,
-            state_manager,
-            chain_name,
-            &normalized_rpc,
-            &deployed,
-            &governor_key,
-            validator_gas_multiplier,
-        )
-        .await?;
+    // Configure DA mode (Blobs vs Calldata vs Validium)
+    let da_mode = resolve_da_mode(args, context, chain_name);
+    match da_mode {
+        DAMode::Blobs => {
+            context.logger().info("Using Blobs for DA (L2 mode)");
+        }
+        DAMode::Calldata => {
+            configure_calldata_da(
+                context,
+                state_manager,
+                chain_name,
+                &normalized_rpc,
+                &deployed,
+                &governor_key,
+                validator_gas_multiplier,
+            )
+            .await?;
+        }
+        DAMode::Validium => {
+            configure_validium_da(
+                context,
+                state_manager,
+                chain_name,
+                &normalized_rpc,
+                &deployed,
+                &governor_key,
+                validator_gas_multiplier,
+            )
+            .await?;
+        }
     }
 
     // Post-deployment ownership operations (config-driven)
@@ -1128,6 +1154,7 @@ async fn configure_calldata_da(
         deployed.chain_admin,
         deployed.diamond_proxy,
         l1_da_validator,
+        PubdataSource::PubdataKeccak256,
         governor_key,
         gas_multiplier,
         context.logger().as_ref(),
@@ -1137,6 +1164,64 @@ async fn configure_calldata_da(
 
     ui::success(format!(
         "Calldata DA mode configured: {}",
+        ui::green(tx_hash)
+    ))?;
+
+    Ok(())
+}
+
+/// Configure Validium DA mode (no DA) on L1.
+async fn configure_validium_da(
+    context: &Context,
+    state_manager: &StateManager,
+    chain_name: &str,
+    rpc_url: &str,
+    deployed: &DeployedContracts,
+    governor_key: &SecretString,
+    gas_multiplier: Option<u64>,
+) -> Result<()> {
+    ui::info("Configuring Validium mode (no DA)...")?;
+
+    let da_validator = get_l1_da_validator_address(state_manager, chain_name).await?;
+
+    // Get ecosystem contracts for bridgehub and state_transition_proxy
+    let chain_contracts = state_manager
+        .chain(chain_name)
+        .contracts()
+        .await
+        .wrap_err("Failed to load chain contracts")?;
+
+    let _bridgehub = chain_contracts
+        .ecosystem_contracts
+        .as_ref()
+        .and_then(|e| e.bridgehub_proxy_addr)
+        .ok_or_else(|| eyre::eyre!("Bridgehub address not found in state"))?;
+
+    let _state_transition_proxy = chain_contracts
+        .ecosystem_contracts
+        .as_ref()
+        .and_then(|e| e.state_transition_proxy_addr)
+        .ok_or_else(|| eyre::eyre!("StateTransitionProxy address not found in state"))?;
+
+    // Use PubdataSource::EmptyNoDa (1) for Validium
+    let tx_hash = adi_ecosystem::configure_l3_da(
+        rpc_url,
+        deployed.chain_admin,
+        deployed.diamond_proxy,
+        da_validator,
+        PubdataSource::EmptyNoDa,
+        governor_key,
+        gas_multiplier,
+        context.logger().as_ref(),
+    )
+    .await
+    .wrap_err("Failed to configure Validium mode")?;
+
+    // Note: Bridgehub and StateTransitionProxy are currently not used by configure_l3_da
+    // but might be needed if the SDK changes to use them.
+
+    ui::success(format!(
+        "Validium mode (no DA) configured: {}",
         ui::green(tx_hash)
     ))?;
 
@@ -1295,24 +1380,46 @@ async fn validate_ecosystem_exists(
     Ok(())
 }
 
-/// Resolve blobs mode from args or chain config.
-///
-/// Priority: CLI arg > chain config > default (false = calldata)
-///
-/// Returns `true` if blobs should be used (L2 behavior),
-/// `false` if calldata should be used (L3 behavior).
-fn resolve_blobs_mode(args: &DeployArgs, context: &Context, chain_name: &str) -> bool {
-    // CLI arg takes priority
-    if let Some(blobs) = args.blobs {
-        return blobs;
+/// Resolve DA mode from args or chain config.
+fn resolve_da_mode(args: &DeployArgs, context: &Context, chain_name: &str) -> DAMode {
+    // CLI args take priority
+    if let Some(true) = args.validium {
+        return DAMode::Validium;
     }
+    if let Some(blobs) = args.blobs {
+        return if blobs {
+            DAMode::Blobs
+        } else {
+            DAMode::Calldata
+        };
+    }
+
     // Fall back to chain config
     context
         .config()
         .ecosystem
         .get_chain(chain_name)
-        .map(|c| c.blobs)
-        .unwrap_or(false)
+        .map(|c| {
+            if c.validium {
+                DAMode::Validium
+            } else if c.blobs {
+                DAMode::Blobs
+            } else {
+                DAMode::Calldata
+            }
+        })
+        .unwrap_or(DAMode::Calldata)
+}
+
+/// Data Availability modes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DAMode {
+    /// Use blob-based pubdata (EIP-4844) - L2 behavior.
+    Blobs,
+    /// Use calldata for pubdata - L3 behavior.
+    Calldata,
+    /// No DA - Validium behavior.
+    Validium,
 }
 
 /// Get L1 DA validator address from state.

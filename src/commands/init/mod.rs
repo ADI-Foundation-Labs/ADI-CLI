@@ -100,6 +100,10 @@ pub struct InitArgs {
     )]
     pub evm_emulator: Option<bool>,
 
+    /// Enable Validium mode (no DA)
+    #[arg(long, help = "Enable Validium mode (no DA)")]
+    pub validium: Option<bool>,
+
     /// Operator address (receives PRECOMMITTER, COMMITTER, REVERTER roles)
     #[arg(long, env = "ADI_OPERATOR")]
     pub operator: Option<Address>,

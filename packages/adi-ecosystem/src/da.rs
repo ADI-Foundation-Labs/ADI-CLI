@@ -107,6 +107,7 @@ pub async fn configure_l3_da(
     chain_admin: Address,
     diamond_proxy: Address,
     l1_da_validator: Address,
+    pubdata_source: PubdataSource,
     governor_key: &SecretString,
     gas_multiplier: Option<u64>,
     logger: &dyn Logger,
@@ -160,7 +161,7 @@ pub async fn configure_l3_da(
     let calldata = build_set_da_validator_pair_multicall_calldata(
         diamond_proxy,
         l1_da_validator,
-        PubdataSource::BlobsAndPubdataKeccak256,
+        pubdata_source,
     );
 
     let green = Style::new().green();
@@ -262,5 +263,21 @@ mod tests {
 
         // Different pubdata sources should produce different calldata
         assert_ne!(calldata_keccak, calldata_blobs);
+    }
+
+    #[test]
+    fn test_build_calldata_validium() {
+        let diamond_proxy = Address::ZERO;
+        let l1_da_validator = Address::ZERO;
+
+        let calldata = build_set_da_validator_pair_multicall_calldata(
+            diamond_proxy,
+            l1_da_validator,
+            PubdataSource::EmptyNoDa,
+        );
+
+        // Validium mode (1) should be present in calldata
+        // The last byte of the inner call is the pubdata_source
+        assert!(calldata.iter().any(|&b| b == 1));
     }
 }
