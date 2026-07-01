@@ -115,10 +115,7 @@ pub struct L3DaConfig<'a> {
 /// # Errors
 ///
 /// Returns error if transaction fails or required addresses are invalid.
-pub async fn configure_l3_da(
-    config: L3DaConfig<'_>,
-    logger: &dyn Logger,
-) -> Result<B256> {
+pub async fn configure_l3_da(config: L3DaConfig<'_>, logger: &dyn Logger) -> Result<B256> {
     logger.debug(&format!(
         "Configuring L3 DA mode via chain_admin: {}",
         config.chain_admin
@@ -161,7 +158,9 @@ pub async fn configure_l3_da(
             .map_err(|e| EcosystemError::TransactionFailed {
                 reason: format!("Failed to get gas price: {}", e),
             })?;
-    let gas_price = config.gas_multiplier.map_or(estimated, |m| estimated * u128::from(m) / 100);
+    let gas_price = config
+        .gas_multiplier
+        .map_or(estimated, |m| estimated * u128::from(m) / 100);
     logger.debug(&format!("Using gas price: {} wei", gas_price));
 
     // Build calldata for setDAValidatorPair via multicall
