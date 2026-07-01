@@ -216,7 +216,10 @@ mod tests {
         let args = build_ecosystem_create_args(&config);
 
         assert!(args.contains(&"--l1-batch-commit-data-generator-mode".to_string()));
-        let mode_idx = args.iter().position(|r| r == "--l1-batch-commit-data-generator-mode").unwrap();
+        let mode_idx = args
+            .iter()
+            .position(|r| r == "--l1-batch-commit-data-generator-mode")
+            .unwrap();
         assert_eq!(args[mode_idx + 1], "validium");
     }
 
@@ -231,7 +234,10 @@ mod tests {
         let args = build_chain_create_args(&config);
 
         assert!(args.contains(&"--l1-batch-commit-data-generator-mode".to_string()));
-        let mode_idx = args.iter().position(|r| r == "--l1-batch-commit-data-generator-mode").unwrap();
+        let mode_idx = args
+            .iter()
+            .position(|r| r == "--l1-batch-commit-data-generator-mode")
+            .unwrap();
         assert_eq!(args[mode_idx + 1], "validium");
     }
 }

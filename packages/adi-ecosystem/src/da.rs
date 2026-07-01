@@ -79,6 +79,24 @@ pub fn build_set_da_validator_pair_multicall_calldata(
     Bytes::from(multicall_call.abi_encode())
 }
 
+/// Arguments for configuring L3 DA mode.
+pub struct L3DaConfig<'a> {
+    /// Settlement layer RPC endpoint URL.
+    pub rpc_url: &'a str,
+    /// ChainAdmin contract address.
+    pub chain_admin: Address,
+    /// Diamond proxy contract address.
+    pub diamond_proxy: Address,
+    /// L1 DA validator contract address.
+    pub l1_da_validator: Address,
+    /// DA mode source.
+    pub pubdata_source: PubdataSource,
+    /// Governor private key for signing transactions.
+    pub governor_key: &'a SecretString,
+    /// Gas price multiplier percentage.
+    pub gas_multiplier: Option<u64>,
+}
+
 /// Configure L3 DA mode (calldata-based pubdata).
 ///
 /// This function sends a transaction to disable blobs and use calldata-based
@@ -87,12 +105,7 @@ pub fn build_set_da_validator_pair_multicall_calldata(
 ///
 /// # Arguments
 ///
-/// * `rpc_url` - Settlement layer RPC endpoint URL.
-/// * `chain_admin` - ChainAdmin contract address.
-/// * `diamond_proxy` - Diamond proxy contract address.
-/// * `l1_da_validator` - RollupL1DAValidator contract address.
-/// * `governor_key` - Governor private key for signing transactions.
-/// * `gas_multiplier` - Gas price multiplier percentage. None to use raw estimate.
+/// * `config` - DA configuration including RPC, addresses, and keys.
 /// * `logger` - Logger for debug/info/warning output.
 ///
 /// # Returns
@@ -103,30 +116,24 @@ pub fn build_set_da_validator_pair_multicall_calldata(
 ///
 /// Returns error if transaction fails or required addresses are invalid.
 pub async fn configure_l3_da(
-    rpc_url: &str,
-    chain_admin: Address,
-    diamond_proxy: Address,
-    l1_da_validator: Address,
-    pubdata_source: PubdataSource,
-    governor_key: &SecretString,
-    gas_multiplier: Option<u64>,
+    config: L3DaConfig<'_>,
     logger: &dyn Logger,
 ) -> Result<B256> {
     logger.debug(&format!(
         "Configuring L3 DA mode via chain_admin: {}",
-        chain_admin
+        config.chain_admin
     ));
 
     // Create signer from governor key
-    let signer = create_signer(governor_key)?;
+    let signer = create_signer(config.governor_key)?;
     let governor_address = signer.address();
     logger.debug(&format!("Governor address: {}", governor_address));
 
     // Create signing provider
     let wallet = EthereumWallet::from(signer);
-    let normalized_rpc = normalize_rpc_url(rpc_url);
+    let normalized_rpc = normalize_rpc_url(config.rpc_url);
     let url: url::Url = normalized_rpc.parse().map_err(|e| {
-        EcosystemError::InvalidConfig(format!("Invalid RPC URL '{}': {}", rpc_url, e))
+        EcosystemError::InvalidConfig(format!("Invalid RPC URL '{}': {}", config.rpc_url, e))
     })?;
     let provider = ProviderBuilder::new().wallet(wallet).connect_http(url);
 
@@ -154,27 +161,27 @@ pub async fn configure_l3_da(
             .map_err(|e| EcosystemError::TransactionFailed {
                 reason: format!("Failed to get gas price: {}", e),
             })?;
-    let gas_price = gas_multiplier.map_or(estimated, |m| estimated * u128::from(m) / 100);
+    let gas_price = config.gas_multiplier.map_or(estimated, |m| estimated * u128::from(m) / 100);
     logger.debug(&format!("Using gas price: {} wei", gas_price));
 
     // Build calldata for setDAValidatorPair via multicall
     let calldata = build_set_da_validator_pair_multicall_calldata(
-        diamond_proxy,
-        l1_da_validator,
-        pubdata_source,
+        config.diamond_proxy,
+        config.l1_da_validator,
+        config.pubdata_source,
     );
 
     let green = Style::new().green();
     let spinner = cliclack::spinner();
     spinner.start(format!(
         "Setting DA validator pair to calldata mode ({})",
-        green.apply_to(l1_da_validator)
+        green.apply_to(config.l1_da_validator)
     ));
 
     // Build transaction to chain_admin
     let tx = TransactionRequest::default()
         .with_from(governor_address)
-        .with_to(chain_admin)
+        .with_to(config.chain_admin)
         .with_input(calldata)
         .with_nonce(nonce)
         .with_gas_limit(100_000) // Conservative gas limit

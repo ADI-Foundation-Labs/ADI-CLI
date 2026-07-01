@@ -63,7 +63,7 @@ pub use config::{
     validate_snake_case_name, ChainConfig, ChainConfigBuilder, EcosystemConfig,
     EcosystemConfigBuilder,
 };
-pub use da::{configure_l3_da, PubdataSource};
+pub use da::{configure_l3_da, L3DaConfig, PubdataSource};
 pub use defaults::{
     ChainDefaults, ChainFundingDefaults, ChainOwnershipDefaults, EcosystemDefaults,
     EcosystemOwnershipDefaults, OperatorsDefaults,

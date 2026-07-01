@@ -1150,13 +1150,15 @@ async fn configure_calldata_da(
         .wrap_err("Failed to get L1 DA validator address")?;
 
     let tx_hash = configure_l3_da(
-        rpc_url,
-        deployed.chain_admin,
-        deployed.diamond_proxy,
-        l1_da_validator,
-        PubdataSource::PubdataKeccak256,
-        governor_key,
-        gas_multiplier,
+        adi_ecosystem::L3DaConfig {
+            rpc_url,
+            chain_admin: deployed.chain_admin,
+            diamond_proxy: deployed.diamond_proxy,
+            l1_da_validator,
+            pubdata_source: PubdataSource::PubdataKeccak256,
+            governor_key,
+            gas_multiplier,
+        },
         context.logger().as_ref(),
     )
     .await
@@ -1205,13 +1207,15 @@ async fn configure_validium_da(
 
     // Use PubdataSource::EmptyNoDa (1) for Validium
     let tx_hash = adi_ecosystem::configure_l3_da(
-        rpc_url,
-        deployed.chain_admin,
-        deployed.diamond_proxy,
-        da_validator,
-        PubdataSource::EmptyNoDa,
-        governor_key,
-        gas_multiplier,
+        adi_ecosystem::L3DaConfig {
+            rpc_url,
+            chain_admin: deployed.chain_admin,
+            diamond_proxy: deployed.diamond_proxy,
+            l1_da_validator: da_validator,
+            pubdata_source: PubdataSource::EmptyNoDa,
+            governor_key,
+            gas_multiplier,
+        },
         context.logger().as_ref(),
     )
     .await
