@@ -333,6 +333,16 @@ impl EcosystemConfig {
     pub fn builder() -> EcosystemConfigBuilder {
         EcosystemConfigBuilder::new()
     }
+
+    /// Returns DA mode as a string.
+    #[must_use]
+    pub fn da_mode(&self) -> String {
+        if self.validium {
+            "validium".to_string()
+        } else {
+            "rollup".to_string()
+        }
+    }
 }
 
 /// Configuration for chain creation within an existing ecosystem.
@@ -485,6 +495,16 @@ impl ChainConfig {
     #[must_use]
     pub fn builder() -> ChainConfigBuilder {
         ChainConfigBuilder::new()
+    }
+
+    /// Returns DA mode as a string.
+    #[must_use]
+    pub fn da_mode(&self) -> String {
+        if self.validium {
+            "validium".to_string()
+        } else {
+            "rollup".to_string()
+        }
     }
 }
 

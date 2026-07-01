@@ -1186,25 +1186,6 @@ async fn configure_validium_da(
 
     let da_validator = get_l1_da_validator_address(state_manager, chain_name).await?;
 
-    // Get ecosystem contracts for bridgehub and state_transition_proxy
-    let chain_contracts = state_manager
-        .chain(chain_name)
-        .contracts()
-        .await
-        .wrap_err("Failed to load chain contracts")?;
-
-    let _bridgehub = chain_contracts
-        .ecosystem_contracts
-        .as_ref()
-        .and_then(|e| e.bridgehub_proxy_addr)
-        .ok_or_else(|| eyre::eyre!("Bridgehub address not found in state"))?;
-
-    let _state_transition_proxy = chain_contracts
-        .ecosystem_contracts
-        .as_ref()
-        .and_then(|e| e.state_transition_proxy_addr)
-        .ok_or_else(|| eyre::eyre!("StateTransitionProxy address not found in state"))?;
-
     // Use PubdataSource::EmptyNoDa (1) for Validium
     let tx_hash = adi_ecosystem::configure_l3_da(
         adi_ecosystem::L3DaConfig {
@@ -1220,9 +1201,6 @@ async fn configure_validium_da(
     )
     .await
     .wrap_err("Failed to configure Validium mode")?;
-
-    // Note: Bridgehub and StateTransitionProxy are currently not used by configure_l3_da
-    // but might be needed if the SDK changes to use them.
 
     ui::success(format!(
         "Validium mode (no DA) configured: {}",

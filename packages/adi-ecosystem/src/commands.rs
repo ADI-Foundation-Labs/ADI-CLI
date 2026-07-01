@@ -53,11 +53,7 @@ pub fn build_ecosystem_create_args(config: &EcosystemConfig) -> Vec<String> {
         "--wallet-creation".to_string(),
         "random".to_string(),
         "--l1-batch-commit-data-generator-mode".to_string(),
-        if config.validium {
-            "validium".to_string()
-        } else {
-            "rollup".to_string()
-        },
+        config.da_mode(),
         "--base-token-address".to_string(),
         config.base_token_address.to_string(),
         "--base-token-price-nominator".to_string(),
@@ -115,11 +111,7 @@ pub fn build_chain_create_args(config: &ChainConfig) -> Vec<String> {
         "--wallet-creation".to_string(),
         "random".to_string(),
         "--l1-batch-commit-data-generator-mode".to_string(),
-        if config.validium {
-            "validium".to_string()
-        } else {
-            "rollup".to_string()
-        },
+        config.da_mode(),
         "--base-token-address".to_string(),
         config.base_token_address.to_string(),
         "--base-token-price-nominator".to_string(),
