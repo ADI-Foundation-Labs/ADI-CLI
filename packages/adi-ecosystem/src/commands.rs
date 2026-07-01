@@ -53,7 +53,7 @@ pub fn build_ecosystem_create_args(config: &EcosystemConfig) -> Vec<String> {
         "--wallet-creation".to_string(),
         "random".to_string(),
         "--l1-batch-commit-data-generator-mode".to_string(),
-        "rollup".to_string(),
+        config.da_mode(),
         "--base-token-address".to_string(),
         config.base_token_address.to_string(),
         "--base-token-price-nominator".to_string(),
@@ -111,7 +111,7 @@ pub fn build_chain_create_args(config: &ChainConfig) -> Vec<String> {
         "--wallet-creation".to_string(),
         "random".to_string(),
         "--l1-batch-commit-data-generator-mode".to_string(),
-        "rollup".to_string(),
+        config.da_mode(),
         "--base-token-address".to_string(),
         config.base_token_address.to_string(),
         "--base-token-price-nominator".to_string(),
@@ -142,6 +142,7 @@ mod tests {
             base_token_address: ETH_TOKEN_ADDRESS,
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
+            validium: false,
             evm_emulator: false,
             rpc_url: None,
         };
@@ -175,6 +176,7 @@ mod tests {
             base_token_price_denominator: 1,
             evm_emulator: true,
             blobs: false,
+            validium: false,
         };
 
         let args = build_chain_create_args(&config);
@@ -191,5 +193,43 @@ mod tests {
         assert!(args.contains(&"true".to_string()));
         assert!(args.contains(&"--wallet-creation".to_string()));
         assert!(args.contains(&"random".to_string()));
+    }
+
+    #[test]
+    fn test_build_ecosystem_create_args_validium() {
+        let config = EcosystemConfig::builder()
+            .name("validium_ecosystem")
+            .l1_network(L1Network::Sepolia)
+            .chain_name("validium_chain")
+            .chain_id(789)
+            .validium(true)
+            .build();
+
+        let args = build_ecosystem_create_args(&config);
+
+        assert!(args.contains(&"--l1-batch-commit-data-generator-mode".to_string()));
+        let mode_idx = args
+            .iter()
+            .position(|r| r == "--l1-batch-commit-data-generator-mode")
+            .unwrap();
+        assert_eq!(args[mode_idx + 1], "validium");
+    }
+
+    #[test]
+    fn test_build_chain_create_args_validium() {
+        let config = ChainConfig::builder()
+            .name("validium_chain")
+            .chain_id(101)
+            .validium(true)
+            .build();
+
+        let args = build_chain_create_args(&config);
+
+        assert!(args.contains(&"--l1-batch-commit-data-generator-mode".to_string()));
+        let mode_idx = args
+            .iter()
+            .position(|r| r == "--l1-batch-commit-data-generator-mode")
+            .unwrap();
+        assert_eq!(args[mode_idx + 1], "validium");
     }
 }

@@ -96,6 +96,10 @@ pub struct AddArgs {
     )]
     pub evm_emulator: Option<bool>,
 
+    /// Enable Validium mode (no DA).
+    #[arg(long, help = "Enable Validium mode (no DA)")]
+    pub validium: Option<bool>,
+
     /// Skip confirmation prompt.
     #[arg(long, short = 'y', help = "Skip confirmation prompt")]
     pub yes: bool,

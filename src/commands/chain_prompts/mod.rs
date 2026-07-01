@@ -12,7 +12,9 @@ use alloy_primitives::Address;
 use crate::error::Result;
 use crate::ui;
 
-use inputs::{prompt_chain_id, prompt_chain_name, prompt_evm_emulator, prompt_prover_mode};
+use inputs::{
+    prompt_chain_id, prompt_chain_name, prompt_evm_emulator, prompt_prover_mode, prompt_validium,
+};
 use sections::{
     prompt_base_token, prompt_funding_section, prompt_operators_section, prompt_ownership_section,
 };
@@ -30,6 +32,7 @@ pub struct PartialChainDefaults {
     pub base_token_price_nominator: Option<u64>,
     pub base_token_price_denominator: Option<u64>,
     pub evm_emulator: Option<bool>,
+    pub validium: Option<bool>,
     pub operator: Option<Address>,
     pub prove_operator: Option<Address>,
     pub execute_operator: Option<Address>,
@@ -60,6 +63,7 @@ pub fn prompt_chain_defaults(
         partial.base_token_price_denominator,
     )?;
     let evm_emulator = prompt_evm_emulator(partial.evm_emulator)?;
+    let validium = prompt_validium(partial.validium)?;
 
     // Operators section (grouped)
     let operators = prompt_operators_section(
@@ -90,6 +94,7 @@ pub fn prompt_chain_defaults(
         base_token_price_nominator: nominator,
         base_token_price_denominator: denominator,
         evm_emulator,
+        validium,
         blobs: false, // Default to calldata mode (L3)
         fee_collector_address: None,
         operators,

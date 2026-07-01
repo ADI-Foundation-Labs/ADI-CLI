@@ -206,3 +206,15 @@ pub(crate) fn prompt_evm_emulator(provided: Option<bool>) -> Result<bool> {
         .interact()
         .wrap_err("Failed to read confirmation")
 }
+
+/// Prompt for Validium mode if not already provided.
+pub(crate) fn prompt_validium(provided: Option<bool>) -> Result<bool> {
+    if let Some(enabled) = provided {
+        return Ok(enabled);
+    }
+
+    ui::confirm("Enable Validium mode (no DA)?")
+        .initial_value(false)
+        .interact()
+        .wrap_err("Failed to read confirmation")
+}

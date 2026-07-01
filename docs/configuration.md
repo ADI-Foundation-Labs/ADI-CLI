@@ -66,6 +66,12 @@ ecosystem:
       # Default: false
       blobs: false
 
+      # Enable Validium mode (data availability outside L1)
+      # true: Data is stored off-chain (L3 Validium)
+      # false: Data is stored on-chain (L3 Rollup)
+      # Default: false
+      validium: false
+
       # Custom ERC20 token for gas payments (omit to use native ETH)
       # base_token_address: "0x..."
       # base_token_price_nominator: 1

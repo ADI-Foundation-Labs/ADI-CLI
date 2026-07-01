@@ -11,7 +11,15 @@
 //! - **Execute Operator**: Executes verified batches on L1
 //! - **Funder**: User-provided wallet that funds all other wallets
 
+mod args;
+mod da_config;
+mod deployment;
+mod display;
 mod ecosystem;
+mod files;
+mod funding;
+mod validators;
+
 pub mod fee_adjuster;
 pub mod ownership;
 

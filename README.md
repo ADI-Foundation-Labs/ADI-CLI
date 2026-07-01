@@ -78,6 +78,7 @@ ecosystem:
     - name: my-chain
       chain_id: 222
       prover_mode: no-proofs
+      validium: true # Set to true for L3 Validium mode
 
 funding:
   deployer_eth: 100.0

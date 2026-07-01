@@ -188,6 +188,11 @@ pub struct EcosystemConfig {
     #[serde(default = "default_price_ratio")]
     pub base_token_price_denominator: u64,
 
+    /// Enable Validium mode (no DA).
+    /// Default: `false`
+    #[serde(default)]
+    pub validium: bool,
+
     /// Enable EVM emulator.
     /// Default: `false`
     #[serde(default)]
@@ -225,6 +230,7 @@ impl Default for EcosystemConfig {
             base_token_address: ETH_TOKEN_ADDRESS,
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
+            validium: false,
             evm_emulator: false,
             rpc_url: None,
         }
@@ -300,6 +306,13 @@ impl EcosystemConfigBuilder {
         self
     }
 
+    /// Set Validium mode.
+    #[must_use]
+    pub fn validium(mut self, enabled: bool) -> Self {
+        self.config.validium = enabled;
+        self
+    }
+
     /// Set EVM emulator flag.
     #[must_use]
     pub fn evm_emulator(mut self, enabled: bool) -> Self {
@@ -319,6 +332,16 @@ impl EcosystemConfig {
     #[must_use]
     pub fn builder() -> EcosystemConfigBuilder {
         EcosystemConfigBuilder::new()
+    }
+
+    /// Returns DA mode as a string.
+    #[must_use]
+    pub fn da_mode(&self) -> String {
+        if self.validium {
+            "validium".to_string()
+        } else {
+            "rollup".to_string()
+        }
     }
 }
 
@@ -358,6 +381,11 @@ pub struct ChainConfig {
     /// Default: `false` (calldata mode for L3 deployments)
     #[serde(default)]
     pub blobs: bool,
+
+    /// Enable Validium mode (no DA).
+    /// Default: `false`
+    #[serde(default)]
+    pub validium: bool,
 }
 
 impl Default for ChainConfig {
@@ -371,6 +399,7 @@ impl Default for ChainConfig {
             base_token_price_denominator: 1,
             evm_emulator: false,
             blobs: false,
+            validium: false,
         }
     }
 }
@@ -437,6 +466,13 @@ impl ChainConfigBuilder {
         self
     }
 
+    /// Set Validium mode.
+    #[must_use]
+    pub fn validium(mut self, enabled: bool) -> Self {
+        self.config.validium = enabled;
+        self
+    }
+
     /// Set blobs flag.
     ///
     /// When `true`, uses blobs for pubdata (L2 chains settling on L1).
@@ -459,6 +495,16 @@ impl ChainConfig {
     #[must_use]
     pub fn builder() -> ChainConfigBuilder {
         ChainConfigBuilder::new()
+    }
+
+    /// Returns DA mode as a string.
+    #[must_use]
+    pub fn da_mode(&self) -> String {
+        if self.validium {
+            "validium".to_string()
+        } else {
+            "rollup".to_string()
+        }
     }
 }
 
@@ -488,6 +534,7 @@ mod tests {
             .chain_id(123)
             .prover_mode(ProverMode::Gpu)
             .evm_emulator(true)
+            .validium(true)
             .build();
 
         assert_eq!(config.name, "my_ecosystem");
@@ -496,6 +543,7 @@ mod tests {
         assert_eq!(config.chain_id, 123);
         assert_eq!(config.prover_mode, ProverMode::Gpu);
         assert!(config.evm_emulator);
+        assert!(config.validium);
     }
 
     #[test]
@@ -519,6 +567,7 @@ mod tests {
             .prover_mode(ProverMode::Gpu)
             .evm_emulator(true)
             .blobs(true)
+            .validium(true)
             .build();
 
         assert_eq!(config.name, "my_chain");
@@ -526,6 +575,7 @@ mod tests {
         assert_eq!(config.prover_mode, ProverMode::Gpu);
         assert!(config.evm_emulator);
         assert!(config.blobs);
+        assert!(config.validium);
     }
 
     #[test]

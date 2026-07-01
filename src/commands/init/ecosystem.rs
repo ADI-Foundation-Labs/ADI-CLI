@@ -424,6 +424,10 @@ fn build_ecosystem_config(
             .evm_emulator
             .or_else(|| chain_defaults.map(|c| c.evm_emulator))
             .unwrap_or(false),
+        validium: args
+            .validium
+            .or_else(|| chain_defaults.map(|c| c.validium))
+            .unwrap_or(false),
         rpc_url: args.rpc_url.clone().or_else(|| defaults.rpc_url.clone()),
     }
 }
@@ -441,6 +445,7 @@ fn build_partial_chain_defaults(args: &InitArgs) -> PartialChainDefaults {
         base_token_price_nominator: args.base_token_price_nominator,
         base_token_price_denominator: args.base_token_price_denominator,
         evm_emulator: args.evm_emulator,
+        validium: args.validium,
         operator: args.operator,
         prove_operator: args.prove_operator,
         execute_operator: args.execute_operator,
@@ -469,6 +474,7 @@ fn ecosystem_config_to_chain_defaults(config: &EcosystemConfig) -> ChainDefaults
         base_token_price_nominator: config.base_token_price_nominator,
         base_token_price_denominator: config.base_token_price_denominator,
         evm_emulator: config.evm_emulator,
+        validium: config.validium,
         blobs: false, // Default to calldata mode (L3)
         fee_collector_address: None,
         operators: Default::default(),
