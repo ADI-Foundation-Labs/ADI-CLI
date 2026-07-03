@@ -171,9 +171,17 @@ pub async fn configure_l3_da(config: L3DaConfig<'_>, logger: &dyn Logger) -> Res
     );
 
     let green = Style::new().green();
+    let mode_name = match config.pubdata_source {
+        PubdataSource::EmptyNoDa => "Validium mode",
+        PubdataSource::PubdataKeccak256 => "calldata mode",
+        PubdataSource::BlobsAndPubdataKeccak256 => "blobs and calldata mode",
+        PubdataSource::BlobsZksyncOs => "ZKsync OS blobs mode",
+    };
+
     let spinner = cliclack::spinner();
     spinner.start(format!(
-        "Setting DA validator pair to calldata mode ({})",
+        "Setting DA validator pair to {} ({})",
+        mode_name,
         green.apply_to(config.l1_da_validator)
     ));
 
