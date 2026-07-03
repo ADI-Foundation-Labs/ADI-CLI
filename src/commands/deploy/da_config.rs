@@ -102,7 +102,8 @@ pub async fn configure_validium_da(
 ) -> Result<()> {
     ui::info("Configuring Validium mode (no DA)...")?;
 
-    let da_validator = get_l1_da_validator_address(state_manager, chain_name, DAMode::Validium).await?;
+    let da_validator =
+        get_l1_da_validator_address(state_manager, chain_name, DAMode::Validium).await?;
 
     let tx_hash = configure_l3_da(
         L3DaConfig {
