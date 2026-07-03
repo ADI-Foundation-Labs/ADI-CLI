@@ -142,37 +142,22 @@ async fn get_l1_da_validator_address(
         .await
         .wrap_err("Failed to load chain contracts")?;
 
-    // Try to find the specific validator for the mode
-    let addr = match mode {
-        DAMode::Validium => {
-            if let Some(l1) = &chain_contracts.l1 {
-                if let Some(addr) = l1.no_da_validium_l1_validator_addr {
-                    return Ok(addr);
-                }
-            }
-            if let Some(eco) = &chain_contracts.ecosystem_contracts {
-                if let Some(addr) = eco.no_da_validium_l1_validator_addr {
-                    return Ok(addr);
-                }
-            }
-            None
-        }
-        DAMode::Blobs | DAMode::Calldata => {
-            if let Some(l1) = &chain_contracts.l1 {
-                if let Some(addr) = l1.rollup_l1_da_validator_addr {
-                    return Ok(addr);
-                }
-            }
-            if let Some(eco) = &chain_contracts.ecosystem_contracts {
-                if let Some(addr) = eco.rollup_l1_da_validator_addr {
-                    return Ok(addr);
-                }
-            }
-            None
-        }
+    let l1 = chain_contracts.l1.as_ref();
+    let chain_ecosystem = chain_contracts.ecosystem_contracts.as_ref();
+
+    let (l1_addr, chain_ecosystem_addr) = match mode {
+        DAMode::Validium => (
+            l1.and_then(|l1| l1.no_da_validium_l1_validator_addr),
+            chain_ecosystem.and_then(|eco| eco.no_da_validium_l1_validator_addr),
+        ),
+
+        DAMode::Blobs | DAMode::Calldata => (
+            l1.and_then(|l1| l1.rollup_l1_da_validator_addr),
+            chain_ecosystem.and_then(|eco| eco.rollup_l1_da_validator_addr),
+        ),
     };
 
-    if let Some(addr) = addr {
+    if let Some(addr) = l1_addr.or(chain_ecosystem_addr) {
         return Ok(addr);
     }
 
@@ -182,32 +167,25 @@ async fn get_l1_da_validator_address(
         .await
         .wrap_err("Failed to load ecosystem contracts")?;
 
-    let addr = match mode {
+    let ctm = eco_contracts.zksync_os_ctm.as_ref();
+
+    let ctm_addr = match mode {
         DAMode::Validium => {
-            if let Some(ctm) = &eco_contracts.zksync_os_ctm {
-                if let Some(addr) = ctm.no_da_validium_l1_validator_addr {
-                    return Ok(addr);
-                }
-            }
-            None
+            ctm.and_then(|ctm| ctm.no_da_validium_l1_validator_addr)
         }
+
         DAMode::Blobs | DAMode::Calldata => {
-            if let Some(ctm) = &eco_contracts.zksync_os_ctm {
-                if let Some(addr) = ctm.rollup_l1_da_validator_addr {
-                    return Ok(addr);
-                }
-            }
-            None
+            ctm.and_then(|ctm| ctm.rollup_l1_da_validator_addr)
         }
     };
 
-    if let Some(addr) = addr {
-        return Ok(addr);
-    }
+    let addr = ctm_addr.ok_or_else(|| {
+        eyre::eyre!(
+            "L1 DA validator address for mode {:?} not found in state. \
+             Ensure deployment completed successfully.",
+            mode
+        )
+    })?;
 
-    Err(eyre::eyre!(
-        "L1 DA validator address for mode {:?} not found in state. \
-         Ensure deployment completed successfully.",
-        mode
-    ))
+    Ok(addr)
 }
