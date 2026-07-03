@@ -170,13 +170,9 @@ async fn get_l1_da_validator_address(
     let ctm = eco_contracts.zksync_os_ctm.as_ref();
 
     let ctm_addr = match mode {
-        DAMode::Validium => {
-            ctm.and_then(|ctm| ctm.no_da_validium_l1_validator_addr)
-        }
+        DAMode::Validium => ctm.and_then(|ctm| ctm.no_da_validium_l1_validator_addr),
 
-        DAMode::Blobs | DAMode::Calldata => {
-            ctm.and_then(|ctm| ctm.rollup_l1_da_validator_addr)
-        }
+        DAMode::Blobs | DAMode::Calldata => ctm.and_then(|ctm| ctm.rollup_l1_da_validator_addr),
     };
 
     let addr = ctm_addr.ok_or_else(|| {
