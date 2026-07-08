@@ -161,11 +161,30 @@ impl ContainerManager {
             platform: None,
         };
 
-        let response = self
-            .docker
-            .create_container(Some(options), container_config)
-            .await
-            .map_err(|e| DockerError::ContainerCreateFailed(e.to_string()))?;
+        // macOS Docker Desktop can briefly fail to see a just-created bind
+        // source (the `.tmp` dir created above), reporting "bind source path
+        // does not exist". Retry a few times to let the file-sharing layer
+        // (VirtioFS/gRPC-FUSE) catch up.
+        let mut attempt = 0u32;
+        let response = loop {
+            match self
+                .docker
+                .create_container(Some(options.clone()), container_config.clone())
+                .await
+            {
+                Ok(response) => break response,
+                Err(e)
+                    if attempt < 5 && e.to_string().contains("bind source path does not exist") =>
+                {
+                    attempt += 1;
+                    self.logger.debug(&format!(
+                        "create_container bind-source race (attempt {attempt}), retrying: {e}"
+                    ));
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+                }
+                Err(e) => return Err(DockerError::ContainerCreateFailed(e.to_string())),
+            }
+        };
 
         self.logger
             .debug(&format!("Container created: {}", container_name));
