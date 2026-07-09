@@ -3,7 +3,7 @@
 use adi_ecosystem::verification::{
     apply_implementations, parse_diamond_cut_data, read_all_implementations,
 };
-use adi_ecosystem::DeployedContracts;
+use adi_ecosystem::{configure_transaction_filterer, DeployedContracts, TransactionFiltererConfig};
 use adi_funding::{is_localhost_rpc, normalize_rpc_url, FundingProvider};
 use adi_state::StateManager;
 use adi_toolkit::{EcosystemInitParams, ProtocolVersion, ToolkitRunner};
@@ -20,6 +20,9 @@ use super::args::DeployArgs;
 use super::da_config::{configure_calldata_da, configure_validium_da, resolve_da_mode, DAMode};
 use super::display::display_deployment_summary;
 use super::files::log_deployment_files;
+use super::nox_transaction_filterer::{
+    deploy_nox_transaction_filterer, DeployNoxTransactionFiltererParams,
+};
 use super::ownership::run_post_deploy_ownership;
 use super::validators::configure_validator_roles;
 
@@ -99,6 +102,8 @@ pub async fn run_ecosystem_deployment(
     )
     .await?;
 
+    let mut nox_transaction_filterer_address = None;
+
     let da_mode = resolve_da_mode(args, context, chain_name);
     match da_mode {
         DAMode::Blobs => {
@@ -127,6 +132,36 @@ pub async fn run_ecosystem_deployment(
                 validator_gas_multiplier,
             )
             .await?;
+
+            let nox_gas_price = estimate_gas_price_wei(rpc_url, gas_multiplier)
+                .await
+                .wrap_err("Failed to estimate gas price for nox-transaction-filterer deployment")?;
+            let transaction_filterer =
+                deploy_nox_transaction_filterer(DeployNoxTransactionFiltererParams {
+                    context,
+                    state_manager,
+                    chain_name,
+                    ecosystem_name,
+                    rpc_url,
+                    protocol_version: &protocol_version,
+                    gas_price_wei: nox_gas_price,
+                })
+                .await?;
+
+            configure_transaction_filterer(
+                TransactionFiltererConfig {
+                    rpc_url: &normalized_rpc,
+                    chain_admin: deployed.chain_admin,
+                    diamond_proxy: deployed.diamond_proxy,
+                    transaction_filterer,
+                    governor_key: &governor_key,
+                    gas_multiplier: validator_gas_multiplier,
+                },
+                context.logger().as_ref(),
+            )
+            .await?;
+
+            nox_transaction_filterer_address = Some(transaction_filterer);
         }
     }
 
@@ -141,7 +176,7 @@ pub async fn run_ecosystem_deployment(
 
     // Deploy FeeAdjusterConfig on L1; opt out via `fee_adjuster.enabled: false` in .adi.yml.
     let fee_adjuster_address = if context.config().fee_adjuster.enabled {
-        let fee_adjuster_gas_price = compute_fee_adjuster_gas_price(rpc_url, gas_multiplier)
+        let fee_adjuster_gas_price = estimate_gas_price_wei(rpc_url, gas_multiplier)
             .await
             .wrap_err("Failed to estimate gas price for fee-adjuster deployment")?;
         let addr = super::fee_adjuster::deploy_fee_adjuster(
@@ -168,16 +203,14 @@ pub async fn run_ecosystem_deployment(
         &deployed,
         &ownership_result,
         fee_adjuster_address,
+        nox_transaction_filterer_address,
     )?;
 
     Ok(())
 }
 
-/// Estimate gas price for the fee-adjuster forge script (skipped on localhost).
-async fn compute_fee_adjuster_gas_price(
-    rpc_url: &Url,
-    gas_multiplier: u64,
-) -> Result<Option<u128>> {
+/// Estimate gas price for a forge script deployment (skipped on localhost).
+async fn estimate_gas_price_wei(rpc_url: &Url, gas_multiplier: u64) -> Result<Option<u128>> {
     if is_localhost_rpc(rpc_url.as_str()) {
         return Ok(None);
     }

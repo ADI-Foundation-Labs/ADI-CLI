@@ -13,6 +13,9 @@ ARG GENESIS_COMMIT
 # image layers. Override REF to pin a branch/tag/commit.
 ARG FEE_ADJUSTER_REPO="git@gitlab.sre.ideasoft.io:adi-foundation/adi-chain/fee-adjuster-contracts.git"
 ARG FEE_ADJUSTER_REF="main"
+
+ARG NOX_TRANSACTION_FILTERER_REPO="git@gitlab.sre.ideasoft.io:adi-foundation/adi-chain/nox/nox-transaction-filterer.git"
+ARG NOX_TRANSACTION_FILTERER_REF="main"
 # Pin forge-std for reproducible script builds.
 ARG FORGE_STD_TAG="v1.9.4"
 
@@ -83,25 +86,23 @@ RUN curl -L https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/in
 ENV PATH="/root/.foundry/bin:${PATH}"
 RUN foundryup-zksync
 
-# Install Node.js (needed to fetch OpenZeppelin sources for fee-adjuster forge build).
+# Install Node.js (needed to fetch OpenZeppelin sources for contract builds).
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get update && apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-# Clone fee-adjuster-contracts + forge-std, install OZ via npm, prebuild artefacts.
-#
-# Credentials are supplied EITHER via BuildKit secret `gitlab_token` (HTTPS+PAT,
-# preferred for CI) OR via forwarded SSH agent `--ssh default` (local dev). The
-# secret takes precedence when both are present.
-#
-# Usage examples:
-#   echo "<PAT>" | docker buildx build --secret id=gitlab_token,src=- ...
-#   docker buildx build --ssh default ...                        # uses SSH agent
+# Pre-clone forge-std to reuse across multiple contract builds.
+RUN git clone --depth 1 --branch ${FORGE_STD_TAG} \
+    https://github.com/foundry-rs/forge-std.git /build/forge-std
+
+# Setup SSH for private repo access.
+RUN mkdir -p ~/.ssh && \
+    ssh-keyscan -t rsa,ed25519 gitlab.sre.ideasoft.io >> ~/.ssh/known_hosts 2>/dev/null || true
+
+# Clone and build fee-adjuster-contracts.
 RUN --mount=type=ssh \
     --mount=type=secret,id=gitlab_token,target=/run/secrets/gitlab_token,required=false \
     set -eu; \
-    mkdir -p ~/.ssh && \
-    ssh-keyscan -t rsa,ed25519 gitlab.sre.ideasoft.io >> ~/.ssh/known_hosts 2>/dev/null || true; \
     if [ -s /run/secrets/gitlab_token ]; then \
         TOKEN="$(cat /run/secrets/gitlab_token)"; \
         HTTPS_URL="$(echo "$FEE_ADJUSTER_REPO" | sed -E 's#^git@([^:]+):#https://\1/#')"; \
@@ -113,12 +114,30 @@ RUN --mount=type=ssh \
     fi; \
     git clone --depth 1 --branch ${FEE_ADJUSTER_REF} "$CLONE_URL" /build/fee-adjuster-contracts && \
     cd /build/fee-adjuster-contracts && \
-    mkdir -p lib && \
-    git clone --depth 1 --branch ${FORGE_STD_TAG} \
-        https://github.com/foundry-rs/forge-std.git lib/forge-std && \
     npm ci --no-audit --no-fund && \
+    rm -rf lib/forge-std && mkdir -p lib && cp -a /build/forge-std lib/forge-std && \
     forge build && \
     rm -rf node_modules/.cache cache_forge
+
+# Clone and build nox-transaction-filterer.
+RUN --mount=type=ssh \
+    --mount=type=secret,id=gitlab_token,target=/run/secrets/gitlab_token,required=false \
+    set -eu; \
+    if [ -s /run/secrets/gitlab_token ]; then \
+        TOKEN="$(cat /run/secrets/gitlab_token)"; \
+        HTTPS_URL="$(echo "$NOX_TRANSACTION_FILTERER_REPO" | sed -E 's#^git@([^:]+):#https://\1/#')"; \
+        CLONE_URL="$(echo "$HTTPS_URL" | sed "s#https://#https://oauth2:${TOKEN}@#")"; \
+        echo "Cloning nox-transaction-filterer via HTTPS+token"; \
+    else \
+        CLONE_URL="$NOX_TRANSACTION_FILTERER_REPO"; \
+        echo "Cloning nox-transaction-filterer via SSH agent"; \
+    fi; \
+    git clone --depth 1 --branch ${NOX_TRANSACTION_FILTERER_REF} "$CLONE_URL" /build/nox-transaction-filterer && \
+    cd /build/nox-transaction-filterer && \
+    (git submodule update --init --recursive || echo "Submodule update failed, attempting manual fix..."); \
+    rm -rf lib/forge-std && mkdir -p lib && cp -a /build/forge-std lib/forge-std && \
+    forge build && \
+    rm -rf cache_forge
 
 # Remove .git to save ~542MB (fake git in runtime handles zkstack)
 RUN find /build -type d -name .git -prune -exec rm -rf '{}' + && \
@@ -174,6 +193,11 @@ COPY --from=builder --chmod=a+w /build/era-contracts /deps/era-contracts
 COPY --from=builder /build/fee-adjuster-contracts /deps/fee-adjuster-contracts
 RUN find /deps/fee-adjuster-contracts -type d -exec chmod 777 {} + && \
     find /deps/fee-adjuster-contracts -type f -exec chmod 666 {} +
+
+# Copy nox-transaction-filterer from builder.
+COPY --from=builder /build/nox-transaction-filterer /deps/nox-transaction-filterer
+RUN find /deps/nox-transaction-filterer -type d -exec chmod 777 {} + && \
+    find /deps/nox-transaction-filterer -type f -exec chmod 666 {} +
 
 # Set HOME for non-root users (forge/yarn cache)
 ENV HOME=/tmp

@@ -176,10 +176,10 @@ tasks:
       NO_CACHE: '{{default "" .NO_CACHE}}'
     cmds:
       - |
-        PLATFORM={{.PLATFORM}} \
         ENABLE_SSH=""
         [ -n "${SSH_AUTH_SOCK:-}" ] && ENABLE_SSH=1
 
+        PLATFORM={{.PLATFORM}} \
         NO_CACHE={{.NO_CACHE}} \
         TAG_SUFFIX="" \
         ENABLE_SSH="$ENABLE_SSH" \

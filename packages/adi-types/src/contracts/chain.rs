@@ -77,6 +77,11 @@ pub struct ChainL1Contracts {
     /// FeeAdjusterConfig contract address (deployed on L1, owned by ChainAdmin).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fee_adjuster_config: Option<Address>,
+
+    /// NoxTransactionFilterer proxy address (deployed on L1, owned by ChainAdmin,
+    /// wired into the chain's Diamond via `setTransactionFilterer`). Validium-only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nox_transaction_filterer_addr: Option<Address>,
 }
 
 /// Chain L2 contracts from chains/*/configs/contracts.yaml.
@@ -253,6 +258,13 @@ impl ChainContracts {
     /// Returns the FeeAdjusterConfig address if available.
     pub fn fee_adjuster_config(&self) -> Option<Address> {
         self.l1.as_ref().and_then(|l| l.fee_adjuster_config)
+    }
+
+    /// Returns the NoxTransactionFilterer proxy address if available.
+    pub fn nox_transaction_filterer_addr(&self) -> Option<Address> {
+        self.l1
+            .as_ref()
+            .and_then(|l| l.nox_transaction_filterer_addr)
     }
 }
 
