@@ -21,6 +21,7 @@ mod funding;
 mod validators;
 
 pub mod fee_adjuster;
+mod nox_transaction_filterer;
 pub mod ownership;
 
 pub use ecosystem::{run, DeployArgs};

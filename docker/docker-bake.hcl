@@ -51,7 +51,7 @@ target "common" {
   tags = TAGS != null ? jsondecode(TAGS) : ["${REGISTRY}/adi-toolkit:${CI_COMMIT_REF_SLUG}"]
   cache-from = notequal("", NO_CACHE) ? [] : CACHE_FROM
   cache-to = notequal("", CACHE_TO_REF) ? ["type=registry,ref=${CACHE_TO_REF},mode=max"] : []
-  # Credentials for cloning private fee-adjuster-contracts:
+  # Credentials for cloning private fee-adjuster-contracts and nox-transaction-filterer:
   # - CI: set GITLAB_TOKEN env -> HTTPS+PAT via BuildKit secret
   # - Local dev: set ENABLE_SSH=1 (with SSH_AUTH_SOCK exported) -> SSH agent
   ssh = notequal("", ENABLE_SSH) ? ["default"] : []
