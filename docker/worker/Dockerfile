@@ -91,50 +91,38 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get update && apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-# Pre-clone forge-std to reuse across multiple contract builds.
-RUN git clone --depth 1 --branch ${FORGE_STD_TAG} \
-    https://github.com/foundry-rs/forge-std.git /build/forge-std
-
-# Setup SSH for private repo access.
-RUN mkdir -p ~/.ssh && \
-    ssh-keyscan -t rsa,ed25519 gitlab.sre.ideasoft.io >> ~/.ssh/known_hosts 2>/dev/null || true
-
-# Clone and build fee-adjuster-contracts.
+# Clone repositories and setup SSH.
 RUN --mount=type=ssh \
     --mount=type=secret,id=gitlab_token,target=/run/secrets/gitlab_token,required=false \
     set -eu; \
+    mkdir -p ~/.ssh && \
+    ssh-keyscan -t rsa,ed25519 gitlab.sre.ideasoft.io >> ~/.ssh/known_hosts 2>/dev/null || true; \
+    git clone --depth 1 --branch ${FORGE_STD_TAG} \
+        https://github.com/foundry-rs/forge-std.git /build/forge-std; \
     if [ -s /run/secrets/gitlab_token ]; then \
         TOKEN="$(cat /run/secrets/gitlab_token)"; \
-        HTTPS_URL="$(echo "$FEE_ADJUSTER_REPO" | sed -E 's#^git@([^:]+):#https://\1/#')"; \
-        CLONE_URL="$(echo "$HTTPS_URL" | sed "s#https://#https://oauth2:${TOKEN}@#")"; \
-        echo "Cloning fee-adjuster-contracts via HTTPS+token"; \
+        FEE_CLONE_URL="https://oauth2:${TOKEN}@$(echo "$FEE_ADJUSTER_REPO" | sed 's#^git@##; s#:#/#')"; \
+        NOX_CLONE_URL="https://oauth2:${TOKEN}@$(echo "$NOX_TRANSACTION_FILTERER_REPO" | sed 's#^git@##; s#:#/#')"; \
+        echo "Cloning private repositories via HTTPS+token"; \
     else \
-        CLONE_URL="$FEE_ADJUSTER_REPO"; \
-        echo "Cloning fee-adjuster-contracts via SSH agent"; \
+        FEE_CLONE_URL="$FEE_ADJUSTER_REPO"; \
+        NOX_CLONE_URL="$NOX_TRANSACTION_FILTERER_REPO"; \
+        echo "Cloning private repositories via SSH agent"; \
     fi; \
-    git clone --depth 1 --branch ${FEE_ADJUSTER_REF} "$CLONE_URL" /build/fee-adjuster-contracts && \
+    git clone --depth 1 --branch ${FEE_ADJUSTER_REF} "$FEE_CLONE_URL" /build/fee-adjuster-contracts; \
+    git clone --depth 1 --branch ${NOX_TRANSACTION_FILTERER_REF} "$NOX_CLONE_URL" /build/nox-transaction-filterer; \
+    git -C /build/nox-transaction-filterer submodule update --init --recursive || echo "Submodule update failed"
+
+# Build fee-adjuster-contracts.
+RUN --mount=type=ssh \
     cd /build/fee-adjuster-contracts && \
     npm ci --no-audit --no-fund && \
     rm -rf lib/forge-std && mkdir -p lib && cp -a /build/forge-std lib/forge-std && \
     forge build && \
     rm -rf node_modules/.cache cache_forge
 
-# Clone and build nox-transaction-filterer.
-RUN --mount=type=ssh \
-    --mount=type=secret,id=gitlab_token,target=/run/secrets/gitlab_token,required=false \
-    set -eu; \
-    if [ -s /run/secrets/gitlab_token ]; then \
-        TOKEN="$(cat /run/secrets/gitlab_token)"; \
-        HTTPS_URL="$(echo "$NOX_TRANSACTION_FILTERER_REPO" | sed -E 's#^git@([^:]+):#https://\1/#')"; \
-        CLONE_URL="$(echo "$HTTPS_URL" | sed "s#https://#https://oauth2:${TOKEN}@#")"; \
-        echo "Cloning nox-transaction-filterer via HTTPS+token"; \
-    else \
-        CLONE_URL="$NOX_TRANSACTION_FILTERER_REPO"; \
-        echo "Cloning nox-transaction-filterer via SSH agent"; \
-    fi; \
-    git clone --depth 1 --branch ${NOX_TRANSACTION_FILTERER_REF} "$CLONE_URL" /build/nox-transaction-filterer && \
-    cd /build/nox-transaction-filterer && \
-    (git submodule update --init --recursive || echo "Submodule update failed, attempting manual fix..."); \
+# Build nox-transaction-filterer.
+RUN cd /build/nox-transaction-filterer && \
     rm -rf lib/forge-std && mkdir -p lib && cp -a /build/forge-std lib/forge-std && \
     forge build && \
     rm -rf cache_forge

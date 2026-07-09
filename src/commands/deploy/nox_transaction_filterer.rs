@@ -148,11 +148,8 @@ pub async fn deploy_nox_transaction_filterer(
         chain_admin_arg.as_str(),
     ];
 
-    let effective_gas_price = if is_localhost_rpc(rpc_url.as_str()) {
-        None
-    } else {
-        gas_price_wei
-    };
+    let is_localhost = is_localhost_rpc(rpc_url.as_str());
+    let effective_gas_price = gas_price_wei.filter(|_| !is_localhost);
 
     let semver_version = protocol_version.to_semver();
     let forge_params = ForgeScriptParams {

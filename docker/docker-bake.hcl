@@ -61,7 +61,7 @@ target "common" {
 }
 
 group "default" {
-  targets = ["toolkit-v0-30-1"]
+  targets = ["toolkit-v0-30-0", "toolkit-v0-30-1"]
 }
 
 target "toolkit-v0-30-0" {
