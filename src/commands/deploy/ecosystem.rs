@@ -19,7 +19,9 @@ use crate::context::Context;
 use crate::error::{Result, WrapErr};
 use crate::ui;
 
-use super::da_config::{resolve_da_mode, DAMode};
+use adi_ecosystem::PubdataMode;
+
+use super::da_config::resolve_pubdata_mode;
 use super::funding::{run_anvil_funding, run_production_funding};
 
 /// Execute the ecosystem deploy command.
@@ -68,11 +70,11 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
         ui::green(settlement_chain_id)
     ))?;
 
-    let da_mode = resolve_da_mode(&args, context, &chain_name);
-    let chain_type = match da_mode {
-        DAMode::Blobs => "L2 (Blobs)",
-        DAMode::Calldata => "L3 (Calldata)",
-        DAMode::Validium => "L3 (Validium)",
+    let pubdata_mode = resolve_pubdata_mode(&args, context, &chain_name);
+    let chain_type = match pubdata_mode {
+        PubdataMode::Blobs => "Blobs (rollup)",
+        PubdataMode::Calldata => "Calldata (rollup)",
+        PubdataMode::CustomDa => "Custom DA (external)",
     };
     ui::note(
         "Deployment target",

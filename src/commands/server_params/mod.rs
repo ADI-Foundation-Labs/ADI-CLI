@@ -114,12 +114,12 @@ pub async fn run(args: &ServerParamsArgs, context: &Context) -> Result<()> {
         .ok()
         .map(|url| url.to_string());
 
-    let blobs = context
+    let pubdata_mode = context
         .config()
         .ecosystem
         .get_chain(&chain_name)
-        .map(|c| c.blobs)
-        .unwrap_or(false);
+        .map(|c| c.pubdata_mode)
+        .unwrap_or_default();
 
     let prover_mode = chain_metadata.prover_version;
 
@@ -147,7 +147,7 @@ pub async fn run(args: &ServerParamsArgs, context: &Context) -> Result<()> {
         wallets: &wallets,
         chain_metadata: &chain_metadata,
         rpc_url: rpc_url.as_deref(),
-        blobs,
+        pubdata_mode,
         prover_mode,
         genesis_base64,
         fee_collector_address,

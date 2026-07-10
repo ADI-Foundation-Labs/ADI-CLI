@@ -95,7 +95,7 @@ impl EcosystemDefaults {
 mod tests {
     use super::*;
 
-    use crate::types::L1Network;
+    use crate::types::{L1Network, PubdataMode};
 
     #[test]
     fn test_ecosystem_defaults() {
@@ -139,7 +139,7 @@ ownership:
 chains:
   - name: chain_a
     chain_id: 222
-    blobs: true
+    pubdata_mode: calldata
   - name: chain_b
     chain_id: 333
 "#;
@@ -149,8 +149,8 @@ chains:
         assert!(ecosystem.ownership.new_owner.is_some());
         assert_eq!(ecosystem.chains.len(), 2);
         assert_eq!(ecosystem.chains[0].name, "chain_a");
-        assert!(ecosystem.chains[0].blobs);
+        assert_eq!(ecosystem.chains[0].pubdata_mode, PubdataMode::Calldata);
         assert_eq!(ecosystem.chains[1].name, "chain_b");
-        assert!(!ecosystem.chains[1].blobs);
+        assert_eq!(ecosystem.chains[1].pubdata_mode, PubdataMode::Blobs);
     }
 }

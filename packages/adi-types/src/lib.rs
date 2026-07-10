@@ -43,6 +43,7 @@ mod network;
 mod operators;
 mod partial;
 mod prover;
+mod pubdata_mode;
 mod url;
 mod wallet;
 
@@ -72,6 +73,9 @@ pub use partial::{PartialChainMetadata, PartialEcosystemMetadata};
 
 // Re-export prover types
 pub use prover::{BatchCommitDataMode, ProverMode, WalletCreation};
+
+// Re-export pubdata mode
+pub use pubdata_mode::PubdataMode;
 
 // Re-export wallet types
 pub use wallet::{Wallet, Wallets};

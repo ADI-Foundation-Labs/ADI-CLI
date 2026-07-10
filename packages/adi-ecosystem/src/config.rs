@@ -5,7 +5,7 @@ use alloy_primitives::Address;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::types::{L1Network, ProverMode};
+use crate::types::{L1Network, ProverMode, PubdataMode};
 
 /// Validate that L2/L3 chain ID does not conflict with the settlement layer chain ID.
 ///
@@ -188,10 +188,10 @@ pub struct EcosystemConfig {
     #[serde(default = "default_price_ratio")]
     pub base_token_price_denominator: u64,
 
-    /// Enable Validium mode (no DA).
-    /// Default: `false`
+    /// Data-availability pubdata mode.
+    /// Default: `blobs`
     #[serde(default)]
-    pub validium: bool,
+    pub pubdata_mode: PubdataMode,
 
     /// Enable EVM emulator.
     /// Default: `false`
@@ -230,7 +230,7 @@ impl Default for EcosystemConfig {
             base_token_address: ETH_TOKEN_ADDRESS,
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
-            validium: false,
+            pubdata_mode: PubdataMode::default(),
             evm_emulator: false,
             rpc_url: None,
         }
@@ -306,10 +306,10 @@ impl EcosystemConfigBuilder {
         self
     }
 
-    /// Set Validium mode.
+    /// Set the pubdata mode.
     #[must_use]
-    pub fn validium(mut self, enabled: bool) -> Self {
-        self.config.validium = enabled;
+    pub fn pubdata_mode(mut self, mode: PubdataMode) -> Self {
+        self.config.pubdata_mode = mode;
         self
     }
 
@@ -334,14 +334,10 @@ impl EcosystemConfig {
         EcosystemConfigBuilder::new()
     }
 
-    /// Returns DA mode as a string.
+    /// Returns the zkstack DA generator mode string (`rollup`/`validium`).
     #[must_use]
     pub fn da_mode(&self) -> String {
-        if self.validium {
-            "validium".to_string()
-        } else {
-            "rollup".to_string()
-        }
+        self.pubdata_mode.zkstack_da_mode().to_string()
     }
 }
 
@@ -374,18 +370,10 @@ pub struct ChainConfig {
     /// Enable EVM emulator.
     pub evm_emulator: bool,
 
-    /// Use blob-based pubdata (EIP-4844).
-    ///
-    /// When `true`, uses blobs for pubdata (L2 chains settling on L1).
-    /// When `false`, uses calldata for pubdata (L3 chains settling on L2).
-    /// Default: `false` (calldata mode for L3 deployments)
+    /// Data-availability pubdata mode.
+    /// Default: `blobs`
     #[serde(default)]
-    pub blobs: bool,
-
-    /// Enable Validium mode (no DA).
-    /// Default: `false`
-    #[serde(default)]
-    pub validium: bool,
+    pub pubdata_mode: PubdataMode,
 }
 
 impl Default for ChainConfig {
@@ -398,8 +386,7 @@ impl Default for ChainConfig {
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
             evm_emulator: false,
-            blobs: false,
-            validium: false,
+            pubdata_mode: PubdataMode::default(),
         }
     }
 }
@@ -466,20 +453,10 @@ impl ChainConfigBuilder {
         self
     }
 
-    /// Set Validium mode.
+    /// Set the pubdata mode.
     #[must_use]
-    pub fn validium(mut self, enabled: bool) -> Self {
-        self.config.validium = enabled;
-        self
-    }
-
-    /// Set blobs flag.
-    ///
-    /// When `true`, uses blobs for pubdata (L2 chains settling on L1).
-    /// When `false`, uses calldata for pubdata (L3 chains settling on L2).
-    #[must_use]
-    pub fn blobs(mut self, enabled: bool) -> Self {
-        self.config.blobs = enabled;
+    pub fn pubdata_mode(mut self, mode: PubdataMode) -> Self {
+        self.config.pubdata_mode = mode;
         self
     }
 
@@ -497,14 +474,10 @@ impl ChainConfig {
         ChainConfigBuilder::new()
     }
 
-    /// Returns DA mode as a string.
+    /// Returns the zkstack DA generator mode string (`rollup`/`validium`).
     #[must_use]
     pub fn da_mode(&self) -> String {
-        if self.validium {
-            "validium".to_string()
-        } else {
-            "rollup".to_string()
-        }
+        self.pubdata_mode.zkstack_da_mode().to_string()
     }
 }
 
@@ -534,7 +507,7 @@ mod tests {
             .chain_id(123)
             .prover_mode(ProverMode::Gpu)
             .evm_emulator(true)
-            .validium(true)
+            .pubdata_mode(PubdataMode::CustomDa)
             .build();
 
         assert_eq!(config.name, "my_ecosystem");
@@ -543,7 +516,7 @@ mod tests {
         assert_eq!(config.chain_id, 123);
         assert_eq!(config.prover_mode, ProverMode::Gpu);
         assert!(config.evm_emulator);
-        assert!(config.validium);
+        assert_eq!(config.pubdata_mode, PubdataMode::CustomDa);
     }
 
     #[test]
@@ -556,7 +529,7 @@ mod tests {
         assert_eq!(config.base_token_price_nominator, 1);
         assert_eq!(config.base_token_price_denominator, 1);
         assert!(!config.evm_emulator);
-        assert!(!config.blobs);
+        assert_eq!(config.pubdata_mode, PubdataMode::Blobs);
     }
 
     #[test]
@@ -566,16 +539,14 @@ mod tests {
             .chain_id(456)
             .prover_mode(ProverMode::Gpu)
             .evm_emulator(true)
-            .blobs(true)
-            .validium(true)
+            .pubdata_mode(PubdataMode::Calldata)
             .build();
 
         assert_eq!(config.name, "my_chain");
         assert_eq!(config.chain_id, 456);
         assert_eq!(config.prover_mode, ProverMode::Gpu);
         assert!(config.evm_emulator);
-        assert!(config.blobs);
-        assert!(config.validium);
+        assert_eq!(config.pubdata_mode, PubdataMode::Calldata);
     }
 
     #[test]

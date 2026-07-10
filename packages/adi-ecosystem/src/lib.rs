@@ -63,7 +63,7 @@ pub use config::{
     validate_snake_case_name, ChainConfig, ChainConfigBuilder, EcosystemConfig,
     EcosystemConfigBuilder,
 };
-pub use da::{configure_l3_da, L3DaConfig, PubdataSource};
+pub use da::{configure_da_validator_pair, DaValidatorPairConfig, L2DACommitmentScheme};
 pub use defaults::{
     ChainDefaults, ChainFundingDefaults, ChainOwnershipDefaults, EcosystemDefaults,
     EcosystemOwnershipDefaults, OperatorsDefaults,
@@ -80,7 +80,7 @@ pub use ownership::{
     transfer_chain_ownership, CalldataEntry, CalldataOutput, OwnershipContract, OwnershipMethod,
     OwnershipResult, OwnershipState, OwnershipStatus, OwnershipStatusSummary, OwnershipSummary,
 };
-pub use types::{L1Network, ProverMode};
+pub use types::{L1Network, ProverMode, PubdataMode};
 pub use validator::{
     build_add_validator_roles_calldata, build_remove_validator_roles_calldata, ValidatorRoles,
 };

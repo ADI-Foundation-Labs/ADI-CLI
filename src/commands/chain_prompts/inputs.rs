@@ -3,7 +3,7 @@
 //! Each function prompts for a single typed value with validation,
 //! returning early if a value was already provided via CLI arguments.
 
-use adi_ecosystem::ProverMode;
+use adi_ecosystem::{ProverMode, PubdataMode};
 use alloy_primitives::Address;
 
 use crate::error::{Result, WrapErr};
@@ -207,14 +207,32 @@ pub(crate) fn prompt_evm_emulator(provided: Option<bool>) -> Result<bool> {
         .wrap_err("Failed to read confirmation")
 }
 
-/// Prompt for Validium mode if not already provided.
-pub(crate) fn prompt_validium(provided: Option<bool>) -> Result<bool> {
-    if let Some(enabled) = provided {
-        return Ok(enabled);
+/// Prompt for the pubdata (DA) mode if not already provided.
+pub(crate) fn prompt_pubdata_mode(provided: Option<PubdataMode>) -> Result<PubdataMode> {
+    if let Some(mode) = provided {
+        return Ok(mode);
     }
 
-    ui::confirm("Enable Validium mode (no DA)?")
-        .initial_value(false)
+    let items = vec![
+        (
+            PubdataMode::Blobs,
+            "blobs",
+            "zkOS blobs (EIP-4844), rollup on L1".to_string(),
+        ),
+        (
+            PubdataMode::Calldata,
+            "calldata",
+            "Rollup pubdata posted as calldata".to_string(),
+        ),
+        (
+            PubdataMode::CustomDa,
+            "custom-da",
+            "External DA (e.g. Avail)".to_string(),
+        ),
+    ];
+
+    ui::select("Pubdata mode")
+        .items(&items)
         .interact()
-        .wrap_err("Failed to read confirmation")
+        .wrap_err("Failed to select pubdata mode")
 }
