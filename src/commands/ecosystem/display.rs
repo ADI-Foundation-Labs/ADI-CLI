@@ -536,6 +536,10 @@ fn format_chain_config_roles(l1: &ChainL1Contracts) -> Vec<String> {
             "  {}",
             format_addr("Fee Adjuster Config", l1.fee_adjuster_config)
         ),
+        format!(
+            "  {}",
+            format_addr("Nox Transaction Filterer", l1.nox_transaction_filterer_addr)
+        ),
     ]
 }
 

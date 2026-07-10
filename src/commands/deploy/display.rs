@@ -185,6 +185,7 @@ pub fn display_deployment_summary(
     deployed: &adi_ecosystem::DeployedContracts,
     ownership_result: &OwnershipOperationResult,
     fee_adjuster: Option<Address>,
+    nox_transaction_filterer: Option<Address>,
 ) -> Result<()> {
     let mut body = format!(
         "Ecosystem: {}\nChain: {}\nDiamond proxy: {}",
@@ -194,6 +195,9 @@ pub fn display_deployment_summary(
     );
     if let Some(addr) = fee_adjuster {
         body.push_str(&format!("\nFee Adjuster Config: {}", ui::green(addr)));
+    }
+    if let Some(addr) = nox_transaction_filterer {
+        body.push_str(&format!("\nNox Transaction Filterer: {}", ui::green(addr)));
     }
     ui::note("Deployment Summary", body)?;
 

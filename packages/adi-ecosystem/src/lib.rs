@@ -50,6 +50,7 @@ mod deploy;
 mod error;
 mod ownership;
 mod signer;
+mod transaction_filterer;
 mod types;
 mod validator;
 mod verify;
@@ -80,6 +81,7 @@ pub use ownership::{
     transfer_chain_ownership, CalldataEntry, CalldataOutput, OwnershipContract, OwnershipMethod,
     OwnershipResult, OwnershipState, OwnershipStatus, OwnershipStatusSummary, OwnershipSummary,
 };
+pub use transaction_filterer::{configure_transaction_filterer, TransactionFiltererConfig};
 pub use types::{L1Network, ProverMode, PubdataMode};
 pub use validator::{
     build_add_validator_roles_calldata, build_remove_validator_roles_calldata, ValidatorRoles,
