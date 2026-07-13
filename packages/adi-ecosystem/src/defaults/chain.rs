@@ -97,7 +97,7 @@ pub struct ChainDefaults {
     pub evm_emulator: bool,
 
     /// Data-availability pubdata mode.
-    /// Default: `blobs`
+    /// Default: `calldata`
     #[serde(default)]
     pub pubdata_mode: PubdataMode,
 
@@ -236,7 +236,7 @@ mod tests {
         assert_eq!(chain.prover_mode, ProverMode::NoProofs);
         assert!(chain.base_token_address.is_none());
         assert!(!chain.evm_emulator);
-        assert_eq!(chain.pubdata_mode, PubdataMode::Blobs);
+        assert_eq!(chain.pubdata_mode, PubdataMode::Calldata);
     }
 
     #[test]

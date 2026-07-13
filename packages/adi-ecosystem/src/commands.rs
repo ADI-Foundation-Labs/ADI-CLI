@@ -128,7 +128,7 @@ pub fn build_chain_create_args(config: &ChainConfig) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{L1Network, ProverMode, PubdataMode};
+    use crate::types::{L1Network, ProverMode, PubdataMode, SettlementLayer};
     use adi_types::ETH_TOKEN_ADDRESS;
 
     #[test]
@@ -143,6 +143,7 @@ mod tests {
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
             pubdata_mode: PubdataMode::Blobs,
+            settlement: SettlementLayer::default(),
             evm_emulator: false,
             rpc_url: None,
         };

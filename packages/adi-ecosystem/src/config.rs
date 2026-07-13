@@ -5,7 +5,7 @@ use alloy_primitives::Address;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::types::{L1Network, ProverMode, PubdataMode};
+use crate::types::{L1Network, ProverMode, PubdataMode, SettlementLayer};
 
 /// Validate that L2/L3 chain ID does not conflict with the settlement layer chain ID.
 ///
@@ -36,6 +36,47 @@ pub fn validate_chain_id(chain_id: u64, settlement_chain_id: u64) -> Result<(), 
              L2/L3 chains must have a unique chain ID different from the settlement layer.",
             chain_id, settlement_chain_id
         ));
+    }
+    Ok(())
+}
+
+/// Validate that a chain's pubdata mode is compatible with the settlement layer.
+///
+/// Blobs (EIP-4844) only exist on Ethereum L1, so `pubdata_mode: blobs` requires
+/// `settlement: l1`. Calldata and custom DA post a keccak commitment that a
+/// settlement layer at either level can accept, so they are always valid.
+///
+/// # Arguments
+///
+/// * `pubdata_mode` - The chain's data-availability pubdata mode.
+/// * `settlement` - The ecosystem's settlement layer.
+///
+/// # Returns
+///
+/// `Ok(())` if compatible, `Err` with a descriptive message otherwise.
+///
+/// # Example
+///
+/// ```rust
+/// use adi_ecosystem::{validate_pubdata_settlement, PubdataMode, SettlementLayer};
+///
+/// // Valid: blobs settle on Ethereum L1.
+/// assert!(validate_pubdata_settlement(PubdataMode::Blobs, SettlementLayer::L1).is_ok());
+///
+/// // Invalid: blobs cannot settle on an L2.
+/// assert!(validate_pubdata_settlement(PubdataMode::Blobs, SettlementLayer::L2).is_err());
+/// ```
+pub fn validate_pubdata_settlement(
+    pubdata_mode: PubdataMode,
+    settlement: SettlementLayer,
+) -> Result<(), String> {
+    if pubdata_mode == PubdataMode::Blobs && settlement == SettlementLayer::L2 {
+        return Err(
+            "pubdata_mode: blobs is incompatible with settlement: l2. Blobs (EIP-4844) only \
+             exist on Ethereum L1; an L2 settlement layer (L3 chain) must use \
+             pubdata_mode: calldata or custom_da."
+                .to_string(),
+        );
     }
     Ok(())
 }
@@ -189,9 +230,14 @@ pub struct EcosystemConfig {
     pub base_token_price_denominator: u64,
 
     /// Data-availability pubdata mode.
-    /// Default: `blobs`
+    /// Default: `calldata`
     #[serde(default)]
     pub pubdata_mode: PubdataMode,
+
+    /// Settlement layer (`l1` = an L2 chain, `l2` = an L3 chain).
+    /// Drives the L1-sender fee tier. Default: `l2`.
+    #[serde(default)]
+    pub settlement: SettlementLayer,
 
     /// Enable EVM emulator.
     /// Default: `false`
@@ -231,6 +277,7 @@ impl Default for EcosystemConfig {
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
             pubdata_mode: PubdataMode::default(),
+            settlement: SettlementLayer::default(),
             evm_emulator: false,
             rpc_url: None,
         }
@@ -313,6 +360,13 @@ impl EcosystemConfigBuilder {
         self
     }
 
+    /// Set the settlement layer.
+    #[must_use]
+    pub fn settlement(mut self, settlement: SettlementLayer) -> Self {
+        self.config.settlement = settlement;
+        self
+    }
+
     /// Set EVM emulator flag.
     #[must_use]
     pub fn evm_emulator(mut self, enabled: bool) -> Self {
@@ -371,7 +425,7 @@ pub struct ChainConfig {
     pub evm_emulator: bool,
 
     /// Data-availability pubdata mode.
-    /// Default: `blobs`
+    /// Default: `calldata`
     #[serde(default)]
     pub pubdata_mode: PubdataMode,
 }
@@ -487,6 +541,30 @@ mod tests {
     use super::*;
 
     #[test]
+    fn blobs_requires_l1_settlement() {
+        // Blobs (EIP-4844) only exist on Ethereum L1, so they are incompatible
+        // with an L2 settlement layer.
+        assert!(validate_pubdata_settlement(PubdataMode::Blobs, SettlementLayer::L2).is_err());
+    }
+
+    #[test]
+    fn blobs_on_l1_settlement_is_ok() {
+        assert!(validate_pubdata_settlement(PubdataMode::Blobs, SettlementLayer::L1).is_ok());
+    }
+
+    #[test]
+    fn calldata_allowed_on_either_settlement() {
+        assert!(validate_pubdata_settlement(PubdataMode::Calldata, SettlementLayer::L1).is_ok());
+        assert!(validate_pubdata_settlement(PubdataMode::Calldata, SettlementLayer::L2).is_ok());
+    }
+
+    #[test]
+    fn custom_da_allowed_on_either_settlement() {
+        assert!(validate_pubdata_settlement(PubdataMode::CustomDa, SettlementLayer::L1).is_ok());
+        assert!(validate_pubdata_settlement(PubdataMode::CustomDa, SettlementLayer::L2).is_ok());
+    }
+
+    #[test]
     fn test_default_config() {
         let config = EcosystemConfig::default();
         assert_eq!(config.name, "adi_ecosystem");
@@ -529,7 +607,7 @@ mod tests {
         assert_eq!(config.base_token_price_nominator, 1);
         assert_eq!(config.base_token_price_denominator, 1);
         assert!(!config.evm_emulator);
-        assert_eq!(config.pubdata_mode, PubdataMode::Blobs);
+        assert_eq!(config.pubdata_mode, PubdataMode::Calldata);
     }
 
     #[test]

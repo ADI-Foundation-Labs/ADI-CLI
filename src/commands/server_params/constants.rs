@@ -42,39 +42,46 @@ pub const BLOCKS_PER_BATCH_LIMIT: u64 = 1400;
 /// Poll interval for L1 sender and watcher.
 pub const POLL_INTERVAL: &str = "500ms";
 
-// ========== L2 values (blobs=true) ==========
+// ========== Fee tier by SETTLEMENT LAYER ==========
+// The L1-sender/sequencer fee economics depend on where the chain settles, not
+// on the DA transport (blobs vs calldata). Settling on Ethereum L1 (an L2 chain)
+// has a modest gas market; settling on an L2 (an L3 chain) can be far pricier.
 
-/// L2 sequencer base fee override.
-pub const L2_BASE_FEE_OVERRIDE: &str = "0x8085C39000";
+// --- Settles on Ethereum L1 (the chain is an L2) ---
 
-/// L2 max fee per gas in gwei.
-pub const L2_MAX_FEE_PER_GAS_GWEI: u64 = 25;
+/// Sequencer base fee override (settles on L1).
+pub const SETTLE_L1_BASE_FEE_OVERRIDE: &str = "0x8085C39000";
 
-/// L2 max priority fee per gas in gwei.
-pub const L2_MAX_PRIORITY_FEE_GWEI: u64 = 25;
+/// Max fee per gas in gwei (settles on L1).
+pub const SETTLE_L1_MAX_FEE_PER_GAS_GWEI: u64 = 25;
 
-/// L2 sequencer native price override.
-pub const L2_NATIVE_PRICE_OVERRIDE: &str = "0x694920";
+/// Max priority fee per gas in gwei (settles on L1).
+pub const SETTLE_L1_MAX_PRIORITY_FEE_GWEI: u64 = 25;
 
-/// L2 max fee per blob gas in gwei.
-pub const L2_MAX_FEE_PER_BLOB_GAS_GWEI: u64 = 25;
+/// Sequencer native price override (settles on L1).
+pub const SETTLE_L1_NATIVE_PRICE_OVERRIDE: &str = "0x694920";
 
-// ========== L3 values (blobs=false) ==========
+// --- Settles on an L2 gateway (the chain is an L3) ---
 
-/// L3 sequencer base fee override.
-pub const L3_BASE_FEE_OVERRIDE: &str = "0x3e8";
+/// Sequencer base fee override (settles on L2).
+pub const SETTLE_L2_BASE_FEE_OVERRIDE: &str = "0x3e8";
 
-/// L3 max fee per gas in gwei.
-pub const L3_MAX_FEE_PER_GAS_GWEI: u64 = 1500;
+/// Max fee per gas in gwei (settles on L2 — gas there can be far higher).
+pub const SETTLE_L2_MAX_FEE_PER_GAS_GWEI: u64 = 1500;
 
-/// L3 max priority fee per gas in gwei.
-pub const L3_MAX_PRIORITY_FEE_GWEI: u64 = 1500;
+/// Max priority fee per gas in gwei (settles on L2).
+pub const SETTLE_L2_MAX_PRIORITY_FEE_GWEI: u64 = 1500;
 
-/// L3 sequencer native price override.
-pub const L3_NATIVE_PRICE_OVERRIDE: &str = "0x1";
+/// Sequencer native price override (settles on L2).
+pub const SETTLE_L2_NATIVE_PRICE_OVERRIDE: &str = "0x1";
 
-/// L3 sequencer pubdata price override.
-pub const L3_PUBDATA_PRICE_OVERRIDE: &str = "0x1";
+// ========== DA transport (by pubdata mode) ==========
+
+/// Max fee per blob gas in gwei (blobs transport only).
+pub const MAX_FEE_PER_BLOB_GAS_GWEI: u64 = 25;
+
+/// Sequencer pubdata price override (calldata / custom-DA transport only).
+pub const PUBDATA_PRICE_OVERRIDE: &str = "0x1";
 
 // ========== External price API (forced prices) ==========
 

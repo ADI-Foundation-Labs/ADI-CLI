@@ -44,6 +44,7 @@ mod operators;
 mod partial;
 mod prover;
 mod pubdata_mode;
+mod settlement;
 mod url;
 mod wallet;
 
@@ -76,6 +77,9 @@ pub use prover::{BatchCommitDataMode, ProverMode, WalletCreation};
 
 // Re-export pubdata mode
 pub use pubdata_mode::PubdataMode;
+
+// Re-export settlement layer
+pub use settlement::SettlementLayer;
 
 // Re-export wallet types
 pub use wallet::{Wallet, Wallets};

@@ -61,8 +61,8 @@ pub mod verification;
 pub use commands::{build_chain_create_args, build_ecosystem_create_args, ERA_CONTRACTS_PATH};
 pub use config::{
     validate_chain_id, validate_chain_id_unique, validate_chain_name_unique,
-    validate_snake_case_name, ChainConfig, ChainConfigBuilder, EcosystemConfig,
-    EcosystemConfigBuilder,
+    validate_pubdata_settlement, validate_snake_case_name, ChainConfig, ChainConfigBuilder,
+    EcosystemConfig, EcosystemConfigBuilder,
 };
 pub use da::{configure_da_validator_pair, DaValidatorPairConfig, L2DACommitmentScheme};
 pub use defaults::{
@@ -82,7 +82,7 @@ pub use ownership::{
     OwnershipResult, OwnershipState, OwnershipStatus, OwnershipStatusSummary, OwnershipSummary,
 };
 pub use transaction_filterer::{configure_transaction_filterer, TransactionFiltererConfig};
-pub use types::{L1Network, ProverMode, PubdataMode};
+pub use types::{L1Network, ProverMode, PubdataMode, SettlementLayer};
 pub use validator::{
     build_add_validator_roles_calldata, build_remove_validator_roles_calldata, ValidatorRoles,
 };

@@ -4,7 +4,7 @@ use url::Url;
 
 use alloy_primitives::Address;
 
-use crate::types::L1Network;
+use crate::types::{L1Network, SettlementLayer};
 
 use super::chain::ChainDefaults;
 
@@ -36,6 +36,11 @@ pub struct EcosystemDefaults {
     #[serde(default)]
     pub l1_network: L1Network,
 
+    /// Settlement layer the chains settle on (`l1` = L2 chains, `l2` = L3 chains).
+    /// Drives the L1-sender fee tier in server params. Default: `l2`.
+    #[serde(default)]
+    pub settlement: SettlementLayer,
+
     /// Settlement layer RPC URL.
     #[serde(default)]
     pub rpc_url: Option<Url>,
@@ -58,6 +63,7 @@ impl Default for EcosystemDefaults {
         Self {
             name: default_ecosystem_name(),
             l1_network: L1Network::Sepolia,
+            settlement: SettlementLayer::default(),
             rpc_url: None,
             ownership: EcosystemOwnershipDefaults::default(),
             chains: Vec::new(),
@@ -95,14 +101,24 @@ impl EcosystemDefaults {
 mod tests {
     use super::*;
 
-    use crate::types::{L1Network, PubdataMode};
+    use crate::types::{L1Network, PubdataMode, SettlementLayer};
 
     #[test]
     fn test_ecosystem_defaults() {
         let ecosystem = EcosystemDefaults::default();
         assert_eq!(ecosystem.name, "adi_ecosystem");
         assert_eq!(ecosystem.l1_network, L1Network::Sepolia);
+        assert_eq!(ecosystem.settlement, SettlementLayer::L2);
         assert!(ecosystem.chains.is_empty());
+    }
+
+    #[test]
+    fn test_settlement_defaults_to_l2_and_parses() {
+        let default_eco: EcosystemDefaults = serde_yaml::from_str("name: e\n").unwrap();
+        assert_eq!(default_eco.settlement, SettlementLayer::L2);
+
+        let l1_eco: EcosystemDefaults = serde_yaml::from_str("name: e\nsettlement: l1\n").unwrap();
+        assert_eq!(l1_eco.settlement, SettlementLayer::L1);
     }
 
     #[test]
@@ -151,6 +167,7 @@ chains:
         assert_eq!(ecosystem.chains[0].name, "chain_a");
         assert_eq!(ecosystem.chains[0].pubdata_mode, PubdataMode::Calldata);
         assert_eq!(ecosystem.chains[1].name, "chain_b");
-        assert_eq!(ecosystem.chains[1].pubdata_mode, PubdataMode::Blobs);
+        // chain_b omits pubdata_mode, so it takes the default.
+        assert_eq!(ecosystem.chains[1].pubdata_mode, PubdataMode::Calldata);
     }
 }

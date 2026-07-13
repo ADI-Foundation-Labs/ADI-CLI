@@ -121,6 +121,10 @@ pub async fn run(args: &ServerParamsArgs, context: &Context) -> Result<()> {
         .map(|c| c.pubdata_mode)
         .unwrap_or_default();
 
+    // Settlement layer is ecosystem-level (all chains share the settlement RPC).
+    // It drives the L1-sender fee tier, orthogonally to the DA pubdata mode.
+    let settlement = context.config().ecosystem.settlement;
+
     let prover_mode = chain_metadata.prover_version;
 
     let genesis_base64 = if args.json || args.upload {
@@ -148,6 +152,7 @@ pub async fn run(args: &ServerParamsArgs, context: &Context) -> Result<()> {
         chain_metadata: &chain_metadata,
         rpc_url: rpc_url.as_deref(),
         pubdata_mode,
+        settlement,
         prover_mode,
         genesis_base64,
         fee_collector_address,

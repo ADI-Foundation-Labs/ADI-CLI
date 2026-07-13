@@ -22,9 +22,12 @@ use strum::{Display, EnumString};
 #[strum(serialize_all = "kebab-case")]
 pub enum PubdataMode {
     /// EIP-4844 blobs (zkOS blobs DA). Rollup settling on L1.
-    #[default]
     Blobs,
     /// Pubdata posted as L1 calldata. Rollup DA, calldata transport.
+    ///
+    /// Default: it is the only mode valid on either settlement layer (blobs
+    /// require L1), so it never conflicts with the default `settlement: l2`.
+    #[default]
     Calldata,
     /// Custom / external DA (e.g. Avail). Only a keccak commitment is on-chain.
     CustomDa,
@@ -129,8 +132,8 @@ mod tests {
     }
 
     #[test]
-    fn default_is_blobs() {
-        assert_eq!(PubdataMode::default(), PubdataMode::Blobs);
+    fn default_is_calldata() {
+        assert_eq!(PubdataMode::default(), PubdataMode::Calldata);
     }
 
     #[test]

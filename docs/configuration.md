@@ -39,6 +39,21 @@ ecosystem:
   # For Sepolia: https://sepolia.infura.io/v3/YOUR_KEY
   rpc_url: https://sepolia.infura.io/v3/YOUR_KEY
 
+  # Settlement layer the chains settle on. Orthogonal to the DA transport
+  # (chains[].pubdata_mode) — it only selects the L1-sender fee tier, because
+  # settling on Ethereum has a very different gas market than settling on an L2.
+  #   l1: settles on Ethereum L1 → the chain is an L2 → L1 fee tier (~25 gwei cap)
+  #   l2: settles on an L2 gateway → the chain is an L3 → L2 fee tier (~1500 gwei cap)
+  # Note: blobs pubdata only exists on Ethereum, so pubdata_mode: blobs always
+  # uses the L1 fee tier regardless of this field.
+  #
+  # VALIDATION: settlement: l2 is incompatible with pubdata_mode: blobs — an L2
+  # settlement layer (L3 chain) cannot post EIP-4844 blobs, so it must use
+  # calldata or custom_da. `adi init` and `adi deploy` reject the blobs + l2
+  # combination with an error.
+  # Default: l2
+  settlement: l2
+
   # Ecosystem-level ownership (for Governance, Bridgehub, etc.)
   # ownership:
   #   new_owner: "0x..."
@@ -60,17 +75,17 @@ ecosystem:
       # Default: false
       evm_emulator: false
 
-      # Use blob-based pubdata (EIP-4844)
-      # true: Uses blobs (L2 chains settling on L1)
-      # false: Uses calldata (L3 chains settling on L2)
-      # Default: false
-      blobs: false
-
-      # Enable Validium mode (data availability outside L1)
-      # true: Data is stored off-chain (L3 Validium)
-      # false: Data is stored on-chain (L3 Rollup)
-      # Default: false
-      validium: false
+      # Data-availability pubdata mode (replaces the former blobs/validium pair).
+      # Selects the on-chain L2 DA commitment scheme (setDAValidatorPair), the
+      # server's l1_sender_pubdata_mode, and rollup-vs-validium chain creation.
+      #   blobs:     EIP-4844 blobs (zkOS blobs) — rollup, commitment scheme 4
+      #   calldata:  pubdata posted as L1 calldata — rollup, commitment scheme 3
+      #   custom_da: external DA, e.g. Avail — validium, commitment scheme 2
+      # Deserializes case-insensitively, ignoring - and _ (custom-da, CustomDA, ...).
+      # Must be compatible with ecosystem.settlement: blobs requires settlement: l1
+      # (see the settlement field above). calldata/custom_da work on either layer.
+      # Default: calldata (the only mode valid on either settlement layer)
+      pubdata_mode: calldata
 
       # Custom ERC20 token for gas payments (omit to use native ETH)
       # base_token_address: "0x..."

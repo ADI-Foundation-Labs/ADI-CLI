@@ -8,7 +8,7 @@
 
 pub use super::args::DeployArgs;
 
-use adi_ecosystem::validate_chain_id;
+use adi_ecosystem::{validate_chain_id, validate_pubdata_settlement};
 use adi_funding::{is_localhost_rpc, normalize_rpc_url, FundingProvider};
 use adi_state::StateManager;
 
@@ -71,6 +71,10 @@ pub async fn run(args: DeployArgs, context: &Context) -> Result<()> {
     ))?;
 
     let pubdata_mode = resolve_pubdata_mode(&args, context, &chain_name);
+    let settlement = context.config().ecosystem.settlement;
+    if let Err(msg) = validate_pubdata_settlement(pubdata_mode, settlement) {
+        return Err(eyre::eyre!("{}", msg));
+    }
     let chain_type = match pubdata_mode {
         PubdataMode::Blobs => "Blobs (rollup)",
         PubdataMode::Calldata => "Calldata (rollup)",

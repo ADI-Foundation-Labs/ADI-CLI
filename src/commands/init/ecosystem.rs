@@ -1,8 +1,9 @@
 //! Ecosystem initialization command implementation.
 
 use adi_ecosystem::{
-    build_ecosystem_create_args, normalize_name, validate_chain_id, validate_snake_case_name,
-    verify_ecosystem_created, ChainDefaults, EcosystemConfig, EcosystemDefaults,
+    build_ecosystem_create_args, normalize_name, validate_chain_id, validate_pubdata_settlement,
+    validate_snake_case_name, verify_ecosystem_created, ChainDefaults, EcosystemConfig,
+    EcosystemDefaults,
 };
 use adi_funding::{normalize_rpc_url, FundingProvider};
 use adi_state::import_ecosystem_state;
@@ -60,6 +61,11 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     // and zkstack agree on the stored ecosystem/chain directory names.
     validate_snake_case_name(&config.name).map_err(|msg| eyre::eyre!("{msg}"))?;
     validate_snake_case_name(&config.chain_name).map_err(|msg| eyre::eyre!("{msg}"))?;
+
+    // Reject a pubdata mode that is incompatible with the settlement layer
+    // (blobs require Ethereum L1) before touching state or the network.
+    validate_pubdata_settlement(config.pubdata_mode, config.settlement)
+        .map_err(|msg| eyre::eyre!("{msg}"))?;
 
     // 4. Validate chain ID doesn't conflict with settlement layer
     ui::info("Validating chain ID against settlement layer...")?;
@@ -428,6 +434,7 @@ fn build_ecosystem_config(
             .pubdata_mode
             .or_else(|| chain_defaults.map(|c| c.pubdata_mode))
             .unwrap_or_default(),
+        settlement: defaults.settlement,
         rpc_url: args.rpc_url.clone().or_else(|| defaults.rpc_url.clone()),
     }
 }
