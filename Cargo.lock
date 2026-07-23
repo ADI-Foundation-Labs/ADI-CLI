@@ -24,7 +24,7 @@ dependencies = [
  "clap_complete",
  "cliclack",
  "config",
- "console 0.15.11",
+ "console",
  "dirs",
  "env_logger",
  "eyre",
@@ -50,7 +50,7 @@ dependencies = [
  "adi-types",
  "bollard",
  "cliclack",
- "console 0.15.11",
+ "console",
  "docker_credential",
  "eyre",
  "futures-util",
@@ -73,7 +73,7 @@ dependencies = [
  "alloy-sol-types",
  "clap",
  "cliclack",
- "console 0.15.11",
+ "console",
  "eyre",
  "hex",
  "reqwest",
@@ -102,7 +102,7 @@ dependencies = [
  "alloy-transport-http",
  "async-trait",
  "cliclack",
- "console 0.15.11",
+ "console",
  "eyre",
  "hex",
  "secrecy",
@@ -119,7 +119,7 @@ dependencies = [
  "adi-types",
  "async-trait",
  "base64 0.22.1",
- "console 0.15.11",
+ "console",
  "flate2",
  "log",
  "rust-s3",
@@ -138,7 +138,7 @@ version = "0.3.0"
 dependencies = [
  "adi-docker",
  "adi-types",
- "console 0.15.11",
+ "console",
  "secrecy",
  "semver 1.0.27",
  "serde",
@@ -1467,7 +1467,7 @@ version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fd2a475e9dff35ddebd459b0523aab732572581f7fe53133edd20b3330a0ce6"
 dependencies = [
- "console 0.16.2",
+ "console",
  "indicatif",
  "once_cell",
  "strsim",
@@ -1500,18 +1500,6 @@ dependencies = [
  "serde_core",
  "winnow",
  "yaml-rust2",
-]
-
-[[package]]
-name = "console"
-version = "0.15.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "054ccb5b10f9f2cbf51eb355ca1d05c2d279ce1804688d0db74b4733a5aeafd8"
-dependencies = [
- "encode_unicode",
- "libc",
- "once_cell",
- "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2703,7 +2691,7 @@ version = "0.18.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25470f23803092da7d239834776d653104d551bc4d7eacaf31e6837854b8e9eb"
 dependencies = [
- "console 0.16.2",
+ "console",
  "portable-atomic",
  "unicode-width",
  "unit-prefix",
@@ -5138,15 +5126,6 @@ name = "windows-sys"
 version = "0.52.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d"
-dependencies = [
- "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "windows-sys"
-version = "0.59.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e38bc4d79ed67fd075bcc251a1c39b32a1776bbe92e5bef1f0bf1f8c531853b"
 dependencies = [
  "windows-targets 0.52.6",
 ]
