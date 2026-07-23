@@ -5,12 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0] - 2026-07-23
 
 ### Added
 
-- Add validium mode configuration
-- Deploy `NoxTransactionFilterer` and wire it into the chain's Diamond automatically when `--validium` is enabled
+- **Validium / custom DA mode support** — chains can use external data availability (e.g. Avail) via `pubdata_mode: custom_da`, created as validium chains with the mode-specific L1 DA validator wired automatically
+- Automatic **`NoxTransactionFilterer` deployment** and registration on the chain's Diamond (via ChainAdmin multicall) for validium/custom-DA chains, with the address persisted to chain state, shown in `adi ecosystem` output, and contract sources prebuilt into the toolkit image
+- **`settlement` ecosystem config key** (`l1` | `l2`, default `l2`) selecting the settlement layer, which drives the L1-sender fee tier (L1 ~25 gwei cap vs L2 ~1500 gwei cap) independently of the DA transport
+- `--pubdata-mode` flag (`blobs` | `calldata` | `custom-da`) on `adi init`, `adi add`, and `adi deploy`, plus an interactive pubdata mode prompt when not provided
+- Pubdata/settlement compatibility validation: `adi init` and `adi deploy` reject `pubdata_mode: blobs` with `settlement: l2` (blobs only exist on Ethereum L1) before touching state or the network
+
+### Changed
+
+- **BREAKING:** the `blobs: true/false` config key and the `--blobs` deploy flag are replaced by the `pubdata_mode` enum (`blobs` | `calldata` | `custom_da`, default `calldata`); the value parses case-insensitively and ignores `-`/`_`
+- L1-sender fee tier selection is based on the settlement layer instead of the blobs flag; blob-gas vs pubdata-price overrides are chosen by DA transport
+- Interactive prompt notes word-wrap properly for long messages (cliclack 0.5 / console 0.16 upgrade)
+
+### Fixed
+
+- Container creation on macOS is retried when Docker Desktop transiently reports "bind source path does not exist" for a just-created mount directory (VirtioFS race)
 
 ## [0.3.0] - 2026-06-17
 
@@ -213,6 +226,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Interactive UI** with themed prompts, confirmations, and multi-select pickers via `dialoguer` and `console`
 - **Colored terminal output** and structured logging via `env_logger` with configurable log levels
 
+[0.4.0]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.5...0.3.0
 [0.2.5]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.4...0.2.5
 [0.2.4]: https://github.com/ADI-Foundation-Labs/ADI-CLI/compare/0.2.3...0.2.4
