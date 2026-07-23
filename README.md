@@ -74,11 +74,12 @@ ecosystem:
   name: adi_ecosystem
   l1_network: sepolia
   rpc_url: https://sepolia.infura.io/v3/YOUR_KEY
+  settlement: l1 # l1 = an L2 chain (settles on Ethereum); l2 = an L3 chain. Default: l2
   chains:
     - name: my-chain
       chain_id: 222
       prover_mode: no-proofs
-      validium: true # Set to true for L3 Validium mode
+      pubdata_mode: blobs # blobs | calldata | custom_da. Default: calldata. blobs requires settlement: l1
 
 funding:
   deployer_eth: 100.0

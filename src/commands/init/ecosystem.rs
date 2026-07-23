@@ -1,8 +1,9 @@
 //! Ecosystem initialization command implementation.
 
 use adi_ecosystem::{
-    build_ecosystem_create_args, normalize_name, validate_chain_id, validate_snake_case_name,
-    verify_ecosystem_created, ChainDefaults, EcosystemConfig, EcosystemDefaults,
+    build_ecosystem_create_args, normalize_name, validate_chain_id, validate_pubdata_settlement,
+    validate_snake_case_name, verify_ecosystem_created, ChainDefaults, EcosystemConfig,
+    EcosystemDefaults,
 };
 use adi_funding::{normalize_rpc_url, FundingProvider};
 use adi_state::import_ecosystem_state;
@@ -60,6 +61,11 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     // and zkstack agree on the stored ecosystem/chain directory names.
     validate_snake_case_name(&config.name).map_err(|msg| eyre::eyre!("{msg}"))?;
     validate_snake_case_name(&config.chain_name).map_err(|msg| eyre::eyre!("{msg}"))?;
+
+    // Reject a pubdata mode that is incompatible with the settlement layer
+    // (blobs require Ethereum L1) before touching state or the network.
+    validate_pubdata_settlement(config.pubdata_mode, config.settlement)
+        .map_err(|msg| eyre::eyre!("{msg}"))?;
 
     // 4. Validate chain ID doesn't conflict with settlement layer
     ui::info("Validating chain ID against settlement layer...")?;
@@ -424,10 +430,11 @@ fn build_ecosystem_config(
             .evm_emulator
             .or_else(|| chain_defaults.map(|c| c.evm_emulator))
             .unwrap_or(false),
-        validium: args
-            .validium
-            .or_else(|| chain_defaults.map(|c| c.validium))
-            .unwrap_or(false),
+        pubdata_mode: args
+            .pubdata_mode
+            .or_else(|| chain_defaults.map(|c| c.pubdata_mode))
+            .unwrap_or_default(),
+        settlement: defaults.settlement,
         rpc_url: args.rpc_url.clone().or_else(|| defaults.rpc_url.clone()),
     }
 }
@@ -445,7 +452,7 @@ fn build_partial_chain_defaults(args: &InitArgs) -> PartialChainDefaults {
         base_token_price_nominator: args.base_token_price_nominator,
         base_token_price_denominator: args.base_token_price_denominator,
         evm_emulator: args.evm_emulator,
-        validium: args.validium,
+        pubdata_mode: args.pubdata_mode,
         operator: args.operator,
         prove_operator: args.prove_operator,
         execute_operator: args.execute_operator,
@@ -474,8 +481,7 @@ fn ecosystem_config_to_chain_defaults(config: &EcosystemConfig) -> ChainDefaults
         base_token_price_nominator: config.base_token_price_nominator,
         base_token_price_denominator: config.base_token_price_denominator,
         evm_emulator: config.evm_emulator,
-        validium: config.validium,
-        blobs: false, // Default to calldata mode (L3)
+        pubdata_mode: config.pubdata_mode,
         fee_collector_address: None,
         operators: Default::default(),
         funding: Default::default(),

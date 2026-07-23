@@ -161,7 +161,6 @@ fn chain_defaults_to_config(defaults: &ChainDefaults) -> ChainConfig {
         base_token_price_nominator: defaults.base_token_price_nominator,
         base_token_price_denominator: defaults.base_token_price_denominator,
         evm_emulator: defaults.evm_emulator,
-        validium: defaults.validium,
-        blobs: defaults.blobs,
+        pubdata_mode: defaults.pubdata_mode,
     }
 }

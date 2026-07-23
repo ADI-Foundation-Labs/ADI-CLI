@@ -2,7 +2,7 @@ use alloy_primitives::Address;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 
-use crate::types::ProverMode;
+use crate::types::{ProverMode, PubdataMode};
 
 /// Predefined operator addresses for a chain.
 ///
@@ -96,18 +96,10 @@ pub struct ChainDefaults {
     #[serde(default)]
     pub evm_emulator: bool,
 
-    /// Use blob-based pubdata (EIP-4844).
-    ///
-    /// When `true`, uses blobs for pubdata (L2 chains settling on L1).
-    /// When `false`, uses calldata for pubdata (L3 chains settling on L2).
-    /// Default: `false` (calldata mode for L3 deployments)
+    /// Data-availability pubdata mode.
+    /// Default: `calldata`
     #[serde(default)]
-    pub blobs: bool,
-
-    /// Enable Validium mode (no DA).
-    /// Default: `false`
-    #[serde(default)]
-    pub validium: bool,
+    pub pubdata_mode: PubdataMode,
 
     /// Override fee collector address for server parameters.
     ///
@@ -146,8 +138,7 @@ impl Default for ChainDefaults {
             base_token_price_nominator: 1,
             base_token_price_denominator: 1,
             evm_emulator: false,
-            blobs: false,
-            validium: false,
+            pubdata_mode: PubdataMode::default(),
             fee_collector_address: None,
             operators: OperatorsDefaults::default(),
             funding: ChainFundingDefaults::default(),
@@ -189,11 +180,8 @@ impl ChainDefaults {
         if self.evm_emulator != defaults.evm_emulator {
             lines.push(format!("evm_emulator: {}", self.evm_emulator));
         }
-        if self.blobs != defaults.blobs {
-            lines.push(format!("blobs: {}", self.blobs));
-        }
-        if self.validium != defaults.validium {
-            lines.push(format!("validium: {}", self.validium));
+        if self.pubdata_mode != defaults.pubdata_mode {
+            lines.push(format!("pubdata_mode: {}", self.pubdata_mode));
         }
         if let Some(addr) = &self.fee_collector_address {
             lines.push(format!("fee_collector_address: \"{}\"", addr));
@@ -238,7 +226,7 @@ impl ChainDefaults {
 mod tests {
     use super::*;
 
-    use crate::types::ProverMode;
+    use crate::types::{ProverMode, PubdataMode};
 
     #[test]
     fn test_chain_defaults() {
@@ -248,7 +236,7 @@ mod tests {
         assert_eq!(chain.prover_mode, ProverMode::NoProofs);
         assert!(chain.base_token_address.is_none());
         assert!(!chain.evm_emulator);
-        assert!(!chain.blobs);
+        assert_eq!(chain.pubdata_mode, PubdataMode::Calldata);
     }
 
     #[test]

@@ -1,6 +1,6 @@
 //! Server parameter extraction logic.
 
-use adi_types::{ChainContracts, ChainMetadata, ProverMode, Wallets};
+use adi_types::{ChainContracts, ChainMetadata, ProverMode, PubdataMode, SettlementLayer, Wallets};
 use alloy_primitives::Address;
 use serde_json::Value;
 
@@ -8,12 +8,12 @@ use super::constants::{
     APP_BIN_UNPACK_PATH, BASE_TOKEN_FORCED_PRICE, BASE_TOKEN_PRICE_UPDATER_ENABLED, BATCH_TIMEOUT,
     BLOCKS_PER_BATCH_LIMIT, BLOCK_DUMP_PATH, BLOCK_TIME, ETH_FORCED_PRICE,
     ETH_FORCED_PRICE_ADDRESS, EXTERNAL_PRICE_API_CLIENT_SOURCE, FUSAKA_UPGRADE_TIMESTAMP,
-    GENESIS_INPUT_PATH, L2_BASE_FEE_OVERRIDE, L2_MAX_FEE_PER_BLOB_GAS_GWEI,
-    L2_MAX_FEE_PER_GAS_GWEI, L2_MAX_PRIORITY_FEE_GWEI, L2_NATIVE_PRICE_OVERRIDE,
-    L3_BASE_FEE_OVERRIDE, L3_MAX_FEE_PER_GAS_GWEI, L3_MAX_PRIORITY_FEE_GWEI,
-    L3_NATIVE_PRICE_OVERRIDE, L3_PUBDATA_PRICE_OVERRIDE, MAX_IN_FLIGHT_BLOCKS, MAX_TXS_IN_BLOCK,
+    GENESIS_INPUT_PATH, MAX_FEE_PER_BLOB_GAS_GWEI, MAX_IN_FLIGHT_BLOCKS, MAX_TXS_IN_BLOCK,
     OBJECT_STORE_BASE_PATH, OBSERVABILITY_LOG_FORMAT, OBSERVABILITY_LOG_USE_COLOR, POLL_INTERVAL,
-    PROVER_API_ADDR, ROCKS_DB_PATH, RUST_LOG_VALUE,
+    PROVER_API_ADDR, PUBDATA_PRICE_OVERRIDE, ROCKS_DB_PATH, RUST_LOG_VALUE,
+    SETTLE_L1_BASE_FEE_OVERRIDE, SETTLE_L1_MAX_FEE_PER_GAS_GWEI, SETTLE_L1_MAX_PRIORITY_FEE_GWEI,
+    SETTLE_L1_NATIVE_PRICE_OVERRIDE, SETTLE_L2_BASE_FEE_OVERRIDE, SETTLE_L2_MAX_FEE_PER_GAS_GWEI,
+    SETTLE_L2_MAX_PRIORITY_FEE_GWEI, SETTLE_L2_NATIVE_PRICE_OVERRIDE,
 };
 
 /// Server parameter with its environment variable name and value.
@@ -58,7 +58,8 @@ pub(super) struct ServerParamsInput<'a> {
     pub wallets: &'a Wallets,
     pub chain_metadata: &'a ChainMetadata,
     pub rpc_url: Option<&'a str>,
-    pub blobs: bool,
+    pub pubdata_mode: PubdataMode,
+    pub settlement: SettlementLayer,
     pub prover_mode: ProverMode,
     pub genesis_base64: Option<String>,
     pub fee_collector_address: Option<Address>,
@@ -268,73 +269,87 @@ pub(super) fn extract(input: &ServerParamsInput<'_>) -> Vec<ServerParam> {
         },
     ]);
 
-    // L2/L3 conditional fields
-    if input.blobs {
-        // L2 mode
-        params.extend([
-            ServerParam {
-                env_name: "l1_sender_pubdata_mode",
-                value: str_val("Blobs"),
-                description: "Pubdata sending mode (Blobs for L2)",
-            },
-            ServerParam {
-                env_name: "sequencer_base_fee_override",
-                value: str_val(L2_BASE_FEE_OVERRIDE),
-                description: "Sequencer base fee override (L2)",
-            },
-            ServerParam {
-                env_name: "l1_sender_max_fee_per_gas_gwei",
-                value: num_val(L2_MAX_FEE_PER_GAS_GWEI),
-                description: "Max fee per gas in gwei (L2)",
-            },
-            ServerParam {
-                env_name: "l1_sender_max_priority_fee_per_gas_gwei",
-                value: num_val(L2_MAX_PRIORITY_FEE_GWEI),
-                description: "Max priority fee per gas in gwei (L2)",
-            },
-            ServerParam {
-                env_name: "sequencer_native_price_override",
-                value: str_val(L2_NATIVE_PRICE_OVERRIDE),
-                description: "Sequencer native price override (L2)",
-            },
-            ServerParam {
-                env_name: "l1_sender_max_fee_per_blob_gas_gwei",
-                value: num_val(L2_MAX_FEE_PER_BLOB_GAS_GWEI),
-                description: "Max fee per blob gas in gwei (L2)",
-            },
-        ]);
+    // Pubdata sending mode (server-side name for the DA mode).
+    params.push(ServerParam {
+        env_name: "l1_sender_pubdata_mode",
+        value: str_val(input.pubdata_mode.server_pubdata_mode()),
+        description: "Pubdata sending mode",
+    });
+
+    // Fee tier is chosen by the SETTLEMENT LAYER, not the DA transport. Blobs
+    // (EIP-4844) only exist on Ethereum L1, so blobs always implies L1 settlement;
+    // otherwise the configured settlement layer decides. This is what lets an L2
+    // that posts calldata keep L1 fees instead of the pricier L2-settlement fees.
+    let effective_settlement = match input.pubdata_mode {
+        PubdataMode::Blobs => SettlementLayer::L1,
+        PubdataMode::Calldata | PubdataMode::CustomDa => input.settlement,
+    };
+    let (base_fee, max_fee, max_priority, native_price) = if effective_settlement.is_l1() {
+        (
+            SETTLE_L1_BASE_FEE_OVERRIDE,
+            SETTLE_L1_MAX_FEE_PER_GAS_GWEI,
+            SETTLE_L1_MAX_PRIORITY_FEE_GWEI,
+            SETTLE_L1_NATIVE_PRICE_OVERRIDE,
+        )
     } else {
-        // L3 mode
+        (
+            SETTLE_L2_BASE_FEE_OVERRIDE,
+            SETTLE_L2_MAX_FEE_PER_GAS_GWEI,
+            SETTLE_L2_MAX_PRIORITY_FEE_GWEI,
+            SETTLE_L2_NATIVE_PRICE_OVERRIDE,
+        )
+    };
+    params.extend([
+        ServerParam {
+            env_name: "sequencer_base_fee_override",
+            value: str_val(base_fee),
+            description: "Sequencer base fee override (by settlement layer)",
+        },
+        ServerParam {
+            env_name: "l1_sender_max_fee_per_gas_gwei",
+            value: num_val(max_fee),
+            description: "Max fee per gas in gwei (by settlement layer)",
+        },
+        ServerParam {
+            env_name: "l1_sender_max_priority_fee_per_gas_gwei",
+            value: num_val(max_priority),
+            description: "Max priority fee per gas in gwei (by settlement layer)",
+        },
+        ServerParam {
+            env_name: "sequencer_native_price_override",
+            value: str_val(native_price),
+            description: "Sequencer native price override (by settlement layer)",
+        },
+    ]);
+
+    // DA-transport fee bits are chosen by the pubdata mode: blobs pay a blob-gas
+    // fee; calldata/custom-DA set a pubdata price instead.
+    match input.pubdata_mode {
+        PubdataMode::Blobs => params.push(ServerParam {
+            env_name: "l1_sender_max_fee_per_blob_gas_gwei",
+            value: num_val(MAX_FEE_PER_BLOB_GAS_GWEI),
+            description: "Max fee per blob gas in gwei (blobs transport)",
+        }),
+        PubdataMode::Calldata | PubdataMode::CustomDa => params.push(ServerParam {
+            env_name: "sequencer_pubdata_price_override",
+            value: str_val(PUBDATA_PRICE_OVERRIDE),
+            description: "Sequencer pubdata price override (calldata transport)",
+        }),
+    }
+
+    // External DA adapter settings (only meaningful in custom DA mode). The
+    // provider endpoints/keys are deployment-specific and left unset here.
+    if matches!(input.pubdata_mode, PubdataMode::CustomDa) {
         params.extend([
             ServerParam {
-                env_name: "l1_sender_pubdata_mode",
-                value: str_val("Calldata"),
-                description: "Pubdata sending mode (Calldata for L3)",
+                env_name: "external_da_enabled",
+                value: str_val("true"),
+                description: "Enable external DA integration",
             },
             ServerParam {
-                env_name: "sequencer_base_fee_override",
-                value: str_val(L3_BASE_FEE_OVERRIDE),
-                description: "Sequencer base fee override (L3)",
-            },
-            ServerParam {
-                env_name: "l1_sender_max_fee_per_gas_gwei",
-                value: num_val(L3_MAX_FEE_PER_GAS_GWEI),
-                description: "Max fee per gas in gwei (L3)",
-            },
-            ServerParam {
-                env_name: "l1_sender_max_priority_fee_per_gas_gwei",
-                value: num_val(L3_MAX_PRIORITY_FEE_GWEI),
-                description: "Max priority fee per gas in gwei (L3)",
-            },
-            ServerParam {
-                env_name: "sequencer_native_price_override",
-                value: str_val(L3_NATIVE_PRICE_OVERRIDE),
-                description: "Sequencer native price override (L3)",
-            },
-            ServerParam {
-                env_name: "sequencer_pubdata_price_override",
-                value: str_val(L3_PUBDATA_PRICE_OVERRIDE),
-                description: "Sequencer pubdata price override (L3)",
+                env_name: "external_da_provider",
+                value: str_val("avail"),
+                description: "External DA provider identifier",
             },
         ]);
     }
@@ -355,7 +370,9 @@ pub(super) fn display_value(value: &Value) -> String {
 #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 mod tests {
     use super::*;
-    use adi_types::{ChainContracts, ChainMetadata, ProverMode, Wallets};
+    use adi_types::{
+        ChainContracts, ChainMetadata, ProverMode, PubdataMode, SettlementLayer, Wallets,
+    };
     use std::collections::HashMap;
 
     fn default_metadata() -> ChainMetadata {
@@ -386,12 +403,36 @@ default_configs_path: /defaults
         .unwrap()
     }
 
-    fn make_input(blobs: bool, prover_mode: ProverMode) -> ServerParamsInput<'static> {
-        make_input_with_base_token(blobs, prover_mode, None)
+    fn make_input(
+        pubdata_mode: PubdataMode,
+        prover_mode: ProverMode,
+    ) -> ServerParamsInput<'static> {
+        make_input_with_base_token(pubdata_mode, prover_mode, None)
     }
 
     fn make_input_with_base_token(
-        blobs: bool,
+        pubdata_mode: PubdataMode,
+        prover_mode: ProverMode,
+        base_token_address: Option<Address>,
+    ) -> ServerParamsInput<'static> {
+        make_input_full(
+            pubdata_mode,
+            SettlementLayer::L2,
+            prover_mode,
+            base_token_address,
+        )
+    }
+
+    fn make_input_with_settlement(
+        pubdata_mode: PubdataMode,
+        settlement: SettlementLayer,
+    ) -> ServerParamsInput<'static> {
+        make_input_full(pubdata_mode, settlement, ProverMode::NoProofs, None)
+    }
+
+    fn make_input_full(
+        pubdata_mode: PubdataMode,
+        settlement: SettlementLayer,
         prover_mode: ProverMode,
         base_token_address: Option<Address>,
     ) -> ServerParamsInput<'static> {
@@ -404,7 +445,8 @@ default_configs_path: /defaults
             wallets,
             chain_metadata: metadata,
             rpc_url: Some("http://localhost:8545"),
-            blobs,
+            pubdata_mode,
+            settlement,
             prover_mode,
             genesis_base64: Some("dGVzdA==".to_string()),
             fee_collector_address: Some(Address::ZERO),
@@ -421,51 +463,107 @@ default_configs_path: /defaults
 
     #[test]
     fn l2_mode_sets_pubdata_mode_to_blobs() {
-        let input = make_input(true, ProverMode::NoProofs);
+        let input = make_input(PubdataMode::Blobs, ProverMode::NoProofs);
         let params = extract(&input);
         let map = to_map(&params);
 
         assert_eq!(map["l1_sender_pubdata_mode"], str_val("Blobs"));
         assert_eq!(
             map["l1_sender_max_fee_per_blob_gas_gwei"],
-            num_val(L2_MAX_FEE_PER_BLOB_GAS_GWEI)
+            num_val(MAX_FEE_PER_BLOB_GAS_GWEI)
         );
         assert_eq!(
             map["sequencer_base_fee_override"],
-            str_val(L2_BASE_FEE_OVERRIDE)
+            str_val(SETTLE_L1_BASE_FEE_OVERRIDE)
         );
         assert_eq!(
             map["sequencer_native_price_override"],
-            str_val(L2_NATIVE_PRICE_OVERRIDE)
+            str_val(SETTLE_L1_NATIVE_PRICE_OVERRIDE)
         );
         assert!(!map.contains_key("sequencer_pubdata_price_override"));
     }
 
     #[test]
     fn l3_mode_includes_pubdata_mode_excludes_blob_gas() {
-        let input = make_input(false, ProverMode::NoProofs);
+        let input = make_input(PubdataMode::Calldata, ProverMode::NoProofs);
         let params = extract(&input);
         let map = to_map(&params);
 
         assert_eq!(map["l1_sender_pubdata_mode"], str_val("Calldata"));
         assert_eq!(
             map["sequencer_pubdata_price_override"],
-            str_val(L3_PUBDATA_PRICE_OVERRIDE)
+            str_val(PUBDATA_PRICE_OVERRIDE)
         );
         assert_eq!(
             map["sequencer_base_fee_override"],
-            str_val(L3_BASE_FEE_OVERRIDE)
+            str_val(SETTLE_L2_BASE_FEE_OVERRIDE)
         );
         assert_eq!(
             map["sequencer_native_price_override"],
-            str_val(L3_NATIVE_PRICE_OVERRIDE)
+            str_val(SETTLE_L2_NATIVE_PRICE_OVERRIDE)
+        );
+        assert!(!map.contains_key("l1_sender_max_fee_per_blob_gas_gwei"));
+    }
+
+    #[test]
+    fn blobs_always_uses_l1_settlement_fees() {
+        // Blobs imply Ethereum L1 settlement regardless of the settlement field.
+        for settlement in [SettlementLayer::L1, SettlementLayer::L2] {
+            let input = make_input_with_settlement(PubdataMode::Blobs, settlement);
+            let params = extract(&input);
+            let map = to_map(&params);
+            assert_eq!(
+                map["l1_sender_max_fee_per_gas_gwei"],
+                num_val(SETTLE_L1_MAX_FEE_PER_GAS_GWEI)
+            );
+            assert_eq!(
+                map["l1_sender_max_priority_fee_per_gas_gwei"],
+                num_val(SETTLE_L1_MAX_PRIORITY_FEE_GWEI)
+            );
+        }
+    }
+
+    #[test]
+    fn calldata_on_l2_settlement_uses_l2_fees() {
+        // Default case (settles on an L2 -> the chain is an L3): high fees.
+        let input = make_input_with_settlement(PubdataMode::Calldata, SettlementLayer::L2);
+        let params = extract(&input);
+        let map = to_map(&params);
+        assert_eq!(
+            map["l1_sender_max_fee_per_gas_gwei"],
+            num_val(SETTLE_L2_MAX_FEE_PER_GAS_GWEI)
+        );
+        assert_eq!(
+            map["sequencer_base_fee_override"],
+            str_val(SETTLE_L2_BASE_FEE_OVERRIDE)
+        );
+    }
+
+    #[test]
+    fn calldata_on_l1_settlement_uses_l1_fees() {
+        // The new capability: an L2 that posts calldata keeps L1 fees, not L3 fees.
+        let input = make_input_with_settlement(PubdataMode::Calldata, SettlementLayer::L1);
+        let params = extract(&input);
+        let map = to_map(&params);
+        assert_eq!(
+            map["l1_sender_max_fee_per_gas_gwei"],
+            num_val(SETTLE_L1_MAX_FEE_PER_GAS_GWEI)
+        );
+        assert_eq!(
+            map["sequencer_base_fee_override"],
+            str_val(SETTLE_L1_BASE_FEE_OVERRIDE)
+        );
+        // Transport bit is still calldata (pubdata price, no blob-gas fee).
+        assert_eq!(
+            map["sequencer_pubdata_price_override"],
+            str_val(PUBDATA_PRICE_OVERRIDE)
         );
         assert!(!map.contains_key("l1_sender_max_fee_per_blob_gas_gwei"));
     }
 
     #[test]
     fn prover_mode_noproofs_enables_fake_provers() {
-        let input = make_input(true, ProverMode::NoProofs);
+        let input = make_input(PubdataMode::Blobs, ProverMode::NoProofs);
         let params = extract(&input);
         let map = to_map(&params);
 
@@ -478,7 +576,7 @@ default_configs_path: /defaults
 
     #[test]
     fn prover_mode_gpu_disables_fake_provers() {
-        let input = make_input(true, ProverMode::Gpu);
+        let input = make_input(PubdataMode::Blobs, ProverMode::Gpu);
         let params = extract(&input);
         let map = to_map(&params);
 
@@ -491,7 +589,7 @@ default_configs_path: /defaults
 
     #[test]
     fn numeric_fields_are_numbers() {
-        let input = make_input(true, ProverMode::NoProofs);
+        let input = make_input(PubdataMode::Blobs, ProverMode::NoProofs);
         let params = extract(&input);
         let map = to_map(&params);
 
@@ -512,7 +610,7 @@ default_configs_path: /defaults
 
     #[test]
     fn static_fields_present() {
-        let input = make_input(true, ProverMode::NoProofs);
+        let input = make_input(PubdataMode::Blobs, ProverMode::NoProofs);
         let params = extract(&input);
         let map = to_map(&params);
 
@@ -541,7 +639,7 @@ default_configs_path: /defaults
 
     #[test]
     fn forced_prices_json_has_eth_only_when_no_base_token() {
-        let input = make_input_with_base_token(true, ProverMode::NoProofs, None);
+        let input = make_input_with_base_token(PubdataMode::Blobs, ProverMode::NoProofs, None);
         let params = extract(&input);
         let map = to_map(&params);
 
@@ -563,7 +661,7 @@ default_configs_path: /defaults
         let cgt: Address = "0x2a98B46fe31BA8Be05ef1cE3D36e1f80Db04190D"
             .parse()
             .unwrap();
-        let input = make_input_with_base_token(true, ProverMode::NoProofs, Some(cgt));
+        let input = make_input_with_base_token(PubdataMode::Blobs, ProverMode::NoProofs, Some(cgt));
         let params = extract(&input);
         let map = to_map(&params);
 

@@ -17,7 +17,9 @@ use crate::error::{Result, WrapErr};
 use crate::ui;
 
 use super::args::DeployArgs;
-use super::da_config::{configure_calldata_da, configure_validium_da, resolve_da_mode, DAMode};
+use adi_ecosystem::PubdataMode;
+
+use super::da_config::{configure_calldata_da, configure_custom_da, resolve_pubdata_mode};
 use super::display::display_deployment_summary;
 use super::files::log_deployment_files;
 use super::nox_transaction_filterer::{
@@ -104,12 +106,16 @@ pub async fn run_ecosystem_deployment(
 
     let mut nox_transaction_filterer_address = None;
 
-    let da_mode = resolve_da_mode(args, context, chain_name);
-    match da_mode {
-        DAMode::Blobs => {
-            context.logger().info("Using Blobs for DA (L2 mode)");
+    let pubdata_mode = resolve_pubdata_mode(args, context, chain_name);
+    match pubdata_mode {
+        PubdataMode::Blobs => {
+            // Blobs (zkOS scheme 4) is the chain-registration default; no
+            // setDAValidatorPair call is needed.
+            context
+                .logger()
+                .info("Using Blobs for DA (zkOS blobs mode)");
         }
-        DAMode::Calldata => {
+        PubdataMode::Calldata => {
             configure_calldata_da(
                 context,
                 state_manager,
@@ -121,8 +127,8 @@ pub async fn run_ecosystem_deployment(
             )
             .await?;
         }
-        DAMode::Validium => {
-            configure_validium_da(
+        PubdataMode::CustomDa => {
+            configure_custom_da(
                 context,
                 state_manager,
                 chain_name,

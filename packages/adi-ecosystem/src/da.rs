@@ -19,8 +19,11 @@ use secrecy::SecretString;
 sol! {
     /// Set DA validator pair on Diamond proxy.
     /// Called through ChainAdmin multicall.
+    ///
+    /// The second argument is the chain's `L2DACommitmentScheme` (an on-chain
+    /// per-chain setting), NOT the per-batch transport flag. Encoded as `uint8`.
     #[allow(missing_docs)]
-    function setDAValidatorPair(address l1DAValidator, uint8 pubdataSource) external;
+    function setDAValidatorPair(address l1DAValidator, uint8 l2DACommitmentScheme) external;
 
     /// ChainAdmin multicall interface.
     #[allow(missing_docs)]
@@ -30,17 +33,25 @@ sol! {
     ) external;
 }
 
-/// Pubdata source modes for DA configuration.
+/// On-chain L2 DA commitment scheme, stored per-chain via `setDAValidatorPair`.
 ///
-/// These values correspond to the `PubdataSource` enum in the ZkSync contracts.
+/// These values correspond to the `L2DACommitmentScheme` enum in the ZKsync
+/// contracts (`common/Config.sol`). This is the commitment *scheme* the chain
+/// expects — distinct from the per-batch transport flag (`PubdataSource {
+/// Calldata=0, Blob=1 }` in `DAUtils.sol`) that the server prefixes onto each
+/// batch's operator DA input. In particular, posting pubdata as **calldata** is
+/// still `BlobsAndPubdataKeccak256` (3): the rollup `CalldataDA` validator uses
+/// scheme 3 for both blob and calldata transports; the calldata-vs-blob choice
+/// is the transport flag, not the scheme. `PubdataKeccak256` (2) is reserved for
+/// custom/external DA and is not used by the standard rollup/gateway validators.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum PubdataSource {
-    /// No DA - Validium mode.
+pub enum L2DACommitmentScheme {
+    /// No DA — Validium mode.
     EmptyNoDa = 1,
-    /// Calldata-based pubdata (no blobs). Used for L3 chains.
+    /// Keccak of pubdata only — for custom/external DA (not on-chain pubdata).
     PubdataKeccak256 = 2,
-    /// Blobs and pubdata keccak256 (Era v0.29 default).
+    /// Rollup scheme for on-chain pubdata via blobs **or** calldata.
     BlobsAndPubdataKeccak256 = 3,
     /// ZKsync OS with blobs.
     BlobsZksyncOs = 4,
@@ -52,7 +63,7 @@ pub enum PubdataSource {
 ///
 /// * `diamond_proxy` - The Diamond proxy contract address.
 /// * `l1_da_validator` - The L1 DA validator contract address.
-/// * `pubdata_source` - The pubdata source mode.
+/// * `commitment_scheme` - The chain's L2 DA commitment scheme.
 ///
 /// # Returns
 ///
@@ -61,12 +72,12 @@ pub enum PubdataSource {
 pub fn build_set_da_validator_pair_multicall_calldata(
     diamond_proxy: Address,
     l1_da_validator: Address,
-    pubdata_source: PubdataSource,
+    commitment_scheme: L2DACommitmentScheme,
 ) -> Bytes {
     // Build inner call to setDAValidatorPair
     let inner_call = setDAValidatorPairCall {
         l1DAValidator: l1_da_validator,
-        pubdataSource: pubdata_source as u8,
+        l2DACommitmentScheme: commitment_scheme as u8,
     };
     let inner_calldata = Bytes::from(inner_call.abi_encode());
 
@@ -79,8 +90,8 @@ pub fn build_set_da_validator_pair_multicall_calldata(
     Bytes::from(multicall_call.abi_encode())
 }
 
-/// Arguments for configuring L3 DA mode.
-pub struct L3DaConfig<'a> {
+/// Arguments for setting a chain's DA validator pair.
+pub struct DaValidatorPairConfig<'a> {
     /// Settlement layer RPC endpoint URL.
     pub rpc_url: &'a str,
     /// ChainAdmin contract address.
@@ -89,19 +100,20 @@ pub struct L3DaConfig<'a> {
     pub diamond_proxy: Address,
     /// L1 DA validator contract address.
     pub l1_da_validator: Address,
-    /// DA mode source.
-    pub pubdata_source: PubdataSource,
+    /// The chain's L2 DA commitment scheme.
+    pub commitment_scheme: L2DACommitmentScheme,
     /// Governor private key for signing transactions.
     pub governor_key: &'a SecretString,
     /// Gas price multiplier percentage.
     pub gas_multiplier: Option<u64>,
 }
 
-/// Configure L3 DA mode (calldata-based pubdata).
+/// Set a chain's DA validator pair (`setDAValidatorPair`) via ChainAdmin.
 ///
-/// This function sends a transaction to disable blobs and use calldata-based
-/// pubdata instead. Required for L3 chains deploying on L2 settlement layers
-/// that don't support EIP-4844 blobs.
+/// Pairs the given L1 DA validator with the chain's L2 DA commitment scheme.
+/// Used for non-default DA modes: calldata (rollup, blobs/calldata transport)
+/// and Validium (no DA). Works for chains settling on L1 (L2) or on a gateway
+/// (L3) — the commitment scheme is the same; only the validator address differs.
 ///
 /// # Arguments
 ///
@@ -115,9 +127,12 @@ pub struct L3DaConfig<'a> {
 /// # Errors
 ///
 /// Returns error if transaction fails or required addresses are invalid.
-pub async fn configure_l3_da(config: L3DaConfig<'_>, logger: &dyn Logger) -> Result<B256> {
+pub async fn configure_da_validator_pair(
+    config: DaValidatorPairConfig<'_>,
+    logger: &dyn Logger,
+) -> Result<B256> {
     logger.debug(&format!(
-        "Configuring L3 DA mode via chain_admin: {}",
+        "Setting DA validator pair via chain_admin: {}",
         config.chain_admin
     ));
 
@@ -167,15 +182,15 @@ pub async fn configure_l3_da(config: L3DaConfig<'_>, logger: &dyn Logger) -> Res
     let calldata = build_set_da_validator_pair_multicall_calldata(
         config.diamond_proxy,
         config.l1_da_validator,
-        config.pubdata_source,
+        config.commitment_scheme,
     );
 
     let green = Style::new().green();
-    let mode_name = match config.pubdata_source {
-        PubdataSource::EmptyNoDa => "Validium mode",
-        PubdataSource::PubdataKeccak256 => "calldata mode",
-        PubdataSource::BlobsAndPubdataKeccak256 => "blobs and calldata mode",
-        PubdataSource::BlobsZksyncOs => "ZKsync OS blobs mode",
+    let mode_name = match config.commitment_scheme {
+        L2DACommitmentScheme::EmptyNoDa => "Validium mode (no DA)",
+        L2DACommitmentScheme::PubdataKeccak256 => "external DA mode (pubdata keccak256)",
+        L2DACommitmentScheme::BlobsAndPubdataKeccak256 => "rollup mode (blobs/calldata pubdata)",
+        L2DACommitmentScheme::BlobsZksyncOs => "ZKsync OS blobs mode",
     };
 
     let spinner = cliclack::spinner();
@@ -221,7 +236,8 @@ pub async fn configure_l3_da(config: L3DaConfig<'_>, logger: &dyn Logger) -> Res
     }
 
     spinner.stop(format!(
-        "DA validator pair set to calldata mode -> Confirmed in block {} (gas: {})",
+        "DA validator pair set to {} -> Confirmed in block {} (gas: {})",
+        mode_name,
         green.apply_to(receipt.block_number.unwrap_or_default()),
         receipt.gas_used
     ));
@@ -234,11 +250,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_pubdata_source_values() {
-        assert_eq!(PubdataSource::EmptyNoDa as u8, 1);
-        assert_eq!(PubdataSource::PubdataKeccak256 as u8, 2);
-        assert_eq!(PubdataSource::BlobsAndPubdataKeccak256 as u8, 3);
-        assert_eq!(PubdataSource::BlobsZksyncOs as u8, 4);
+    fn test_commitment_scheme_values() {
+        assert_eq!(L2DACommitmentScheme::EmptyNoDa as u8, 1);
+        assert_eq!(L2DACommitmentScheme::PubdataKeccak256 as u8, 2);
+        assert_eq!(L2DACommitmentScheme::BlobsAndPubdataKeccak256 as u8, 3);
+        assert_eq!(L2DACommitmentScheme::BlobsZksyncOs as u8, 4);
     }
 
     #[test]
@@ -249,7 +265,7 @@ mod tests {
         let calldata = build_set_da_validator_pair_multicall_calldata(
             diamond_proxy,
             l1_da_validator,
-            PubdataSource::PubdataKeccak256,
+            L2DACommitmentScheme::BlobsAndPubdataKeccak256,
         );
 
         // Calldata should not be empty
@@ -263,20 +279,20 @@ mod tests {
         let diamond_proxy = Address::ZERO;
         let l1_da_validator = Address::ZERO;
 
-        let calldata_keccak = build_set_da_validator_pair_multicall_calldata(
+        let calldata_rollup = build_set_da_validator_pair_multicall_calldata(
             diamond_proxy,
             l1_da_validator,
-            PubdataSource::PubdataKeccak256,
+            L2DACommitmentScheme::BlobsAndPubdataKeccak256,
         );
 
         let calldata_blobs = build_set_da_validator_pair_multicall_calldata(
             diamond_proxy,
             l1_da_validator,
-            PubdataSource::BlobsZksyncOs,
+            L2DACommitmentScheme::BlobsZksyncOs,
         );
 
-        // Different pubdata sources should produce different calldata
-        assert_ne!(calldata_keccak, calldata_blobs);
+        // Different commitment schemes should produce different calldata
+        assert_ne!(calldata_rollup, calldata_blobs);
     }
 
     #[test]
@@ -287,11 +303,11 @@ mod tests {
         let calldata = build_set_da_validator_pair_multicall_calldata(
             diamond_proxy,
             l1_da_validator,
-            PubdataSource::EmptyNoDa,
+            L2DACommitmentScheme::EmptyNoDa,
         );
 
         // Validium mode (1) should be present in calldata
-        // The last byte of the inner call is the pubdata_source
+        // The last byte of the inner call is the commitment scheme
         assert!(calldata.iter().any(|&b| b == 1));
     }
 }

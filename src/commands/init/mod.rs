@@ -2,7 +2,7 @@
 
 mod ecosystem;
 
-use adi_ecosystem::{L1Network, ProverMode};
+use adi_ecosystem::{L1Network, ProverMode, PubdataMode};
 use alloy_primitives::Address;
 use clap::Args;
 use serde::{Deserialize, Serialize};
@@ -100,9 +100,9 @@ pub struct InitArgs {
     )]
     pub evm_emulator: Option<bool>,
 
-    /// Enable Validium mode (no DA)
-    #[arg(long, help = "Enable Validium mode (no DA)")]
-    pub validium: Option<bool>,
+    /// Data-availability pubdata mode.
+    #[arg(long, value_enum, help = "Pubdata mode (blobs | calldata | custom-da)")]
+    pub pubdata_mode: Option<PubdataMode>,
 
     /// Operator address (receives PRECOMMITTER, COMMITTER, REVERTER roles)
     #[arg(long, env = "ADI_OPERATOR")]

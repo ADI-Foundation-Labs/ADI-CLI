@@ -1,5 +1,6 @@
 //! CLI arguments for the deploy command.
 
+use adi_ecosystem::PubdataMode;
 use clap::Args;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -111,17 +112,10 @@ pub struct DeployArgs {
     )]
     pub protocol_version: Option<String>,
 
-    /// Use blob-based pubdata (EIP-4844). Overrides chain config if specified.
+    /// Data-availability pubdata mode. Overrides chain config if specified.
     ///
-    /// When `true`, uses blobs for pubdata (L2 chains settling on L1).
-    /// When `false`, uses calldata for pubdata (L3 chains settling on L2).
-    #[arg(
-        long,
-        help = "Use blob-based pubdata (true=blobs for L2, false=calldata for L3)"
-    )]
-    pub blobs: Option<bool>,
-
-    /// Enable Validium mode (no DA). Overrides chain config if specified.
-    #[arg(long, help = "Enable Validium mode (no DA)")]
-    pub validium: Option<bool>,
+    /// `blobs` (zkOS blobs, scheme 4), `calldata` (rollup calldata, scheme 3),
+    /// or `custom-da` (external DA e.g. Avail, scheme 2).
+    #[arg(long, value_enum, help = "Pubdata mode (blobs | calldata | custom-da)")]
+    pub pubdata_mode: Option<PubdataMode>,
 }

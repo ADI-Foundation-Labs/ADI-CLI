@@ -2,7 +2,7 @@
 
 mod chain;
 
-use adi_ecosystem::ProverMode;
+use adi_ecosystem::{ProverMode, PubdataMode};
 use alloy_primitives::Address;
 use clap::Args;
 use serde::{Deserialize, Serialize};
@@ -96,9 +96,9 @@ pub struct AddArgs {
     )]
     pub evm_emulator: Option<bool>,
 
-    /// Enable Validium mode (no DA).
-    #[arg(long, help = "Enable Validium mode (no DA)")]
-    pub validium: Option<bool>,
+    /// Data-availability pubdata mode.
+    #[arg(long, value_enum, help = "Pubdata mode (blobs | calldata | custom-da)")]
+    pub pubdata_mode: Option<PubdataMode>,
 
     /// Skip confirmation prompt.
     #[arg(long, short = 'y', help = "Skip confirmation prompt")]
