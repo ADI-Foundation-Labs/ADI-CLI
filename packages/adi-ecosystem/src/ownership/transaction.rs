@@ -7,6 +7,7 @@ use alloy_network::TransactionBuilder;
 use alloy_primitives::{Address, Bytes, B256};
 use alloy_provider::Provider;
 use alloy_rpc_types::TransactionRequest;
+use tokio::time::{timeout, Duration};
 
 /// Transaction result with hash and block number.
 pub struct TxResult {
@@ -48,9 +49,11 @@ where
 
     let tx_hash = *pending.tx_hash();
 
-    let receipt = pending
-        .get_receipt()
+    let receipt = timeout(Duration::from_secs(300), pending.get_receipt())
         .await
+        .map_err(|_| EcosystemError::TransactionFailed {
+            reason: "Transaction stuck in mempool for 5 minutes".to_string(),
+        })?
         .map_err(|e| EcosystemError::TransactionFailed {
             reason: format!("Failed to get receipt: {}", e),
         })?;

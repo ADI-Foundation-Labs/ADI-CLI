@@ -16,6 +16,7 @@ use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
 use console::Style;
 use secrecy::SecretString;
+use tokio::time::{timeout, Duration};
 
 /// Contract addresses required for validator role configuration.
 #[derive(Debug, Clone)]
@@ -369,15 +370,26 @@ async fn execute_validator_role_txs(params: ValidatorRoleTxParams<'_>) -> Result
             .logger
             .debug(&format!("Transaction sent: {}", tx_hash));
 
-        let receipt = pending.get_receipt().await.map_err(|e| {
-            spinner.error(format!("Confirmation failed: {}", e));
-            EcosystemError::TransactionFailed {
-                reason: format!(
-                    "Failed to confirm {} validator role tx: {}",
-                    assignment.name, e
-                ),
-            }
-        })?;
+        let receipt = timeout(Duration::from_secs(300), pending.get_receipt())
+            .await
+            .map_err(|_| {
+                spinner.error("Transaction stuck in mempool for 5 minutes");
+                EcosystemError::TransactionFailed {
+                    reason: format!(
+                        "Transaction stuck in mempool for 5 minutes: {} validator role tx",
+                        assignment.name
+                    ),
+                }
+            })?
+            .map_err(|e| {
+                spinner.error(format!("Confirmation failed: {}", e));
+                EcosystemError::TransactionFailed {
+                    reason: format!(
+                        "Failed to confirm {} validator role tx: {}",
+                        assignment.name, e
+                    ),
+                }
+            })?;
 
         if !receipt.status() {
             spinner.error("Transaction reverted");

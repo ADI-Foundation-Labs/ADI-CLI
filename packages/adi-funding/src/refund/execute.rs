@@ -13,6 +13,7 @@ use crate::events::{FundingEvent, FundingEventHandler};
 use crate::provider::FundingProvider;
 use crate::signer::create_signer;
 use crate::transfer::{build_token_transfer_calldata, Transfer, TransferType};
+use tokio::time::{timeout, Duration};
 
 /// Default ERC20 token decimals when not specified.
 const DEFAULT_TOKEN_DECIMALS: u8 = 18;
@@ -282,9 +283,12 @@ async fn send_transfer<P: Provider>(
 
     let tx_hash = *pending.tx_hash();
 
-    let receipt = pending
-        .get_receipt()
+    let receipt = timeout(Duration::from_secs(300), pending.get_receipt())
         .await
+        .map_err(|_| FundingError::TransactionFailed {
+            to: transfer.to,
+            reason: "Transaction stuck in mempool for 5 minutes".to_string(),
+        })?
         .map_err(|e| FundingError::TransactionFailed {
             to: transfer.to,
             reason: e.to_string(),
