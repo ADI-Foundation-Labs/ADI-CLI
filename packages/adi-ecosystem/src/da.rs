@@ -6,7 +6,7 @@
 
 use crate::error::{EcosystemError, Result};
 use crate::signer::create_signer;
-use adi_types::{normalize_rpc_url, Logger};
+use adi_types::{normalize_rpc_url, Logger, TX_TIMEOUT_SECONDS};
 use alloy_network::{EthereumWallet, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_provider::{Provider, ProviderBuilder};
@@ -15,8 +15,6 @@ use alloy_sol_types::{sol, SolCall};
 use console::Style;
 use secrecy::SecretString;
 use tokio::time::{timeout, Duration};
-
-use adi_types::TX_TIMEOUT_SECONDS;
 
 // Define the contract interfaces using alloy's sol! macro
 sol! {

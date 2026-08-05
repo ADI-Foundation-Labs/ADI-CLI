@@ -9,7 +9,7 @@ use crate::signer::create_signer;
 use crate::validator::{
     build_add_validator_roles_calldata, build_remove_validator_roles_calldata, ValidatorRoles,
 };
-use adi_types::{normalize_rpc_url, ChainContracts, Logger, Operators};
+use adi_types::{normalize_rpc_url, ChainContracts, Logger, Operators, TX_TIMEOUT_SECONDS};
 use alloy_network::{EthereumWallet, TransactionBuilder};
 use alloy_primitives::{Address, B256};
 use alloy_provider::{Provider, ProviderBuilder};
@@ -17,8 +17,6 @@ use alloy_rpc_types::TransactionRequest;
 use console::Style;
 use secrecy::SecretString;
 use tokio::time::{timeout, Duration};
-
-use adi_types::TX_TIMEOUT_SECONDS;
 
 /// Contract addresses required for validator role configuration.
 #[derive(Debug, Clone)]

@@ -10,7 +10,7 @@ use crate::error::{FundingError, Result};
 use crate::events::{FundingEvent, FundingEventHandler, NoOpEventHandler};
 use crate::provider::FundingProvider;
 use crate::signer::create_signer;
-use adi_types::{Wallet, Wallets};
+use adi_types::{TX_TIMEOUT_SECONDS, Wallet, Wallets};
 use alloy_network::{EthereumWallet, TransactionBuilder};
 use alloy_primitives::{Address, B256, U256};
 use alloy_provider::{Provider, ProviderBuilder};
@@ -18,8 +18,6 @@ use alloy_rpc_types::eth::TransactionRequest;
 use secrecy::SecretString;
 use std::sync::Arc;
 use tokio::time::{timeout, Duration};
-
-use adi_types::TX_TIMEOUT_SECONDS;
 
 /// Anvil default private key (account 0).
 /// Address: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
