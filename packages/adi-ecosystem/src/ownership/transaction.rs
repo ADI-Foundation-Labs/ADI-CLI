@@ -9,6 +9,8 @@ use alloy_provider::Provider;
 use alloy_rpc_types::TransactionRequest;
 use tokio::time::{timeout, Duration};
 
+use adi_types::TX_TIMEOUT_SECONDS;
+
 /// Transaction result with hash and block number.
 pub struct TxResult {
     /// Transaction hash.
@@ -49,10 +51,10 @@ where
 
     let tx_hash = *pending.tx_hash();
 
-    let receipt = timeout(Duration::from_secs(300), pending.get_receipt())
+    let receipt = timeout(Duration::from_secs(TX_TIMEOUT_SECONDS), pending.get_receipt())
         .await
         .map_err(|_| EcosystemError::TransactionFailed {
-            reason: "Transaction stuck in mempool for 5 minutes".to_string(),
+            reason: "Transaction not mined within timeout window".to_string(),
         })?
         .map_err(|e| EcosystemError::TransactionFailed {
             reason: format!("Failed to get receipt: {}", e),

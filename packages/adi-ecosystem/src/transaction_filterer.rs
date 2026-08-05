@@ -17,6 +17,8 @@ use console::Style;
 use secrecy::SecretString;
 use tokio::time::{timeout, Duration};
 
+use adi_types::TX_TIMEOUT_SECONDS;
+
 sol! {
     /// Register the transaction filterer on the Diamond proxy.
     /// Called through ChainAdmin multicall.
@@ -146,12 +148,12 @@ pub async fn configure_transaction_filterer(
 
     let tx_hash = *pending.tx_hash();
 
-    let receipt = timeout(Duration::from_secs(300), pending.get_receipt())
+    let receipt = timeout(Duration::from_secs(TX_TIMEOUT_SECONDS), pending.get_receipt())
         .await
         .map_err(|_| {
-            spinner.error("Transaction stuck in mempool for 5 minutes");
+            spinner.error("Transaction not mined within timeout window");
             EcosystemError::TransactionFailed {
-                reason: "Transaction stuck in mempool for 5 minutes: setTransactionFilterer".to_string(),
+                reason: "Transaction not mined within timeout window: setTransactionFilterer".to_string(),
             }
         })?
         .map_err(|e| {

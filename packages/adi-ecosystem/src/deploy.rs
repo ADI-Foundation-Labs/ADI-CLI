@@ -18,6 +18,8 @@ use console::Style;
 use secrecy::SecretString;
 use tokio::time::{timeout, Duration};
 
+use adi_types::TX_TIMEOUT_SECONDS;
+
 /// Contract addresses required for validator role configuration.
 #[derive(Debug, Clone)]
 pub struct DeployedContracts {
@@ -370,13 +372,13 @@ async fn execute_validator_role_txs(params: ValidatorRoleTxParams<'_>) -> Result
             .logger
             .debug(&format!("Transaction sent: {}", tx_hash));
 
-        let receipt = timeout(Duration::from_secs(300), pending.get_receipt())
+        let receipt = timeout(Duration::from_secs(TX_TIMEOUT_SECONDS), pending.get_receipt())
             .await
             .map_err(|_| {
-                spinner.error("Transaction stuck in mempool for 5 minutes");
+                spinner.error("Transaction not mined within timeout window");
                 EcosystemError::TransactionFailed {
                     reason: format!(
-                        "Transaction stuck in mempool for 5 minutes: {} validator role tx",
+                        "Transaction not mined within timeout window: {} validator role tx",
                         assignment.name
                     ),
                 }

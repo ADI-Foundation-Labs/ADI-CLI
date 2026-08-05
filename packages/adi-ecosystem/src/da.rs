@@ -16,6 +16,8 @@ use console::Style;
 use secrecy::SecretString;
 use tokio::time::{timeout, Duration};
 
+use adi_types::TX_TIMEOUT_SECONDS;
+
 // Define the contract interfaces using alloy's sol! macro
 sol! {
     /// Set DA validator pair on Diamond proxy.
@@ -222,12 +224,12 @@ pub async fn configure_da_validator_pair(
     let tx_hash = *pending.tx_hash();
 
     // Wait for confirmation with timeout
-    let receipt = timeout(Duration::from_secs(300), pending.get_receipt())
+    let receipt = timeout(Duration::from_secs(TX_TIMEOUT_SECONDS), pending.get_receipt())
         .await
         .map_err(|_| {
-            spinner.error("Transaction stuck in mempool for 5 minutes");
+            spinner.error("Transaction not mined within timeout window");
             EcosystemError::TransactionFailed {
-                reason: "Transaction stuck in mempool for 5 minutes: setDAValidatorPair".to_string(),
+                reason: "Transaction not mined within timeout window: setDAValidatorPair".to_string(),
             }
         })?
         .map_err(|e| {

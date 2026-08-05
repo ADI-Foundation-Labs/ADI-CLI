@@ -10,6 +10,8 @@ use crate::error::{Result, UpgradeError};
 use crate::signing::build_signing_provider;
 use tokio::time::{timeout, Duration};
 
+use adi_types::TX_TIMEOUT_SECONDS;
+
 /// Convert semver Version to protocol version uint256.
 ///
 /// Formula: `(major << 40) | (minor << 32) | patch`
@@ -48,9 +50,9 @@ pub(crate) async fn send_chain_tx<P: Provider + Clone>(
         .await
         .map_err(|e| UpgradeError::GovernanceFailed(format!("{label} tx failed: {e}")))?;
 
-    let receipt = timeout(Duration::from_secs(300), pending.get_receipt())
+    let receipt = timeout(Duration::from_secs(TX_TIMEOUT_SECONDS), pending.get_receipt())
         .await
-        .map_err(|_| UpgradeError::GovernanceFailed(format!("{label} stuck in mempool for 5 minutes")))?
+        .map_err(|_| UpgradeError::GovernanceFailed(format!("{label} not mined within timeout window")))?
         .map_err(|e| UpgradeError::GovernanceFailed(format!("{label} receipt failed: {e}")))?;
 
     log::info!("{label} tx: {}", receipt.transaction_hash);
