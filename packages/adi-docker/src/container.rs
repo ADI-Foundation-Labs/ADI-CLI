@@ -9,6 +9,7 @@ use bollard::container::{
 };
 use bollard::models::{HostConfig, Mount, MountTypeEnum};
 use bollard::Docker;
+use std::env;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
@@ -89,13 +90,19 @@ impl ContainerManager {
             ..Default::default()
         };
 
-        let docker_socket_mount = Mount {
-            target: Some("/var/run/docker.sock".to_string()),
-            source: Some("/var/run/docker.sock".to_string()),
-            typ: Some(MountTypeEnum::BIND),
-            read_only: Some(false),
-            ..Default::default()
-        };
+        // Resolve Docker socket path from DOCKER_HOST env var, fall back to default.
+        // Only mount if the path exists and is a valid socket. Colima (VirtioFS)
+        // Resolve Docker socket path from DOCKER_HOST env var, fall back to default.
+        // Only mount if the path is the standard /var/run/docker.sock. Non-standard
+        // paths (e.g. Colima's ~/.colima/default/docker.sock) may reside on a
+        // VirtioFS mount that does not support forwarding Unix socket files into
+        // containers. The container will run without Docker-in-Docker support if
+        // the socket is unavailable or at a non-standard location.
+        let docker_socket_path = env::var("DOCKER_HOST")
+            .ok()
+            .filter(|h| !h.is_empty())
+            .and_then(|h| h.strip_prefix("unix://").map(|s| s.to_string()))
+            .unwrap_or_else(|| "/var/run/docker.sock".to_string());
 
         let tmp_dir = state_dir_absolute.join(".tmp");
         tokio::fs::create_dir_all(&tmp_dir).await.map_err(|e| {
@@ -105,6 +112,16 @@ impl ContainerManager {
                 e
             ))
         })?;
+
+        // Sync parent directory to force VirtioFS/9p to acknowledge the new
+        // directory before Docker attempts the bind mount. This mitigates a
+        // race on Colima (VirtioFS) and other VM engines where a just-created
+        // directory is not yet visible to the VM's filesystem layer.
+        if let Some(parent) = tmp_dir.parent() {
+            if let Ok(file) = tokio::fs::File::open(parent).await {
+                let _ = file.sync_all().await;
+            }
+        }
 
         let tmp_dir_str = tmp_dir
             .to_str()
@@ -124,8 +141,28 @@ impl ContainerManager {
             ..Default::default()
         };
 
+        let mut mounts = vec![workspace_mount, tmp_mount];
+        if docker_socket_path == "/var/run/docker.sock"
+            && tokio::fs::metadata(&docker_socket_path).await.is_ok()
+        {
+            self.logger.debug("Mounting Docker socket from /var/run/docker.sock");
+            let docker_socket_mount = Mount {
+                target: Some("/var/run/docker.sock".to_string()),
+                source: Some(docker_socket_path),
+                typ: Some(MountTypeEnum::BIND),
+                read_only: Some(false),
+                ..Default::default()
+            };
+            mounts.insert(1, docker_socket_mount);
+        } else {
+            self.logger.debug(&format!(
+                "Docker socket at '{}' is non-standard or unavailable, skipping mount",
+                docker_socket_path
+            ));
+        }
+
         let host_config = HostConfig {
-            mounts: Some(vec![workspace_mount, docker_socket_mount, tmp_mount]),
+            mounts: Some(mounts),
             network_mode: if config.host_network {
                 Some("host".to_string())
             } else {
@@ -161,12 +198,22 @@ impl ContainerManager {
             platform: None,
         };
 
-        // macOS Docker Desktop can briefly fail to see a just-created bind
-        // source (the `.tmp` dir created above), reporting "bind source path
-        // does not exist". Retry a few times to let the file-sharing layer
-        // (VirtioFS/gRPC-FUSE) catch up.
+        // macOS Docker Desktop and Colima (VirtioFS) can briefly fail to see
+        // a just-created bind source (the `.tmp` dir created above), reporting
+        // "bind source path does not exist". Retry with fsync to let the
+        // file-sharing layer (VirtioFS/gRPC-FUSE/9p) catch up.
         let mut attempt = 0u32;
         let response = loop {
+            // Sync parent directory before each attempt to force the VM's
+            // filesystem layer to acknowledge the directory exists.
+            if attempt > 0 {
+                if let Some(parent) = tmp_dir.parent() {
+                    if let Ok(file) = tokio::fs::File::open(parent).await {
+                        let _ = file.sync_all().await;
+                    }
+                }
+                tokio::time::sleep(Duration::from_millis(200)).await;
+            }
             match self
                 .docker
                 .create_container(Some(options.clone()), container_config.clone())
@@ -174,13 +221,13 @@ impl ContainerManager {
             {
                 Ok(response) => break response,
                 Err(e)
-                    if attempt < 5 && e.to_string().contains("bind source path does not exist") =>
+                    if attempt < 10 && e.to_string().contains("bind source path does not exist") =>
                 {
                     attempt += 1;
                     self.logger.debug(&format!(
                         "create_container bind-source race (attempt {attempt}), retrying: {e}"
                     ));
-                    tokio::time::sleep(Duration::from_millis(200)).await;
+                    tokio::time::sleep(Duration::from_millis(1000)).await;
                 }
                 Err(e) => return Err(DockerError::ContainerCreateFailed(e.to_string())),
             }

@@ -4,6 +4,8 @@ use crate::error::{DockerError, Result};
 use crate::image::ImageManager;
 use adi_types::{LogCrateLogger, Logger};
 use bollard::Docker;
+use bollard::API_DEFAULT_VERSION;
+use std::env;
 use std::sync::Arc;
 
 /// Wrapper around bollard::Docker with helper methods.
@@ -48,9 +50,24 @@ impl DockerClient {
     /// Returns an error if connection to Docker daemon fails.
     pub async fn with_logger(logger: Arc<dyn Logger>) -> Result<Self> {
         logger.debug("Connecting to Docker daemon...");
-        // Use socket connection with longer timeout for large image pulls
-        let docker = Docker::connect_with_socket_defaults()
-            .map_err(|e: bollard::errors::Error| DockerError::DaemonNotRunning(e.to_string()))?;
+
+        // Check DOCKER_HOST env var first, fall back to default socket
+        let docker = match env::var("DOCKER_HOST").ok() {
+            Some(host) if !host.is_empty() => {
+                logger.debug(&format!("Using DOCKER_HOST: {}", host));
+                Docker::connect_with_local(&host, 120, API_DEFAULT_VERSION)
+                    .map_err(|e: bollard::errors::Error| {
+                        DockerError::DaemonNotRunning(e.to_string())
+                    })?
+            }
+            _ => {
+                logger.debug("Using default Docker socket");
+                Docker::connect_with_socket_defaults()
+                    .map_err(|e: bollard::errors::Error| {
+                        DockerError::DaemonNotRunning(e.to_string())
+                    })?
+            }
+        };
 
         let client = Self {
             inner: docker,
