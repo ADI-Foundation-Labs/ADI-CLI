@@ -3,6 +3,9 @@
 //! Each protocol version may have different upgrade scripts and post-hooks.
 
 mod v0_30;
+mod v0_31;
+
+pub use v0_31::V0_31_0Handler;
 
 use adi_toolkit::ProtocolVersion;
 
@@ -53,5 +56,8 @@ pub fn get_handler(version: &ProtocolVersion) -> Option<Box<dyn VersionHandler>>
     match version {
         ProtocolVersion::V0_30_0 => None,
         ProtocolVersion::V0_30_1 => Some(Box::new(v0_30::V0_30_1Handler)),
+        // v31 does not use the single-forge-script VersionHandler engine; it is
+        // dispatched to the `v31` module at the command layer before this call.
+        ProtocolVersion::V0_31_0 => None,
     }
 }

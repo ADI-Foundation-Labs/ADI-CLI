@@ -58,6 +58,8 @@ pub use governance::{
     resolve_governance_contracts, GovernanceAddresses, GovernanceCalldata, GovernanceResult,
 };
 
+pub mod v31;
+
 pub mod chain_upgrade;
 
 pub use chain_upgrade::{

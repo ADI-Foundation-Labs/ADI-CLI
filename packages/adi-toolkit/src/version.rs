@@ -45,6 +45,9 @@ pub enum ProtocolVersion {
     #[default]
     #[strum(serialize = "v0.30.1", serialize = "0.30.1")]
     V0_30_1,
+    /// Protocol version 0.31.0
+    #[strum(serialize = "v0.31.0", serialize = "0.31.0")]
+    V0_31_0,
 }
 
 impl ProtocolVersion {
@@ -105,6 +108,7 @@ impl ProtocolVersion {
         match self {
             ProtocolVersion::V0_30_0 => semver::Version::new(0, 30, 0),
             ProtocolVersion::V0_30_1 => semver::Version::new(0, 30, 1),
+            ProtocolVersion::V0_31_0 => semver::Version::new(0, 31, 0),
         }
     }
 
