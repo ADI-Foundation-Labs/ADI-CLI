@@ -6,6 +6,7 @@ version = 4
 name = "adi-cli"
 version = "0.4.0"
 dependencies = [
+ "adi-docker",
  "adi-ecosystem",
  "adi-funding",
  "adi-state",

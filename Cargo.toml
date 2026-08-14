@@ -209,6 +209,7 @@ console = { workspace = true }
 async-trait = { workspace = true }
 
 # SDK packages
+adi-docker = { workspace = true }
 adi-toolkit = { workspace = true }
 adi-ecosystem = { workspace = true }
 adi-state = { workspace = true }
