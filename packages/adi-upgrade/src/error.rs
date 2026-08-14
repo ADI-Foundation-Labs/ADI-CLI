@@ -1,5 +1,7 @@
 //! Error types for upgrade operations.
 
+use std::path::Path;
+
 use thiserror::Error;
 
 /// Result type alias using UpgradeError.
@@ -31,4 +33,12 @@ pub enum UpgradeError {
     /// Governance transaction failed.
     #[error("Governance transaction failed: {0}")]
     GovernanceFailed(String),
+}
+
+/// A `map_err` closure that tags an [`std::io::Error`] with the operation and path.
+pub(crate) fn io_ctx<'a>(
+    op: &'static str,
+    path: &'a Path,
+) -> impl Fn(std::io::Error) -> UpgradeError + 'a {
+    move |e| UpgradeError::Config(format!("{op} {}: {e}", path.display()))
 }
