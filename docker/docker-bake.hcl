@@ -61,7 +61,7 @@ target "common" {
 }
 
 group "default" {
-  targets = ["toolkit-v0-30-0", "toolkit-v0-30-1"]
+  targets = ["toolkit-v0-30-0", "toolkit-v0-30-1", "toolkit-v0-31-0"]
 }
 
 target "toolkit-v0-30-0" {
@@ -84,5 +84,22 @@ target "toolkit-v0-30-1" {
     FOUNDRY_ZKSYNC_VERSION = "latest"
     GENESIS_COMMIT = "a8e6de4f4f260ab33bb2ac57c441c0bec4a8fb2c"
     ERA_CONTRACTS_TAG = "vb-v30.1-upgrade"
+  }
+}
+
+# v31 upgrade image. The v31 flow is driven by `protocol_ops` (built from the
+# era-contracts v31 branch) + a standard `anvil` for its L1 fork — zkstack is
+# unused here, so its zksync-era/genesis pins mirror v0.30.1.
+target "toolkit-v0-31-0" {
+  inherits = ["common"]
+  tags = ["${REGISTRY}/adi-toolkit:v0.31.0${TAG_SUFFIX}"]
+  args = {
+    ZKSYNC_ERA_COMMIT = "a48fd5f99a3fad0542b514fc9c508094230b35f4"
+    CONTRACTS_COMMIT = "9ddc915c85d1f44c79b5d55e160d384138ed5105"
+    FOUNDRY_ZKSYNC_VERSION = "latest"
+    GENESIS_COMMIT = "a8e6de4f4f260ab33bb2ac57c441c0bec4a8fb2c"
+    ERA_CONTRACTS_REPO = "https://github.com/StanislavBreadfulAI/era-contracts.git"
+    ERA_CONTRACTS_TAG = "stan/mainnet-v31-deploy"
+    BUILD_PROTOCOL_OPS = "1"
   }
 }

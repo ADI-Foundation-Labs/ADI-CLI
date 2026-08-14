@@ -7,7 +7,12 @@ ARG ZKSYNC_ERA_COMMIT
 ARG ZKSYNC_ERA_OS_INTEGRATION_COMMIT=""
 ARG CONTRACTS_COMMIT=""
 ARG ERA_CONTRACTS_TAG=""
+# era-contracts source repo. Default is upstream
+ARG ERA_CONTRACTS_REPO="https://github.com/matter-labs/era-contracts.git"
 ARG GENESIS_COMMIT
+# When set (v31 image), build the era-contracts `protocol_ops` CLI and install a
+# standard anvil — the v31 upgrade flow drives protocol_ops against an L1 fork.
+ARG BUILD_PROTOCOL_OPS=""
 # Fee-adjuster contracts source. SSH URL is used so the host SSH agent forwarded
 # via `--ssh default` (BuildKit) provides credentials — no tokens are baked into
 # image layers. Override REF to pin a branch/tag/commit.
@@ -71,7 +76,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
 RUN mkdir -p /build/era-contracts && \
     if [ -n "$ERA_CONTRACTS_TAG" ]; then \
     git clone --depth 1 --branch ${ERA_CONTRACTS_TAG} \
-        https://github.com/matter-labs/era-contracts.git /build/era-contracts && \
+        ${ERA_CONTRACTS_REPO} /build/era-contracts && \
     cd /build/era-contracts && \
     git submodule update --init --recursive --jobs "$(nproc || echo 4)"; \
     fi
@@ -91,6 +96,29 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get update && apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
 
+# v31: build protocol_ops (drives the upgrade) + a standard anvil (its L1 fork).
+# Binaries land in /build/extra-bins, copied to the runtime PATH below. The
+# `yarn install` primes the era-contracts deps so protocol_ops can `forge build`
+# l1-contracts at runtime — that dep set is the most likely image iteration
+# point when first building + running this target (T7).
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/cargo-target,sharing=locked \
+    --mount=type=cache,target=/usr/local/rustup,sharing=locked \
+    mkdir -p /build/extra-bins && \
+    if [ -n "$BUILD_PROTOCOL_OPS" ]; then \
+      export FOUNDRY_DIR=/opt/foundry-std && \
+      curl -L https://foundry.paradigm.xyz | bash && \
+      /opt/foundry-std/bin/foundryup && \
+      cp /opt/foundry-std/bin/anvil /build/extra-bins/anvil && \
+      npm install -g yarn && \
+      (cd /build/era-contracts && (yarn install --frozen-lockfile || yarn install) && \
+       yarn --cwd da-contracts build:foundry && yarn --cwd l1-contracts build:foundry) && \
+      cd /build/era-contracts/protocol-ops && \
+      cargo build --release && \
+      cp /cargo-target/release/protocol_ops /build/extra-bins/protocol_ops; \
+    fi
+
 # Clone repositories and setup SSH.
 RUN --mount=type=ssh \
     --mount=type=secret,id=gitlab_token,target=/run/secrets/gitlab_token,required=false \
@@ -99,33 +127,42 @@ RUN --mount=type=ssh \
     ssh-keyscan -t rsa,ed25519 gitlab.sre.ideasoft.io >> ~/.ssh/known_hosts 2>/dev/null || true; \
     git clone --depth 1 --branch ${FORGE_STD_TAG} \
         https://github.com/foundry-rs/forge-std.git /build/forge-std; \
-    if [ -s /run/secrets/gitlab_token ]; then \
-        TOKEN="$(cat /run/secrets/gitlab_token)"; \
-        FEE_CLONE_URL="https://oauth2:${TOKEN}@$(echo "$FEE_ADJUSTER_REPO" | sed 's#^git@##; s#:#/#')"; \
-        NOX_CLONE_URL="https://oauth2:${TOKEN}@$(echo "$NOX_TRANSACTION_FILTERER_REPO" | sed 's#^git@##; s#:#/#')"; \
-        echo "Cloning private repositories via HTTPS+token"; \
+    if [ -n "$BUILD_PROTOCOL_OPS" ]; then \
+        echo "v31 image: skipping private fee-adjuster/nox repos (unused by the v31 flow)"; \
+        mkdir -p /build/fee-adjuster-contracts /build/nox-transaction-filterer; \
     else \
-        FEE_CLONE_URL="$FEE_ADJUSTER_REPO"; \
-        NOX_CLONE_URL="$NOX_TRANSACTION_FILTERER_REPO"; \
-        echo "Cloning private repositories via SSH agent"; \
-    fi; \
-    git clone --depth 1 --branch ${FEE_ADJUSTER_REF} "$FEE_CLONE_URL" /build/fee-adjuster-contracts; \
-    git clone --depth 1 --branch ${NOX_TRANSACTION_FILTERER_REF} "$NOX_CLONE_URL" /build/nox-transaction-filterer; \
-    git -C /build/nox-transaction-filterer submodule update --init --recursive || echo "Submodule update failed"
+        if [ -s /run/secrets/gitlab_token ]; then \
+            TOKEN="$(cat /run/secrets/gitlab_token)"; \
+            FEE_CLONE_URL="https://oauth2:${TOKEN}@$(echo "$FEE_ADJUSTER_REPO" | sed 's#^git@##; s#:#/#')"; \
+            NOX_CLONE_URL="https://oauth2:${TOKEN}@$(echo "$NOX_TRANSACTION_FILTERER_REPO" | sed 's#^git@##; s#:#/#')"; \
+            echo "Cloning private repositories via HTTPS+token"; \
+        else \
+            FEE_CLONE_URL="$FEE_ADJUSTER_REPO"; \
+            NOX_CLONE_URL="$NOX_TRANSACTION_FILTERER_REPO"; \
+            echo "Cloning private repositories via SSH agent"; \
+        fi; \
+        git clone --depth 1 --branch ${FEE_ADJUSTER_REF} "$FEE_CLONE_URL" /build/fee-adjuster-contracts; \
+        git clone --depth 1 --branch ${NOX_TRANSACTION_FILTERER_REF} "$NOX_CLONE_URL" /build/nox-transaction-filterer; \
+        git -C /build/nox-transaction-filterer submodule update --init --recursive || echo "Submodule update failed"; \
+    fi
 
-# Build fee-adjuster-contracts.
+# Build fee-adjuster-contracts (skipped for the v31 image — repo not cloned).
 RUN --mount=type=ssh \
+    if [ -z "$BUILD_PROTOCOL_OPS" ]; then \
     cd /build/fee-adjuster-contracts && \
     npm ci --no-audit --no-fund && \
     rm -rf lib/forge-std && mkdir -p lib && cp -a /build/forge-std lib/forge-std && \
     forge build && \
-    rm -rf node_modules/.cache cache_forge
+    rm -rf node_modules/.cache cache_forge; \
+    fi
 
-# Build nox-transaction-filterer.
-RUN cd /build/nox-transaction-filterer && \
+# Build nox-transaction-filterer (skipped for the v31 image — repo not cloned).
+RUN if [ -z "$BUILD_PROTOCOL_OPS" ]; then \
+    cd /build/nox-transaction-filterer && \
     rm -rf lib/forge-std && mkdir -p lib && cp -a /build/forge-std lib/forge-std && \
     forge build && \
-    rm -rf cache_forge
+    rm -rf cache_forge; \
+    fi
 
 # Remove .git to save ~542MB (fake git in runtime handles zkstack)
 RUN find /build -type d -name .git -prune -exec rm -rf '{}' + && \
@@ -173,6 +210,10 @@ COPY --from=builder --chmod=a+w /build/zksync-era /deps/zksync-era
 
 # Copy era-contracts from builder (if it was cloned)
 COPY --from=builder --chmod=a+w /build/era-contracts /deps/era-contracts
+
+# Copy v31 binaries (protocol_ops + anvil). The dir is empty for non-v31
+# targets, so this is a no-op there.
+COPY --from=builder /build/extra-bins/ /usr/local/bin/
 
 # Copy fee-adjuster-contracts (sources + prebuilt out/) from builder.
 # Forge needs to write broadcast/ + cache files at runtime as a non-root user,

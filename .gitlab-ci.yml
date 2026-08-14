@@ -3,7 +3,7 @@ spec:
     build_target:
       default: default
       type: "string"
-      options: [default, toolkit-v0-30-0, toolkit-v0-30-1]
+      options: [default, toolkit-v0-30-0, toolkit-v0-30-1, toolkit-v0-31-0]
       description: "Select the build target (default builds all, or pick a specific version)"
 ---
 stages:
