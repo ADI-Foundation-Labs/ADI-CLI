@@ -11,7 +11,7 @@ use crate::error::{Result, WrapErr};
 use crate::ui;
 
 /// Default Vault base URL.
-const DEFAULT_VAULT_URL: &str = "https://vault.dev.internal.adifoundation.ai";
+const DEFAULT_VAULT_URL: &str = "https://vault.infra.adifoundation.ai";
 
 /// Upload server parameters to HashiCorp Vault.
 pub async fn run(
