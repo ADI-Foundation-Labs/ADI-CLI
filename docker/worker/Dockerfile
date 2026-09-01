@@ -6,12 +6,14 @@ FROM rust:1.93-slim-bookworm AS builder
 ARG ZKSYNC_ERA_COMMIT
 ARG ZKSYNC_ERA_OS_INTEGRATION_COMMIT=""
 ARG CONTRACTS_COMMIT=""
+# era-contracts checkout: ERA_CONTRACTS_COMMIT pins a full 40-hex commit SHA
+# (fetched directly, so it does not have to be a branch tip); ERA_CONTRACTS_TAG
+# clones the head of a branch or tag. The commit wins when both are set.
 ARG ERA_CONTRACTS_TAG=""
-# era-contracts source repo. Default is upstream
-ARG ERA_CONTRACTS_REPO="https://github.com/matter-labs/era-contracts.git"
+ARG ERA_CONTRACTS_COMMIT=""
 ARG GENESIS_COMMIT
 # When set (v31 image), build the era-contracts `protocol_ops` CLI and install a
-# standard anvil — the v31 upgrade flow drives protocol_ops against an L1 fork.
+# standard anvil: the v31 upgrade flow drives protocol_ops against an L1 fork.
 ARG BUILD_PROTOCOL_OPS=""
 # Fee-adjuster contracts source. SSH URL is used so the host SSH agent forwarded
 # via `--ssh default` (BuildKit) provides credentials — no tokens are baked into
@@ -74,11 +76,17 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
 
 # Clone era-contracts (conditional) - needed for upgrade scripts
 RUN mkdir -p /build/era-contracts && \
-    if [ -n "$ERA_CONTRACTS_TAG" ]; then \
+    if [ -n "$ERA_CONTRACTS_COMMIT" ]; then \
+    git -C /build/era-contracts init -q && \
+    git -C /build/era-contracts remote add origin https://github.com/matter-labs/era-contracts.git && \
+    git -C /build/era-contracts fetch --depth 1 origin "$ERA_CONTRACTS_COMMIT" && \
+    git -C /build/era-contracts checkout -q FETCH_HEAD; \
+    elif [ -n "$ERA_CONTRACTS_TAG" ]; then \
     git clone --depth 1 --branch ${ERA_CONTRACTS_TAG} \
-        ${ERA_CONTRACTS_REPO} /build/era-contracts && \
-    cd /build/era-contracts && \
-    git submodule update --init --recursive --jobs "$(nproc || echo 4)"; \
+        https://github.com/matter-labs/era-contracts.git /build/era-contracts; \
+    fi && \
+    if [ -e /build/era-contracts/.git ]; then \
+    git -C /build/era-contracts submodule update --init --recursive --jobs "$(nproc || echo 4)"; \
     fi
 
 # Download genesis.json
@@ -96,11 +104,10 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get update && apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-# v31: build protocol_ops (drives the upgrade) + a standard anvil (its L1 fork).
-# Binaries land in /build/extra-bins, copied to the runtime PATH below. The
-# `yarn install` primes the era-contracts deps so protocol_ops can `forge build`
-# l1-contracts at runtime — that dep set is the most likely image iteration
-# point when first building + running this target (T7).
+# v31: build protocol_ops (drives the upgrade) and a standard anvil (its L1
+# fork). Binaries land in /build/extra-bins and are copied onto the runtime
+# PATH below. The yarn install primes the era-contracts deps so protocol_ops can
+# forge build l1-contracts at runtime.
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,target=/cargo-target,sharing=locked \
@@ -127,42 +134,33 @@ RUN --mount=type=ssh \
     ssh-keyscan -t rsa,ed25519 gitlab.sre.ideasoft.io >> ~/.ssh/known_hosts 2>/dev/null || true; \
     git clone --depth 1 --branch ${FORGE_STD_TAG} \
         https://github.com/foundry-rs/forge-std.git /build/forge-std; \
-    if [ -n "$BUILD_PROTOCOL_OPS" ]; then \
-        echo "v31 image: skipping private fee-adjuster/nox repos (unused by the v31 flow)"; \
-        mkdir -p /build/fee-adjuster-contracts /build/nox-transaction-filterer; \
+    if [ -s /run/secrets/gitlab_token ]; then \
+        TOKEN="$(cat /run/secrets/gitlab_token)"; \
+        FEE_CLONE_URL="https://oauth2:${TOKEN}@$(echo "$FEE_ADJUSTER_REPO" | sed 's#^git@##; s#:#/#')"; \
+        NOX_CLONE_URL="https://oauth2:${TOKEN}@$(echo "$NOX_TRANSACTION_FILTERER_REPO" | sed 's#^git@##; s#:#/#')"; \
+        echo "Cloning private repositories via HTTPS+token"; \
     else \
-        if [ -s /run/secrets/gitlab_token ]; then \
-            TOKEN="$(cat /run/secrets/gitlab_token)"; \
-            FEE_CLONE_URL="https://oauth2:${TOKEN}@$(echo "$FEE_ADJUSTER_REPO" | sed 's#^git@##; s#:#/#')"; \
-            NOX_CLONE_URL="https://oauth2:${TOKEN}@$(echo "$NOX_TRANSACTION_FILTERER_REPO" | sed 's#^git@##; s#:#/#')"; \
-            echo "Cloning private repositories via HTTPS+token"; \
-        else \
-            FEE_CLONE_URL="$FEE_ADJUSTER_REPO"; \
-            NOX_CLONE_URL="$NOX_TRANSACTION_FILTERER_REPO"; \
-            echo "Cloning private repositories via SSH agent"; \
-        fi; \
-        git clone --depth 1 --branch ${FEE_ADJUSTER_REF} "$FEE_CLONE_URL" /build/fee-adjuster-contracts; \
-        git clone --depth 1 --branch ${NOX_TRANSACTION_FILTERER_REF} "$NOX_CLONE_URL" /build/nox-transaction-filterer; \
-        git -C /build/nox-transaction-filterer submodule update --init --recursive || echo "Submodule update failed"; \
-    fi
+        FEE_CLONE_URL="$FEE_ADJUSTER_REPO"; \
+        NOX_CLONE_URL="$NOX_TRANSACTION_FILTERER_REPO"; \
+        echo "Cloning private repositories via SSH agent"; \
+    fi; \
+    git clone --depth 1 --branch ${FEE_ADJUSTER_REF} "$FEE_CLONE_URL" /build/fee-adjuster-contracts; \
+    git clone --depth 1 --branch ${NOX_TRANSACTION_FILTERER_REF} "$NOX_CLONE_URL" /build/nox-transaction-filterer; \
+    git -C /build/nox-transaction-filterer submodule update --init --recursive || echo "Submodule update failed"
 
-# Build fee-adjuster-contracts (skipped for the v31 image — repo not cloned).
+# Build fee-adjuster-contracts.
 RUN --mount=type=ssh \
-    if [ -z "$BUILD_PROTOCOL_OPS" ]; then \
     cd /build/fee-adjuster-contracts && \
     npm ci --no-audit --no-fund && \
     rm -rf lib/forge-std && mkdir -p lib && cp -a /build/forge-std lib/forge-std && \
     forge build && \
-    rm -rf node_modules/.cache cache_forge; \
-    fi
+    rm -rf node_modules/.cache cache_forge
 
-# Build nox-transaction-filterer (skipped for the v31 image — repo not cloned).
-RUN if [ -z "$BUILD_PROTOCOL_OPS" ]; then \
-    cd /build/nox-transaction-filterer && \
+# Build nox-transaction-filterer.
+RUN cd /build/nox-transaction-filterer && \
     rm -rf lib/forge-std && mkdir -p lib && cp -a /build/forge-std lib/forge-std && \
     forge build && \
-    rm -rf cache_forge; \
-    fi
+    rm -rf cache_forge
 
 # Remove .git to save ~542MB (fake git in runtime handles zkstack)
 RUN find /build -type d -name .git -prune -exec rm -rf '{}' + && \
