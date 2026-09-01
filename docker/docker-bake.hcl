@@ -61,7 +61,7 @@ target "common" {
 }
 
 group "default" {
-  targets = ["toolkit-v0-30-0", "toolkit-v0-30-1"]
+  targets = ["toolkit-v0-30-0", "toolkit-v0-30-1", "toolkit-v0-31-0"]
 }
 
 target "toolkit-v0-30-0" {
@@ -84,5 +84,24 @@ target "toolkit-v0-30-1" {
     FOUNDRY_ZKSYNC_VERSION = "latest"
     GENESIS_COMMIT = "a8e6de4f4f260ab33bb2ac57c441c0bec4a8fb2c"
     ERA_CONTRACTS_TAG = "vb-v30.1-upgrade"
+  }
+}
+
+# v31 upgrade image. The v31 flow is driven by protocol_ops (built from
+# era-contracts) plus a standard anvil for its L1 fork; zkstack is unused by the
+# upgrade, so its zksync-era/genesis pins mirror v0.30.1. era-contracts is
+# pinned by commit on upstream matter-labs/era-contracts, branch
+# kl/testnet-v31-calldata (PR #2268, the squash of the mainnet-v31-deploy fork
+# branch, identical tree): no tag exists and the branch is unprotected.
+target "toolkit-v0-31-0" {
+  inherits = ["common"]
+  tags = ["${REGISTRY}/adi-toolkit:v0.31.0${TAG_SUFFIX}"]
+  args = {
+    ZKSYNC_ERA_COMMIT = "a48fd5f99a3fad0542b514fc9c508094230b35f4"
+    CONTRACTS_COMMIT = "9ddc915c85d1f44c79b5d55e160d384138ed5105"
+    FOUNDRY_ZKSYNC_VERSION = "latest"
+    GENESIS_COMMIT = "a8e6de4f4f260ab33bb2ac57c441c0bec4a8fb2c"
+    ERA_CONTRACTS_COMMIT = "48177e9b2a6251e3dd555e1bd353f3cf2b9aa6d0"
+    BUILD_PROTOCOL_OPS = "1"
   }
 }

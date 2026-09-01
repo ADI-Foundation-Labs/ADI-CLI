@@ -6,8 +6,15 @@ FROM rust:1.93-slim-bookworm AS builder
 ARG ZKSYNC_ERA_COMMIT
 ARG ZKSYNC_ERA_OS_INTEGRATION_COMMIT=""
 ARG CONTRACTS_COMMIT=""
+# era-contracts checkout: ERA_CONTRACTS_COMMIT pins a full 40-hex commit SHA
+# (fetched directly, so it does not have to be a branch tip); ERA_CONTRACTS_TAG
+# clones the head of a branch or tag. The commit wins when both are set.
 ARG ERA_CONTRACTS_TAG=""
+ARG ERA_CONTRACTS_COMMIT=""
 ARG GENESIS_COMMIT
+# When set (v31 image), build the era-contracts `protocol_ops` CLI and install a
+# standard anvil: the v31 upgrade flow drives protocol_ops against an L1 fork.
+ARG BUILD_PROTOCOL_OPS=""
 # Fee-adjuster contracts source. SSH URL is used so the host SSH agent forwarded
 # via `--ssh default` (BuildKit) provides credentials — no tokens are baked into
 # image layers. Override REF to pin a branch/tag/commit.
@@ -69,11 +76,17 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
 
 # Clone era-contracts (conditional) - needed for upgrade scripts
 RUN mkdir -p /build/era-contracts && \
-    if [ -n "$ERA_CONTRACTS_TAG" ]; then \
+    if [ -n "$ERA_CONTRACTS_COMMIT" ]; then \
+    git -C /build/era-contracts init -q && \
+    git -C /build/era-contracts remote add origin https://github.com/matter-labs/era-contracts.git && \
+    git -C /build/era-contracts fetch --depth 1 origin "$ERA_CONTRACTS_COMMIT" && \
+    git -C /build/era-contracts checkout -q FETCH_HEAD; \
+    elif [ -n "$ERA_CONTRACTS_TAG" ]; then \
     git clone --depth 1 --branch ${ERA_CONTRACTS_TAG} \
-        https://github.com/matter-labs/era-contracts.git /build/era-contracts && \
-    cd /build/era-contracts && \
-    git submodule update --init --recursive --jobs "$(nproc || echo 4)"; \
+        https://github.com/matter-labs/era-contracts.git /build/era-contracts; \
+    fi && \
+    if [ -e /build/era-contracts/.git ]; then \
+    git -C /build/era-contracts submodule update --init --recursive --jobs "$(nproc || echo 4)"; \
     fi
 
 # Download genesis.json
@@ -90,6 +103,28 @@ RUN foundryup-zksync
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get update && apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
+
+# v31: build protocol_ops (drives the upgrade) and a standard anvil (its L1
+# fork). Binaries land in /build/extra-bins and are copied onto the runtime
+# PATH below. The yarn install primes the era-contracts deps so protocol_ops can
+# forge build l1-contracts at runtime.
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/cargo-target,sharing=locked \
+    --mount=type=cache,target=/usr/local/rustup,sharing=locked \
+    mkdir -p /build/extra-bins && \
+    if [ -n "$BUILD_PROTOCOL_OPS" ]; then \
+      export FOUNDRY_DIR=/opt/foundry-std && \
+      curl -L https://foundry.paradigm.xyz | bash && \
+      /opt/foundry-std/bin/foundryup && \
+      cp /opt/foundry-std/bin/anvil /build/extra-bins/anvil && \
+      npm install -g yarn && \
+      (cd /build/era-contracts && (yarn install --frozen-lockfile || yarn install) && \
+       yarn --cwd da-contracts build:foundry && yarn --cwd l1-contracts build:foundry) && \
+      cd /build/era-contracts/protocol-ops && \
+      cargo build --release && \
+      cp /cargo-target/release/protocol_ops /build/extra-bins/protocol_ops; \
+    fi
 
 # Clone repositories and setup SSH.
 RUN --mount=type=ssh \
@@ -173,6 +208,10 @@ COPY --from=builder --chmod=a+w /build/zksync-era /deps/zksync-era
 
 # Copy era-contracts from builder (if it was cloned)
 COPY --from=builder --chmod=a+w /build/era-contracts /deps/era-contracts
+
+# Copy v31 binaries (protocol_ops + anvil). The dir is empty for non-v31
+# targets, so this is a no-op there.
+COPY --from=builder /build/extra-bins/ /usr/local/bin/
 
 # Copy fee-adjuster-contracts (sources + prebuilt out/) from builder.
 # Forge needs to write broadcast/ + cache files at runtime as a non-root user,
