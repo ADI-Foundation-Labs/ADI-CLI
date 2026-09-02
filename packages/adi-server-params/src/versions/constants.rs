@@ -1,7 +1,7 @@
 //! Static constants for server parameter values.
 
 /// Default RUST_LOG value for the ZkSync OS server.
-pub const RUST_LOG_VALUE: &str = "info,zksync_os_server=info,zksync_os_sequencer=info,zksync_os_merkle_tree=info,zksync_os_priority_tree=info";
+pub const RUST_LOG_VALUE: &str = "info,zksync_os_server=info,zksync_os_sequencer=info,zksync_os_merkle_tree=info,zksync_os_priority_tree=info,zksync_os_server::prover_api=info,discv5::service=error";
 
 /// RocksDB path inside the container.
 pub const ROCKS_DB_PATH: &str = "/chain/db/node1";
@@ -17,9 +17,6 @@ pub const PROVER_API_ADDR: &str = "0.0.0.0:3320";
 
 /// Prover object store base path.
 pub const OBJECT_STORE_BASE_PATH: &str = "/chain/db/shared";
-
-/// Application binary unpack path.
-pub const APP_BIN_UNPACK_PATH: &str = "/chain/db/node1/app_bins";
 
 /// Maximum in-flight blocks for prover input generator.
 pub const MAX_IN_FLIGHT_BLOCKS: &str = "30";
@@ -96,6 +93,14 @@ pub const OBSERVABILITY_LOG_FORMAT: &str = "terminal";
 
 /// Observability log use-color flag.
 pub const OBSERVABILITY_LOG_USE_COLOR: &str = "true";
+
+/// Number of L1 block confirmations the L1 watcher waits for before
+/// treating observed L1 state as final.
+pub const L1_WATCHER_CONFIRMATIONS: &str = "1";
+
+/// Number of L1 block confirmations required before the L1 sender treats a
+/// submitted transaction as confirmed.
+pub const L1_SENDER_REQUIRED_CONFIRMATIONS: &str = "1";
 
 /// ETH placeholder address used in the forced-prices map.
 pub const ETH_FORCED_PRICE_ADDRESS: &str = "0x0000000000000000000000000000000000000001";
