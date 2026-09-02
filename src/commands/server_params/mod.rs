@@ -1,12 +1,10 @@
 //! Display server parameters for Docker Compose configuration.
 
-mod constants;
-mod params;
-
 use std::collections::HashMap;
 
+pub use adi_server_params::ServerVersion;
+use adi_server_params::{display_value, extract, ServerParam, ServerParamsInput};
 use clap::Args;
-use params::{display_value, ServerParam, ServerParamsInput};
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 
@@ -27,6 +25,10 @@ pub struct ServerParamsArgs {
     /// Chain name (falls back to config if not provided).
     #[arg(long)]
     pub chain: Option<String>,
+
+    /// ZkSync OS server version to generate parameters for.
+    #[arg(long, value_enum, default_value_t = ServerVersion::V0211)]
+    pub server_version: ServerVersion,
 
     /// Output as JSON instead of formatted text.
     #[arg(long)]
@@ -59,6 +61,10 @@ pub async fn run(args: &ServerParamsArgs, context: &Context) -> Result<()> {
     if !args.json {
         ui::info(format!("Ecosystem: {}", ui::green(&ecosystem_name)))?;
         ui::info(format!("Chain: {}", ui::green(&chain_name)))?;
+        ui::info(format!(
+            "Server Version: {}",
+            ui::green(&args.server_version.to_string())
+        ))?;
     }
 
     let state_manager = create_state_manager_with_context(&ecosystem_name, context)?;
@@ -157,8 +163,9 @@ pub async fn run(args: &ServerParamsArgs, context: &Context) -> Result<()> {
         genesis_base64,
         fee_collector_address,
         base_token_address,
+        server_version: args.server_version,
     };
-    let params_list = params::extract(&input);
+    let params_list = extract(&input);
 
     if args.json {
         let json_output: HashMap<&str, Option<serde_json::Value>> = params_list

@@ -106,24 +106,26 @@ See `commands/version.rs` (simple) or `commands/init/` (with args) for patterns.
 
 ### Workspace Packages
 
-The CLI is built from 6 workspace packages with clear separation of concerns:
+The CLI is built from workspace packages with clear separation of concerns, including:
 
-| Package         | Description                                        |
-| --------------- | -------------------------------------------------- |
-| `adi-docker`    | Pure Docker management SDK (bollard wrapper)       |
-| `adi-toolkit`   | High-level toolkit container orchestration         |
-| `adi-ecosystem` | Domain logic for ZkSync ecosystem management       |
-| `adi-state`     | Abstract state management with filesystem backend  |
-| `adi-funding`   | Wallet funding SDK with plan-execute pattern       |
-| `adi-types`     | Shared domain types (wallets, contracts, metadata) |
+| Package             | Description                                        |
+| ------------------- | --------------------------------------------------- |
+| `adi-docker`        | Pure Docker management SDK (bollard wrapper)       |
+| `adi-toolkit`       | High-level toolkit container orchestration         |
+| `adi-ecosystem`     | Domain logic for ZkSync ecosystem management       |
+| `adi-state`         | Abstract state management with filesystem backend  |
+| `adi-funding`       | Wallet funding SDK with plan-execute pattern       |
+| `adi-server-params` | Versioned ZkSync OS server parameter generation    |
+| `adi-types`         | Shared domain types (wallets, contracts, metadata) |
 
 Package dependency graph:
 ```
 adi-cli (binary)
-├── adi-toolkit ─────► adi-docker
-├── adi-ecosystem ───► adi-types
-├── adi-state ───────► adi-types
-├── adi-funding ─────► adi-types
+├── adi-toolkit ─────────► adi-docker
+├── adi-ecosystem ───────► adi-types
+├── adi-state ───────────► adi-types
+├── adi-funding ─────────► adi-types
+├── adi-server-params ───► adi-types
 └── adi-types (no internal deps)
 ```
 
