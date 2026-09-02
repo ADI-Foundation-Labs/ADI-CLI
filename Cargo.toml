@@ -188,6 +188,7 @@ adi-state = { path = "packages/adi-state" }
 adi-funding = { path = "packages/adi-funding" }
 adi-upgrade = { path = "packages/adi-upgrade" }
 adi-vault = { path = "packages/adi-vault" }
+adi-server-params = { path = "packages/adi-server-params" }
 
 [lints]
 workspace = true
@@ -217,6 +218,7 @@ adi-funding = { workspace = true }
 adi-types = { workspace = true }
 adi-upgrade = { workspace = true }
 adi-vault = { workspace = true }
+adi-server-params = { workspace = true }
 
 # EVM types
 alloy-primitives = { workspace = true }

@@ -217,11 +217,14 @@ adi server-params --chain my-chain
 # JSON output (includes base64 genesis)
 adi server-params --chain my-chain --json
 
+# Specific server version (defaults to v0.21.1)
+adi server-params --chain my-chain --server-version v0.21.1
+
 # Upload to HashiCorp Vault
 adi server-params --chain my-chain --upload
 ```
 
-Outputs Docker Compose environment variables (RPC URLs, operator keys, prover settings, fee overrides) for running a ZkSync server node. Use `--json` for machine-readable output. Use `--upload` to push parameters directly to HashiCorp Vault (prompts for token and path interactively, or pass `--vault-token` and `--vault-path`).
+Outputs Docker Compose environment variables (RPC URLs, operator keys, prover settings, fee overrides) for running a ZkSync server node. Use `--server-version` to select the ZkSync OS server version to generate parameters for (defaults to `v0.21.1`; an unrecognized version is rejected with an error listing the supported values). Use `--json` for machine-readable output. Use `--upload` to push parameters directly to HashiCorp Vault (prompts for token and path interactively, or pass `--vault-token` and `--vault-path`).
 
 ### refund — Return funds from ecosystem wallets
 

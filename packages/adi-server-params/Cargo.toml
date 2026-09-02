@@ -1,0 +1,23 @@
+[package]
+name = "adi-server-params"
+version.workspace = true
+edition.workspace = true
+description = "Versioned ZkSync OS server parameter generation"
+
+[lib]
+name = "adi_server_params"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+adi-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+strum = { workspace = true }
+clap = { workspace = true }
+alloy-primitives = { workspace = true }
+
+[dev-dependencies]
+serde_yaml = { workspace = true }
