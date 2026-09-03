@@ -8,6 +8,9 @@ use alloy_rpc_types::TransactionRequest;
 
 use crate::error::{Result, UpgradeError};
 use crate::signing::build_signing_provider;
+use tokio::time::{timeout, Duration};
+
+use adi_types::TX_TIMEOUT_SECONDS;
 
 /// Result of governance execution.
 #[derive(Debug)]
@@ -50,9 +53,10 @@ pub async fn execute_governance<P: Provider + Clone>(
             UpgradeError::GovernanceFailed(format!("scheduleTransparent tx failed: {e}"))
         })?;
 
-    let schedule_receipt = schedule_pending.get_receipt().await.map_err(|e| {
-        UpgradeError::GovernanceFailed(format!("scheduleTransparent receipt failed: {e}"))
-    })?;
+    let schedule_receipt = timeout(Duration::from_secs(TX_TIMEOUT_SECONDS), schedule_pending.get_receipt())
+        .await
+        .map_err(|_| UpgradeError::GovernanceFailed("scheduleTransparent not mined within timeout window".to_string()))?
+        .map_err(|e| UpgradeError::GovernanceFailed(format!("scheduleTransparent receipt failed: {e}")))?;
 
     let schedule_tx_hash = schedule_receipt.transaction_hash;
     log::info!("scheduleTransparent tx: {}", schedule_tx_hash);
@@ -69,9 +73,9 @@ pub async fn execute_governance<P: Provider + Clone>(
         .await
         .map_err(|e| UpgradeError::GovernanceFailed(format!("execute tx failed: {e}")))?;
 
-    let execute_receipt = execute_pending
-        .get_receipt()
+    let execute_receipt = timeout(Duration::from_secs(TX_TIMEOUT_SECONDS), execute_pending.get_receipt())
         .await
+        .map_err(|_| UpgradeError::GovernanceFailed("execute not mined within timeout window".to_string()))?
         .map_err(|e| UpgradeError::GovernanceFailed(format!("execute receipt failed: {e}")))?;
 
     let execute_tx_hash = execute_receipt.transaction_hash;

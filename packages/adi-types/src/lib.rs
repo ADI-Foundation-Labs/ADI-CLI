@@ -91,4 +91,4 @@ pub use operators::Operators;
 pub use logger::{LogCrateLogger, Logger, NoopLogger};
 
 // Re-export URL utilities
-pub use url::{is_localhost_rpc, normalize_rpc_url};
+pub use url::{is_localhost_rpc, normalize_rpc_url, TX_TIMEOUT_SECONDS};

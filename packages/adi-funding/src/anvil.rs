@@ -10,13 +10,14 @@ use crate::error::{FundingError, Result};
 use crate::events::{FundingEvent, FundingEventHandler, NoOpEventHandler};
 use crate::provider::FundingProvider;
 use crate::signer::create_signer;
-use adi_types::{Wallet, Wallets};
+use adi_types::{TX_TIMEOUT_SECONDS, Wallet, Wallets};
 use alloy_network::{EthereumWallet, TransactionBuilder};
 use alloy_primitives::{Address, B256, U256};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::eth::TransactionRequest;
 use secrecy::SecretString;
 use std::sync::Arc;
+use tokio::time::{timeout, Duration};
 
 /// Anvil default private key (account 0).
 /// Address: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
@@ -266,14 +267,16 @@ impl AnvilFunder {
 
             let tx_hash = *pending.tx_hash();
 
-            let receipt =
-                pending
-                    .get_receipt()
-                    .await
-                    .map_err(|e| FundingError::TransactionFailed {
-                        to: target.address,
-                        reason: e.to_string(),
-                    })?;
+            let receipt = timeout(Duration::from_secs(TX_TIMEOUT_SECONDS), pending.get_receipt())
+                .await
+                .map_err(|_| FundingError::TransactionFailed {
+                    to: target.address,
+                    reason: "Transaction not mined within timeout window".to_string(),
+                })?
+                .map_err(|e| FundingError::TransactionFailed {
+                    to: target.address,
+                    reason: e.to_string(),
+                })?;
 
             if !receipt.status() {
                 return Err(FundingError::TransactionReverted(format!(

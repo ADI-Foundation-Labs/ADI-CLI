@@ -182,6 +182,7 @@ version = "0.4.0"
 dependencies = [
  "adi-state",
  "adi-toolkit",
+ "adi-types",
  "alloy-contract",
  "alloy-network",
  "alloy-primitives",

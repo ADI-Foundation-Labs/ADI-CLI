@@ -6,8 +6,7 @@
 
 use crate::error::{EcosystemError, Result};
 use crate::signer::create_signer;
-use adi_types::normalize_rpc_url;
-use adi_types::Logger;
+use adi_types::{normalize_rpc_url, Logger, TX_TIMEOUT_SECONDS};
 use alloy_network::{EthereumWallet, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_provider::{Provider, ProviderBuilder};
@@ -15,6 +14,7 @@ use alloy_rpc_types::TransactionRequest;
 use alloy_sol_types::{sol, SolCall};
 use console::Style;
 use secrecy::SecretString;
+use tokio::time::{timeout, Duration};
 
 sol! {
     /// Register the transaction filterer on the Diamond proxy.
@@ -145,12 +145,20 @@ pub async fn configure_transaction_filterer(
 
     let tx_hash = *pending.tx_hash();
 
-    let receipt = pending.get_receipt().await.map_err(|e| {
-        spinner.error(format!("Confirmation failed: {}", e));
-        EcosystemError::TransactionFailed {
-            reason: format!("Failed to confirm setTransactionFilterer tx: {}", e),
-        }
-    })?;
+    let receipt = timeout(Duration::from_secs(TX_TIMEOUT_SECONDS), pending.get_receipt())
+        .await
+        .map_err(|_| {
+            spinner.error("Transaction not mined within timeout window");
+            EcosystemError::TransactionFailed {
+                reason: "Transaction not mined within timeout window: setTransactionFilterer".to_string(),
+            }
+        })?
+        .map_err(|e| {
+            spinner.error(format!("Confirmation failed: {}", e));
+            EcosystemError::TransactionFailed {
+                reason: format!("Failed to confirm setTransactionFilterer tx: {}", e),
+            }
+        })?;
 
     if !receipt.status() {
         spinner.error("Transaction reverted");

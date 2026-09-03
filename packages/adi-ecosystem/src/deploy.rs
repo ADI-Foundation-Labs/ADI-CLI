@@ -9,13 +9,14 @@ use crate::signer::create_signer;
 use crate::validator::{
     build_add_validator_roles_calldata, build_remove_validator_roles_calldata, ValidatorRoles,
 };
-use adi_types::{normalize_rpc_url, ChainContracts, Logger, Operators};
+use adi_types::{normalize_rpc_url, ChainContracts, Logger, Operators, TX_TIMEOUT_SECONDS};
 use alloy_network::{EthereumWallet, TransactionBuilder};
 use alloy_primitives::{Address, B256};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
 use console::Style;
 use secrecy::SecretString;
+use tokio::time::{timeout, Duration};
 
 /// Contract addresses required for validator role configuration.
 #[derive(Debug, Clone)]
@@ -369,15 +370,26 @@ async fn execute_validator_role_txs(params: ValidatorRoleTxParams<'_>) -> Result
             .logger
             .debug(&format!("Transaction sent: {}", tx_hash));
 
-        let receipt = pending.get_receipt().await.map_err(|e| {
-            spinner.error(format!("Confirmation failed: {}", e));
-            EcosystemError::TransactionFailed {
-                reason: format!(
-                    "Failed to confirm {} validator role tx: {}",
-                    assignment.name, e
-                ),
-            }
-        })?;
+        let receipt = timeout(Duration::from_secs(TX_TIMEOUT_SECONDS), pending.get_receipt())
+            .await
+            .map_err(|_| {
+                spinner.error("Transaction not mined within timeout window");
+                EcosystemError::TransactionFailed {
+                    reason: format!(
+                        "Transaction not mined within timeout window: {} validator role tx",
+                        assignment.name
+                    ),
+                }
+            })?
+            .map_err(|e| {
+                spinner.error(format!("Confirmation failed: {}", e));
+                EcosystemError::TransactionFailed {
+                    reason: format!(
+                        "Failed to confirm {} validator role tx: {}",
+                        assignment.name, e
+                    ),
+                }
+            })?;
 
         if !receipt.status() {
             spinner.error("Transaction reverted");

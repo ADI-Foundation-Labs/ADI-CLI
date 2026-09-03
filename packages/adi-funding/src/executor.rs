@@ -13,6 +13,9 @@ use alloy_rpc_types::eth::TransactionRequest;
 use alloy_signer_local::PrivateKeySigner;
 use secrecy::SecretString;
 use std::sync::Arc;
+use tokio::time::{timeout, Duration};
+
+use adi_types::TX_TIMEOUT_SECONDS;
 
 /// Result of executing a funding plan.
 #[derive(Clone, Debug)]
@@ -225,10 +228,13 @@ impl FundingExecutor {
             })
             .await;
 
-        // Wait for confirmation
-        let receipt = pending
-            .get_receipt()
+        // Wait for confirmation with timeout
+        let receipt = timeout(Duration::from_secs(TX_TIMEOUT_SECONDS), pending.get_receipt())
             .await
+            .map_err(|_| FundingError::TransactionFailed {
+                to: transfer.to,
+                reason: "Transaction not mined within timeout window".to_string(),
+            })?
             .map_err(|e| FundingError::TransactionFailed {
                 to: transfer.to,
                 reason: e.to_string(),

@@ -2,6 +2,14 @@
 //!
 //! Provides helpers for normalizing URLs between Docker container and host contexts.
 
+/// Default timeout in seconds for waiting on a transaction receipt.
+///
+/// If a transaction is not mined within this window, the CLI returns a
+/// clear error instead of hanging indefinitely. 120 seconds is generous
+/// for testnet/mainnet; a tx stuck longer likely has a nonce gap, gas
+/// issue, or rate-limit problem that no amount of waiting will fix.
+pub const TX_TIMEOUT_SECONDS: u64 = 120;
+
 /// Check if an RPC URL points to localhost.
 ///
 /// Returns `true` for URLs containing:

@@ -9,7 +9,6 @@ use adi_funding::{normalize_rpc_url, FundingProvider};
 use adi_state::import_ecosystem_state;
 use adi_toolkit::{ProtocolVersion, ToolkitRunner};
 use std::sync::Arc;
-use tempfile::TempDir;
 
 use super::InitArgs;
 use crate::commands::chain_ops;
@@ -29,12 +28,12 @@ use crate::ui;
 /// 1. Validates the protocol version
 /// 2. Merges CLI args with config defaults
 /// 3. Checks if ecosystem already exists (prompts for confirmation to reinitialize)
-/// 4. Creates a temporary directory for zkstack output
-/// 5. Runs zkstack ecosystem create pointing to temp dir
-/// 6. Verifies ecosystem was created in temp dir
-/// 7. Imports state from temp dir through StateManager to configured backend
+/// 4. Creates a workspace directory under ecosystem state dir for zkstack output
+/// 5. Runs zkstack ecosystem create pointing to workspace dir
+/// 6. Verifies ecosystem was created in workspace dir
+/// 7. Imports state from workspace dir through StateManager to configured backend
 /// 8. Validates imported state
-/// 9. TempDir is automatically cleaned up on drop
+/// 9. Cleans up workspace directory
 pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     ui::intro("ADI Init")?;
     context.logger().debug("Starting ecosystem initialization");
@@ -265,22 +264,26 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
         .logger()
         .debug(&format!("zkstack args: {:?}", zkstack_args));
 
-    // 5. Create temp directory for zkstack output
-    let temp_dir = TempDir::new().wrap_err("Failed to create temporary directory")?;
-    let temp_path = temp_dir
-        .path()
-        .canonicalize()
-        .wrap_err("Failed to resolve temp directory to absolute path")?;
+    // 5. Create workspace directory inside ecosystem state dir
+    // Using a path under $HOME/state/ avoids VirtioFS race conditions on
+    // Colima and other VM engines that only monitor $HOME by default.
+    let workspace_dir = ecosystem_path.join(".tmp").join("init");
+    tokio::fs::create_dir_all(&workspace_dir)
+        .await
+        .wrap_err("Failed to create workspace directory")?;
+    let workspace_path = tokio::fs::canonicalize(&workspace_dir)
+        .await
+        .wrap_err("Failed to resolve workspace directory to absolute path")?;
     context
         .logger()
-        .debug(&format!("Using temp directory: {}", temp_path.display()));
+        .debug(&format!("Using workspace directory: {}", workspace_path.display()));
 
     // 6. Create state directory
     tokio::fs::create_dir_all(state_dir)
         .await
         .wrap_err("Failed to create state directory")?;
 
-    // 7. Create toolkit runner and execute pointing to temp dir
+    // 7. Create toolkit runner and execute pointing to workspace dir
     ui::info("Connecting to Docker...")?;
     let runner = ToolkitRunner::with_config_and_logger(
         context.toolkit_config(),
@@ -293,7 +296,7 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     let args_refs: Vec<&str> = zkstack_args.iter().map(String::as_str).collect();
 
     let exit_code = runner
-        .run_zkstack(&args_refs, &temp_path, state_dir, &version.to_semver())
+        .run_zkstack(&args_refs, &workspace_path, state_dir, &version.to_semver())
         .await
         .wrap_err("Failed to run zkstack ecosystem create")?;
 
@@ -304,12 +307,12 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
         ));
     }
 
-    // 8. Verify ecosystem was created in temp dir
+    // 8. Verify ecosystem was created in workspace dir
     ui::info("Verifying ecosystem files...")?;
-    verify_ecosystem_created(&temp_path, &config, context.logger().as_ref())
+    verify_ecosystem_created(&workspace_path, &config, context.logger().as_ref())
         .wrap_err("Ecosystem verification failed")?;
 
-    // 9. Import state from temp dir through StateManager
+    // 9. Import state from workspace dir through StateManager
     // zkstack normalizes ecosystem names (- → _), so we need to use the same normalization
     let ecosystem_name = normalize_name(&config.name);
     ui::info(format!(
@@ -319,7 +322,7 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
     ui::info("Importing ecosystem state through backend...")?;
     import_ecosystem_state(
         &state_manager,
-        &temp_path,
+        &workspace_path,
         &ecosystem_name,
         &config.chain_name,
     )
@@ -374,7 +377,15 @@ pub async fn run(args: &InitArgs, context: &Context) -> Result<()> {
         config.name
     ))?;
 
-    // TempDir is automatically cleaned up when dropped
+    // Clean up workspace directory
+    if let Err(e) = tokio::fs::remove_dir_all(&workspace_dir).await {
+        context.logger().warning(&format!(
+            "Failed to clean up workspace directory '{}': {}",
+            workspace_dir.display(),
+            e
+        ));
+    }
+
     Ok(())
 }
 
